@@ -15,21 +15,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Win32Application.h">
+    <ClInclude Include="WindowWin32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WindowWin32.h">
+    <ClInclude Include="ApplicationWin32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Win32Application.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="WindowWin32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ApplicationWin32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

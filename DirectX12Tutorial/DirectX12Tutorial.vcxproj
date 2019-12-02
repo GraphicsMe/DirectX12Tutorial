@@ -115,12 +115,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Win32Application.h" />
+    <ClInclude Include="ApplicationWin32.h" />
     <ClInclude Include="WindowWin32.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Win32Application.cpp" />
+    <ClCompile Include="ApplicationWin32.cpp" />
     <ClCompile Include="WindowWin32.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
