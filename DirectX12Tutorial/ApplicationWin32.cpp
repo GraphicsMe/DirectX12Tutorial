@@ -1,4 +1,5 @@
 #include "ApplicationWin32.h"
+#include "D3D12RHI.h"
 #include <iostream>
 
 
@@ -17,6 +18,7 @@ ApplicationWin32::~ApplicationWin32()
 void ApplicationWin32::Run()
 {
 	m_window = new WindowWin32(m_windowDesc);
+	m_rhi = new D3D12RHI(m_window);
 
 	this->OnStartup();
 
@@ -41,7 +43,7 @@ void ApplicationWin32::OnStartup()
 
 void ApplicationWin32::OnUpdate()
 {
-	
+	m_rhi->Render();
 }
 
 void ApplicationWin32::OnShutdown()

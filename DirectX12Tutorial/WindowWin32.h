@@ -20,6 +20,10 @@ public:
 	~WindowWin32();
 
 	bool IsClosed() const;
+	int GetWidth() const { return m_windowDesc.Width; }
+	int GetHeight() const { return m_windowDesc.Height; }
+	HWND GetWindowHandle() const { return m_hwnd; }
+
 
 private:
 	static LRESULT WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -28,5 +32,6 @@ private:
 private:
 	HWND m_hwnd;
 	bool m_bIsClosed;
+	WindowDesc m_windowDesc;
 };
 

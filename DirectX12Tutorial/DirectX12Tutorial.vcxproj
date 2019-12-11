@@ -116,11 +116,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="ApplicationWin32.h" />
+    <ClInclude Include="Camera.h" />
+    <ClInclude Include="Common.h" />
+    <ClInclude Include="D3D12RHI.h" />
+    <ClInclude Include="MathLib.h" />
     <ClInclude Include="WindowWin32.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Common.cpp" />
+    <ClCompile Include="D3D12RHI.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ApplicationWin32.cpp" />
+    <ClCompile Include="MathLib.cpp" />
     <ClCompile Include="WindowWin32.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

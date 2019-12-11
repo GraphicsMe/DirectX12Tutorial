@@ -1,5 +1,7 @@
 #include <Windows.h>
 #include <iostream>
+#include <algorithm>
+
 #include "WindowWin32.h"
 
 
@@ -8,6 +10,7 @@ const TCHAR WindowWin32::AppWindowClass[] = L"DirectX12TutorialWindow";
 WindowWin32::WindowWin32(const WindowDesc& Desc)
 	: m_hwnd(nullptr)
 	, m_bIsClosed(false)
+	, m_windowDesc(Desc)
 {
 	HINSTANCE InstanceHandle = GetModuleHandle(nullptr);
 	WNDCLASSEX wc = {};
@@ -15,6 +18,11 @@ WindowWin32::WindowWin32(const WindowDesc& Desc)
 	wc.lpfnWndProc = WindowProc;
 	wc.hInstance = InstanceHandle;
 	wc.lpszClassName = AppWindowClass;
+
+	int screenWidth = ::GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = ::GetSystemMetrics(SM_CYSCREEN);
+	int windowX = std::max<int>(0, (screenWidth - Desc.Width) / 2);
+	int windowY = std::max<int>(0, (screenHeight - Desc.Height) / 2);
 
 	RegisterClassEx(&wc);
 
@@ -26,7 +34,7 @@ WindowWin32::WindowWin32(const WindowDesc& Desc)
 		AppWindowClass,  // Window class
 		Desc.Caption.c_str(),  // Window title
 		WS_OVERLAPPEDWINDOW,  // Window style
-		CW_USEDEFAULT, CW_USEDEFAULT, Desc.Width, Desc.Height,  // Position and Size
+		windowX, windowY, Desc.Width, Desc.Height,  // Position and Size
 		NULL,  // Parent window    
 		NULL,  // Menu
 		InstanceHandle,  // Instance handle
