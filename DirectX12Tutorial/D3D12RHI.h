@@ -25,7 +25,7 @@ private:
 	ComPtr<ID3D12Device> CreateDevice(ComPtr<IDXGIAdapter1> adapter);
 	ComPtr<ID3D12CommandQueue> CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type);
 	ComPtr<IDXGISwapChain3> CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, int width, int height, int bufferCount);
-	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors);
+	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag, uint32_t numDescriptors);
 	void UpdateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 	ComPtr<ID3D12GraphicsCommandList> CreateCommandList(D3D12_COMMAND_LIST_TYPE type, ComPtr<ID3D12CommandAllocator> commandAllocator);
 	
@@ -55,7 +55,7 @@ protected:
 		FMatrix projectionMatrix;
 		FMatrix modelMatrix;
 		FMatrix viewMatrix;
-	} uboVS;
+	} m_uboVS;
 
 private:
 	ComPtr<ID3D12Device> m_device;

@@ -147,13 +147,13 @@ ComPtr<IDXGISwapChain3> D3D12RHI::CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory
 	return swapchain3;
 }
 
-ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t numDescriptors)
+ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag, uint32_t numDescriptors)
 {
 	// create render target view
 	D3D12_DESCRIPTOR_HEAP_DESC Desc = {};
 	Desc.NumDescriptors = numDescriptors;
 	Desc.Type = type;
-	Desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	Desc.Flags = flag;
 
 	ComPtr<ID3D12DescriptorHeap> descriptorHeap;
 	ThrowIfFailed(m_device->CreateDescriptorHeap(&Desc, IID_PPV_ARGS(&descriptorHeap)));
@@ -217,7 +217,7 @@ bool D3D12RHI::Initialize(WindowWin32* Window)
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_renderTargetViewHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, backBufferCount);
+	m_renderTargetViewHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, backBufferCount);
 	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	UpdateRenderTargetViews(m_swapChain, m_renderTargetViewHeap);
@@ -418,17 +418,11 @@ void D3D12RHI::SetupUniformBuffer()
 	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 	heapProps.CreationNodeMask = 1;
 	heapProps.VisibleNodeMask = 1;
-
-	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-	heapDesc.NumDescriptors = 1;
-	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_uniformBufferHeap)));
-
+	
 	D3D12_RESOURCE_DESC uboResourceDesc;
 	uboResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	uboResourceDesc.Alignment = 0;
-	uboResourceDesc.Width = (sizeof(uboVS) + 255) & ~255;
+	uboResourceDesc.Width = (sizeof(m_uboVS) + 255) & ~255;
 	uboResourceDesc.Height = 1;
 	uboResourceDesc.DepthOrArraySize = 1;
 	uboResourceDesc.MipLevels = 1;
@@ -445,11 +439,13 @@ void D3D12RHI::SetupUniformBuffer()
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&m_uniformBuffer)));
+
+	m_uniformBufferHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
 	m_uniformBufferHeap->SetName(L"Constant Buffer Upload Resource Heap");
 
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = m_uniformBuffer->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = (sizeof(uboVS) + 255) & ~255;    // CB size is required to be 256-byte aligned.
+	cbvDesc.SizeInBytes = (sizeof(m_uboVS) + 255) & ~255;    // CB size is required to be 256-byte aligned.
 
 	D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle(m_uniformBufferHeap->GetCPUDescriptorHandleForHeapStart());
 	cbvHandle.ptr = cbvHandle.ptr + m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 0;
@@ -462,7 +458,7 @@ void D3D12RHI::SetupUniformBuffer()
 	readRange.End = 0;
 
 	ThrowIfFailed(m_uniformBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
-	memcpy(m_mappedUniformBuffer, &uboVS, sizeof(uboVS));
+	memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
 	m_uniformBuffer->Unmap(0, &readRange);
 }
 
@@ -627,16 +623,16 @@ void D3D12RHI::Render()
 	// Update Uniforms
 	m_elapsedTime += 0.001f * time;
 	m_elapsedTime = fmodf(m_elapsedTime, 6.283185307179586f);
-	uboVS.modelMatrix = FMatrix::RotateY(m_elapsedTime);
+	m_uboVS.modelMatrix = FMatrix::RotateY(m_elapsedTime);
 
 	FCamera camera(Vector3f(0.f, 0.f, -3.5f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
-	uboVS.viewMatrix = camera.GetViewMatrix();
+	m_uboVS.viewMatrix = camera.GetViewMatrix();
 
 	const float FovVertical = MATH_PI / 4.f;
-	uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, m_viewport.Width / m_viewport.Height, 0.01f, 1000);
+	m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, m_viewport.Width / m_viewport.Height, 0.01f, 1000);
 
 	ThrowIfFailed(m_uniformBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
-	memcpy(m_mappedUniformBuffer, &uboVS, sizeof(uboVS));
+	memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
 	m_uniformBuffer->Unmap(0, nullptr);
 
 	FillCommandLists();
