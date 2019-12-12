@@ -7,10 +7,10 @@
 
 const TCHAR WindowWin32::AppWindowClass[] = L"DirectX12TutorialWindow";
 
-WindowWin32::WindowWin32(const WindowDesc& Desc)
+WindowWin32::WindowWin32(const GameDesc& Desc)
 	: m_hwnd(nullptr)
 	, m_bIsClosed(false)
-	, m_windowDesc(Desc)
+	, m_GameDesc(Desc)
 {
 	HINSTANCE InstanceHandle = GetModuleHandle(nullptr);
 	WNDCLASSEX wc = {};
@@ -49,7 +49,7 @@ WindowWin32::WindowWin32(const WindowDesc& Desc)
 
 WindowWin32::~WindowWin32()
 {
-
+	::DestroyWindow(m_hwnd);
 }
 
 bool WindowWin32::IsClosed() const

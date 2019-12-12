@@ -1,11 +1,12 @@
 #include "ApplicationWin32.h"
+#include "Game.h"
 
 
 int main()
 {
-	WindowDesc Desc;
+	GameDesc Desc;
 	Desc.Caption = L"Tutorial 1 - Create A Window";
-	ApplicationWin32 App(Desc);
-	App.Run();
+	Game tutorial(Desc);
+	ApplicationWin32::Get().Run(&tutorial);
 	return 0;
 }

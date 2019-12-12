@@ -2,13 +2,8 @@
 
 #include <string>
 #include <Windows.h>
+#include "Game.h"
 
-struct WindowDesc
-{
-	std::wstring Caption = L"The Practice of Direct3D 12 Programming";
-	int Width = 1024;
-	int Height = 768;
-};
 
 class WindowWin32
 {
@@ -16,12 +11,12 @@ public:
 	static const TCHAR AppWindowClass[];
 
 public:
-	WindowWin32(const WindowDesc& Desc);
+	WindowWin32(const GameDesc& Desc);
 	~WindowWin32();
 
 	bool IsClosed() const;
-	int GetWidth() const { return m_windowDesc.Width; }
-	int GetHeight() const { return m_windowDesc.Height; }
+	int GetWidth() const { return m_GameDesc.Width; }
+	int GetHeight() const { return m_GameDesc.Height; }
 	HWND GetWindowHandle() const { return m_hwnd; }
 
 
@@ -32,6 +27,6 @@ private:
 private:
 	HWND m_hwnd;
 	bool m_bIsClosed;
-	WindowDesc m_windowDesc;
+	GameDesc m_GameDesc;
 };
 

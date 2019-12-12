@@ -23,6 +23,7 @@
     <ProjectGuid>{2B161A44-B3A5-4AAA-848D-E2D148CE27E7}</ProjectGuid>
     <RootNamespace>DirectX12Tutorial</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <ProjectName>DirectX12Lib</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -39,7 +40,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
@@ -117,16 +118,19 @@
   <ItemGroup>
     <ClInclude Include="ApplicationWin32.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="D3D12RHI.h" />
+    <ClInclude Include="Game.h" />
     <ClInclude Include="MathLib.h" />
     <ClInclude Include="WindowWin32.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="Common.cpp" />
     <ClCompile Include="D3D12RHI.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Game.cpp" />
     <ClCompile Include="ApplicationWin32.cpp" />
     <ClCompile Include="MathLib.cpp" />
     <ClCompile Include="WindowWin32.cpp" />

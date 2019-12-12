@@ -1,26 +1,33 @@
 #include "ApplicationWin32.h"
+#include "Game.h"
 #include "D3D12RHI.h"
 #include <iostream>
 
 
-ApplicationWin32::ApplicationWin32(const WindowDesc& Desc)
-	: m_windowDesc(Desc)
+ApplicationWin32::ApplicationWin32()
 {
-	
 }
 
 ApplicationWin32::~ApplicationWin32()
 {
+	delete m_rhi;
 	delete m_window;
 	std::cout << "~Win32Application" << std::endl;
 }
 
-void ApplicationWin32::Run()
+ApplicationWin32& ApplicationWin32::ApplicationWin32::Get()
 {
-	m_window = new WindowWin32(m_windowDesc);
+	static ApplicationWin32 Singleton;
+	return Singleton;
+}
+
+void ApplicationWin32::Run(Game* game)
+{
+	Assert(game != nullptr);
+	m_window = new WindowWin32(game->GetDesc());
 	m_rhi = new D3D12RHI(m_window);
 
-	this->OnStartup();
+	game->OnStartup();
 
 	while (!m_window->IsClosed())
 	{
@@ -31,22 +38,12 @@ void ApplicationWin32::Run()
 			::DispatchMessage(&msg);
 		}
 
-		this->OnUpdate();
+		game->OnUpdate();
 	}
-	this->OnShutdown();
+	game->OnShutdown();
 }
 
-void ApplicationWin32::OnStartup()
-{
-	std::cout << "OnStartup" << std::endl;
-}
-
-void ApplicationWin32::OnUpdate()
+void ApplicationWin32::Render()
 {
 	m_rhi->Render();
-}
-
-void ApplicationWin32::OnShutdown()
-{
-	std::cout << "OnShutdown" << std::endl;
 }

@@ -1,0 +1,27 @@
+#pragma once
+
+#include <string>
+
+struct GameDesc
+{
+	std::wstring Caption = L"The Practice of Direct3D 12 Programming";
+	int Width = 1024;
+	int Height = 768;
+};
+
+class Game
+{
+public:
+	Game(const GameDesc& Desc);
+	virtual ~Game();
+
+	const GameDesc& GetDesc() const { return m_GameDesc; }
+
+	virtual void OnStartup();
+	virtual void OnUpdate();
+	virtual void OnShutdown();
+
+private:
+	GameDesc m_GameDesc;
+};
+

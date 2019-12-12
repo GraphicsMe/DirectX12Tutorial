@@ -2,23 +2,24 @@
 #include "WindowWin32.h"
 
 
+class Game;
 class D3D12RHI;
 
 class ApplicationWin32
 {
 public:
-	ApplicationWin32(const WindowDesc& Desc);
 	virtual ~ApplicationWin32();
 
-	void Run();
+	static ApplicationWin32& Get();
 
-	virtual void OnStartup();
-	virtual void OnUpdate();
-	virtual void OnShutdown();
+	void Run(Game* game);
+	void Render();
+
+private:
+	ApplicationWin32();
 
 private:
 	D3D12RHI* m_rhi;
 	WindowWin32* m_window;
-	WindowDesc m_windowDesc;
 };
 

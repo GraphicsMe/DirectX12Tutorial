@@ -1,14 +1,17 @@
 #include <chrono>
 #include <iostream>
 #include <D3Dcompiler.h>
+#include <dxgidebug.h>
 
 #include "D3D12RHI.h"
 #include "Common.h"
 #include "WindowWin32.h"
 #include "Camera.h"
+#include "CommandQueue.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
 using namespace std;
@@ -25,17 +28,19 @@ D3D12RHI::D3D12RHI(WindowWin32* Window)
 
 D3D12RHI::~D3D12RHI()
 {
-	//if (mSwapchain != nullptr)
-	//{
-	//	mSwapchain->SetFullscreenState(false, nullptr);
-	//	mSwapchain->Release();
-	//	mSwapchain = nullptr;
-	//}
+	if (m_commandQueue)
+	{
+		delete m_commandQueue;
+		m_commandQueue = nullptr;
+	}
 
-	//destroyCommands();
-	//destroyFrameBuffer();
-	//destroyResources();
-	//destroyAPI();
+//#ifdef _DEBUG
+//	ComPtr<IDXGIDebug1> dxgiDebug;
+//	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
+//	{
+//		dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+//	}
+//#endif
 }
 
 ComPtr<IDXGIFactory4> D3D12RHI::CreateDXGIFactory()
@@ -113,19 +118,6 @@ ComPtr<ID3D12Device> D3D12RHI::CreateDevice(ComPtr<IDXGIAdapter1> adapter)
 	return device;
 }
 
-ComPtr<ID3D12CommandQueue> D3D12RHI::CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type)
-{
-	D3D12_COMMAND_QUEUE_DESC Desc = {};
-	Desc.Type = type;
-	Desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	Desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	Desc.NodeMask = 0;
-
-	ComPtr<ID3D12CommandQueue> commandQueue;
-	ThrowIfFailed(m_device->CreateCommandQueue(&Desc, IID_PPV_ARGS(&commandQueue)));
-	return commandQueue;
-}
-
 ComPtr<IDXGISwapChain3> D3D12RHI::CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, int width, int height, int bufferCount)
 {
 	DXGI_SWAP_CHAIN_DESC1 Desc = {};
@@ -140,7 +132,7 @@ ComPtr<IDXGISwapChain3> D3D12RHI::CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory
 	Desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	Desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	ComPtr<IDXGISwapChain1> swapchain1;
-	ThrowIfFailed(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), hwnd, &Desc, nullptr, nullptr, &swapchain1));
+	ThrowIfFailed(factory->CreateSwapChainForHwnd(m_commandQueue->GetD3D12CommandQueue().Get(), hwnd, &Desc, nullptr, nullptr, &swapchain1));
 
 	ComPtr<IDXGISwapChain3> swapchain3;
 	ThrowIfFailed(swapchain1.As(&swapchain3));
@@ -176,26 +168,6 @@ void D3D12RHI::UpdateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr
 	}
 }
 
-ComPtr<ID3D12GraphicsCommandList> D3D12RHI::CreateCommandList(D3D12_COMMAND_LIST_TYPE type, ComPtr<ID3D12CommandAllocator> commandAllocator)
-{
-	ComPtr<ID3D12GraphicsCommandList> commandList;
-	ThrowIfFailed(m_device->CreateCommandList(0, type, commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&commandList)));
-	commandList->SetName(L"My Command List");
-	ThrowIfFailed(commandList->Close());
-	return commandList;
-}
-
-HANDLE D3D12RHI::CreateEventHandle()
-{
-    HANDLE fenceEvent;
-     
-    fenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-    Assert(fenceEvent && "Failed to create fence event.");
- 
-    return fenceEvent;
-}
-
-
 bool D3D12RHI::Initialize(WindowWin32* Window)
 {
 	int width = Window->GetWidth();
@@ -208,7 +180,8 @@ bool D3D12RHI::Initialize(WindowWin32* Window)
 	m_device = CreateDevice(dxgiAdapter);
 
 	// 2. create command queue
-	m_commandQueue = CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	//m_commandQueue = CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	m_commandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	
 	// 3. create swap chain
 	m_swapChain = CreateSwapChain(Window->GetWindowHandle(), dxgiFactory, width, height, backBufferCount);
@@ -224,13 +197,6 @@ bool D3D12RHI::Initialize(WindowWin32* Window)
 
 	// Create Command Allocator
 	ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
-
-	m_commandList = CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator);
-
-	// Create fence
-	ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-	m_fenceValue = 1;
-	m_fenceEvent = CreateEventHandle();
 
 	m_rootSignature = CreateRootSignature();
 
@@ -558,42 +524,44 @@ void D3D12RHI::SetupPiplineState()
 	}
 }
 
-void D3D12RHI::FillCommandLists()
+void D3D12RHI::FillCommandLists(ComPtr<ID3D12GraphicsCommandList> commandList)
 {
-	ThrowIfFailed(m_commandAllocator->Reset());
+	//ThrowIfFailed(m_commandAllocator->Reset());
 
-	ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+	//ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+
+	commandList->SetPipelineState(m_pipelineState.Get());
 
 	// Set necessary state.
-	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-	m_commandList->RSSetViewports(1, &m_viewport);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
+	commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	commandList->RSSetViewports(1, &m_viewport);
+	commandList->RSSetScissorRects(1, &m_scissorRect);
 
 	ID3D12DescriptorHeap *pDescriptorHeaps[] = { m_uniformBufferHeap.Get() };
-	m_commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
+	commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
-	m_commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
+	commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
 
 	// Indicate that the back buffer will be used as a render target.
-	SetResourceBarrier(m_commandList, m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	SetResourceBarrier(commandList, m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_renderTargetViewHeap->GetCPUDescriptorHandleForHeapStart());
 	rtvHandle.ptr = rtvHandle.ptr + (m_frameIndex * m_rtvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
 	// Record commands.
 	const float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-	m_commandList->IASetIndexBuffer(&m_indexBufferView);
+	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	commandList->IASetIndexBuffer(&m_indexBufferView);
 
-	m_commandList->DrawInstanced(3, 1, 0, 0);
+	commandList->DrawInstanced(3, 1, 0, 0);
 
-	SetResourceBarrier(m_commandList, m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	SetResourceBarrier(commandList, m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
-	ThrowIfFailed(m_commandList->Close());
+	//ThrowIfFailed(commandList->Close());
 }
 
 void D3D12RHI::SetResourceBarrier(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource> resource, 
@@ -635,36 +603,13 @@ void D3D12RHI::Render()
 	memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
 	m_uniformBuffer->Unmap(0, nullptr);
 
-	FillCommandLists();
+	ComPtr<ID3D12GraphicsCommandList> commandList = m_commandQueue->GetCommandList();
 
-	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	FillCommandLists(commandList);
+	m_commandQueue->ExecuteCommandList(commandList);
 	m_swapChain->Present(1, 0);
 
-	Flush(m_commandQueue, m_fence, m_fenceValue, m_fenceEvent);
+	//m_myCommandQueue->Flush();
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-}
-
-uint64_t D3D12RHI::Signal(ComPtr<ID3D12CommandQueue> commandQueue, ComPtr<ID3D12Fence> fence, uint64_t& fenceValue)
-{
-    uint64_t fenceValueForSignal = fenceValue++;
-    ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValueForSignal));
- 
-    return fenceValueForSignal;
-}
-
-void D3D12RHI::WaitForFenceValue(ComPtr<ID3D12Fence> fence, uint64_t fenceValue, HANDLE fenceEvent )
-{
-    if (fence->GetCompletedValue() < fenceValue)
-    {
-        ThrowIfFailed(fence->SetEventOnCompletion(fenceValue, fenceEvent));
-        ::WaitForSingleObject(fenceEvent, INFINITE);
-    }
-}
-
-void D3D12RHI::Flush(ComPtr<ID3D12CommandQueue> commandQueue, ComPtr<ID3D12Fence> fence, uint64_t& fenceValue, HANDLE fenceEvent )
-{
-    uint64_t fenceValueForSignal = Signal(commandQueue, fence, fenceValue);
-    WaitForFenceValue(fence, fenceValueForSignal, fenceEvent);
 }
