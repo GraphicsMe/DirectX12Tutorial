@@ -124,6 +124,7 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="MathLib.h" />
+    <ClInclude Include="RenderWindow.h" />
     <ClInclude Include="WindowWin32.h" />
   </ItemGroup>
   <ItemGroup>
@@ -134,6 +135,7 @@
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="ApplicationWin32.cpp" />
     <ClCompile Include="MathLib.cpp" />
+    <ClCompile Include="RenderWindow.cpp" />
     <ClCompile Include="WindowWin32.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

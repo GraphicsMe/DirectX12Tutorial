@@ -10,14 +10,21 @@ class WindowWin32
 public:
 	static const TCHAR AppWindowClass[];
 
+private:
+	WindowWin32();
+
 public:
-	WindowWin32(const GameDesc& Desc);
+	bool Initialize(const GameDesc& Desc);
 	~WindowWin32();
+
+	static WindowWin32& Get();
+	void Destroy();
 
 	bool IsClosed() const;
 	int GetWidth() const { return m_GameDesc.Width; }
 	int GetHeight() const { return m_GameDesc.Height; }
 	HWND GetWindowHandle() const { return m_hwnd; }
+	void Show();
 
 
 private:

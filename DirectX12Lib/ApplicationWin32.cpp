@@ -4,15 +4,17 @@
 #include <iostream>
 
 
-ApplicationWin32::ApplicationWin32()
+bool ApplicationWin32::Initialize(Game* game)
 {
+	WindowWin32::Get().Initialize(game->GetDesc());
+	D3D12RHI::Get().Initialize();
+	return true;
 }
 
 ApplicationWin32::~ApplicationWin32()
 {
-	delete m_rhi;
-	delete m_window;
-	std::cout << "~Win32Application" << std::endl;
+	D3D12RHI::Get().Destroy();
+	WindowWin32::Get().Destroy();
 }
 
 ApplicationWin32& ApplicationWin32::ApplicationWin32::Get()
@@ -24,13 +26,19 @@ ApplicationWin32& ApplicationWin32::ApplicationWin32::Get()
 void ApplicationWin32::Run(Game* game)
 {
 	Assert(game != nullptr);
-	m_window = new WindowWin32(game->GetDesc());
-	m_rhi = new D3D12RHI(m_window);
+
+	if (!Initialize(game))
+	{
+		return;
+	}
 
 	game->OnStartup();
 	game->LoadContent();
 
-	while (!m_window->IsClosed())
+	WindowWin32& Window = WindowWin32::Get();
+	Window.Show();
+
+	while (!Window.IsClosed())
 	{
 		MSG msg = {};
 		while(::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))

@@ -7,11 +7,36 @@
 
 const TCHAR WindowWin32::AppWindowClass[] = L"DirectX12TutorialWindow";
 
-WindowWin32::WindowWin32(const GameDesc& Desc)
+WindowWin32::WindowWin32()
 	: m_hwnd(nullptr)
 	, m_bIsClosed(false)
-	, m_GameDesc(Desc)
 {
+}
+
+WindowWin32& WindowWin32::Get()
+{
+	static WindowWin32 Singleton;
+	return Singleton;
+}
+
+void WindowWin32::Destroy()
+{
+	if (m_hwnd)
+	{
+		::DestroyWindow(m_hwnd);
+		m_hwnd = nullptr;
+	}
+}
+
+WindowWin32::~WindowWin32()
+{
+	Destroy();
+}
+
+bool WindowWin32::Initialize(const GameDesc& Desc)
+{
+	m_GameDesc = Desc;
+
 	HINSTANCE InstanceHandle = GetModuleHandle(nullptr);
 	WNDCLASSEX wc = {};
 	wc.cbSize = sizeof(wc);
@@ -42,19 +67,17 @@ WindowWin32::WindowWin32(const GameDesc& Desc)
 	);
 
 	::SetWindowLongPtr(m_hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
-
-	::ShowWindow(m_hwnd, SW_SHOWNORMAL);
-}
-
-
-WindowWin32::~WindowWin32()
-{
-	::DestroyWindow(m_hwnd);
+	return true;
 }
 
 bool WindowWin32::IsClosed() const
 {
 	return m_bIsClosed;
+}
+
+void WindowWin32::Show()
+{
+	::ShowWindow(m_hwnd, SW_SHOWNORMAL);
 }
 
 LRESULT WindowWin32::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

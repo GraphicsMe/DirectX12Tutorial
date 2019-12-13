@@ -14,9 +14,16 @@ class WindowWin32;
 class CommandQueue;
 class D3D12RHI
 {
+private:
+	D3D12RHI() = default;
 public:
-	D3D12RHI(WindowWin32* Window);
-	virtual ~D3D12RHI();
+	~D3D12RHI() = default;
+
+	static D3D12RHI& Get();
+
+public:
+	bool Initialize();
+	void Destroy();
 
 	CommandQueue* GetCommandQueue() { return m_commandQueue; }
 	ComPtr<ID3D12Device> GetD3D12Device() { return m_device; }
@@ -32,14 +39,13 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetView();
 
 private:
-	bool Initialize(WindowWin32* Window);
 
 	ComPtr<IDXGIFactory4> CreateDXGIFactory();
 	ComPtr<IDXGIAdapter1> GetAdapter(ComPtr<IDXGIFactory4> factory);
 	ComPtr<ID3D12Device> CreateDevice(ComPtr<IDXGIAdapter1> adapter);
 	ComPtr<IDXGISwapChain3> CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, int width, int height, int bufferCount);
 	
-	void UpdateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap);
+	void CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 	
 private:
 	ComPtr<ID3D12Device> m_device;

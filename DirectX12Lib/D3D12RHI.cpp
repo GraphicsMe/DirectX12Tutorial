@@ -18,28 +18,6 @@
 using namespace std;
 //using namespace std::chrono;
 
-D3D12RHI::D3D12RHI(WindowWin32* Window)
-{
-	Initialize(Window);
-}
-
-
-D3D12RHI::~D3D12RHI()
-{
-	if (m_commandQueue)
-	{
-		delete m_commandQueue;
-		m_commandQueue = nullptr;
-	}
-
-//#ifdef _DEBUG
-//	ComPtr<IDXGIDebug1> dxgiDebug;
-//	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
-//	{
-//		dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-//	}
-//#endif
-}
 
 ComPtr<IDXGIFactory4> D3D12RHI::CreateDXGIFactory()
 {
@@ -151,7 +129,7 @@ ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEA
 	return descriptorHeap;
 }
 
-void D3D12RHI::UpdateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap)
+void D3D12RHI::CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap)
 {
 	// create frame resource
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart());
@@ -166,11 +144,14 @@ void D3D12RHI::UpdateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr
 	}
 }
 
-bool D3D12RHI::Initialize(WindowWin32* Window)
+D3D12RHI& D3D12RHI::Get()
 {
-	int width = Window->GetWidth();
-	int height = Window->GetHeight();
+	static D3D12RHI Singleton;
+	return Singleton;
+}
 
+bool D3D12RHI::Initialize()
+{
 	ComPtr<IDXGIFactory4> dxgiFactory = CreateDXGIFactory();
 	ComPtr<IDXGIAdapter1> dxgiAdapter = GetAdapter(dxgiFactory);
 	
@@ -182,19 +163,26 @@ bool D3D12RHI::Initialize(WindowWin32* Window)
 	m_commandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	
 	// 3. create swap chain
-	m_swapChain = CreateSwapChain(Window->GetWindowHandle(), dxgiFactory, width, height, backBufferCount);
+	WindowWin32& Window = WindowWin32::Get();
+	m_swapChain = CreateSwapChain(Window.GetWindowHandle(), dxgiFactory, Window.GetWidth(), Window.GetHeight(), backBufferCount);
 	
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
 	m_renderTargetViewHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, backBufferCount);
 	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	UpdateRenderTargetViews(m_swapChain, m_renderTargetViewHeap);
+	CreateRenderTargetViews(m_swapChain, m_renderTargetViewHeap);
 
-	// Create Command Allocator
-	//ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
-	
 	return true;
+}
+
+void D3D12RHI::Destroy()
+{
+	if (m_commandQueue)
+	{
+		delete m_commandQueue;
+		m_commandQueue = nullptr;
+	}
 }
 
 UINT D3D12RHI::Present()

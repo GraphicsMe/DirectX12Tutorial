@@ -22,15 +22,14 @@ public:
 
 	~Tutorial2() 
 	{
-		m_rhi->GetCommandQueue()->Flush();
+		D3D12RHI::Get().GetCommandQueue()->Flush();
 	}
 
 	void LoadContent()
 	{
-		m_rhi = ApplicationWin32::Get().GetRHI();
-		m_device = m_rhi->GetD3D12Device();
+		m_device = D3D12RHI::Get().GetD3D12Device();
 
-		m_rootSignature = ApplicationWin32::Get().GetRHI()->CreateRootSignature();
+		m_rootSignature = D3D12RHI::Get().CreateRootSignature();
 
 		SetupVertexBuffer();
 		SetupIndexBuffer();
@@ -46,7 +45,8 @@ public:
 	
 	void OnRender()
 	{
-		CommandQueue* commandQueue = m_rhi->GetCommandQueue();
+		D3D12RHI& RHI = D3D12RHI::Get();
+		CommandQueue* commandQueue = RHI.GetCommandQueue();
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
@@ -76,7 +76,7 @@ public:
 		FillCommandLists(commandList);
 		commandQueue->ExecuteCommandList(commandList);
 		
-		m_rhi->Present();
+		RHI.Present();
 
 		//commandQueue->Flush();
 	}
@@ -187,9 +187,9 @@ private:
 
 	void SetupShaders()
 	{
-		m_vertexShader = ApplicationWin32::Get().GetRHI()->CreateShader(L"../Resources/triangle.vert", "main", "vs_5_0");
+		m_vertexShader = D3D12RHI::Get().CreateShader(L"../Resources/triangle.vert", "main", "vs_5_0");
 
-		m_pixelShader = ApplicationWin32::Get().GetRHI()->CreateShader(L"../Resources/triangle.frag", "main", "ps_5_0");
+		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/triangle.frag", "main", "ps_5_0");
 	}
 
 	void SetupPiplineState()
@@ -249,6 +249,7 @@ private:
 
 	void FillCommandLists(ComPtr<ID3D12GraphicsCommandList> commandList)
 	{
+		D3D12RHI& RHI = D3D12RHI::Get();
 		commandList->SetPipelineState(m_pipelineState.Get());
 
 		// Set necessary state.
@@ -262,11 +263,11 @@ private:
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
 		commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
 
-		auto BackBuffer = m_rhi->GetBackBuffer();
+		auto BackBuffer = RHI.GetBackBuffer();
 		// Indicate that the back buffer will be used as a render target.
-		m_rhi->SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rhi->GetCurrentRenderTargetView();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = RHI.GetCurrentRenderTargetView();
 
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
@@ -279,7 +280,7 @@ private:
 
 		commandList->DrawInstanced(3, 1, 0, 0);
 
-		m_rhi->SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 		//ThrowIfFailed(commandList->Close());
 	}
@@ -314,7 +315,7 @@ private:
 			nullptr,
 			IID_PPV_ARGS(&m_uniformBuffer)));
 
-		m_uniformBufferHeap = m_rhi->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
+		m_uniformBufferHeap = D3D12RHI::Get().CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
 		m_uniformBufferHeap->SetName(L"Constant Buffer Upload Resource Heap");
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
@@ -348,7 +349,6 @@ private:
 	D3D12_RECT m_scissorRect;
 
 	ComPtr<ID3D12Device> m_device;
-	D3D12RHI* m_rhi;
 
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 	ComPtr<ID3D12PipelineState> m_pipelineState;
