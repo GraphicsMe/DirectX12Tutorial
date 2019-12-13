@@ -18,7 +18,9 @@ public:
 	const GameDesc& GetDesc() const { return m_GameDesc; }
 
 	virtual void OnStartup();
+	virtual void LoadContent();
 	virtual void OnUpdate();
+	virtual void OnRender();
 	virtual void OnShutdown();
 
 private:

@@ -13,7 +13,8 @@ public:
 	static ApplicationWin32& Get();
 
 	void Run(Game* game);
-	void Render();
+
+	D3D12RHI* GetRHI() { return m_rhi; }
 
 private:
 	ApplicationWin32();

@@ -121,6 +121,7 @@
     <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="D3D12RHI.h" />
+    <ClInclude Include="d3dx12.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="MathLib.h" />
     <ClInclude Include="WindowWin32.h" />

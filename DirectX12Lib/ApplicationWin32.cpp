@@ -28,6 +28,7 @@ void ApplicationWin32::Run(Game* game)
 	m_rhi = new D3D12RHI(m_window);
 
 	game->OnStartup();
+	game->LoadContent();
 
 	while (!m_window->IsClosed())
 	{
@@ -39,11 +40,7 @@ void ApplicationWin32::Run(Game* game)
 		}
 
 		game->OnUpdate();
+		game->OnRender();
 	}
 	game->OnShutdown();
-}
-
-void ApplicationWin32::Render()
-{
-	m_rhi->Render();
 }

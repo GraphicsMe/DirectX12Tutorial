@@ -116,7 +116,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="tutorial2.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DirectX12Lib\DirectX12Lib.vcxproj">

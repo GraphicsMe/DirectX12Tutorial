@@ -17,9 +17,16 @@ void Game::OnStartup()
 	std::cout << "OnStartup" << std::endl;
 }
 
+void Game::LoadContent()
+{
+}
+
 void Game::OnUpdate()
 {
-	ApplicationWin32::Get().Render();
+}
+
+void Game::OnRender()
+{
 }
 
 void Game::OnShutdown()
