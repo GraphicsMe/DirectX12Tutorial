@@ -12,7 +12,7 @@ private:
 	RenderWindow() = default;
 public:
 	static RenderWindow& Get();
-	void Initialize();
+	void Initialize(ComPtr<ID3D12CommandQueue>);
 	~RenderWindow();
 
 	// swap chain & present

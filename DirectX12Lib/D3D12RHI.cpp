@@ -9,6 +9,7 @@
 #include "WindowWin32.h"
 #include "Camera.h"
 #include "CommandQueue.h"
+#include "RenderWindow.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -126,21 +127,26 @@ bool D3D12RHI::Initialize()
 	m_device = CreateDevice(dxgiAdapter);
 
 	// 2. create command queue
-	m_commandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-	
-	// 3. create render window(swapchain)
+	m_copyCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COPY);
+	m_directCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-	
+	// 3. create render window(swapchain)
+	RenderWindow::Get().Initialize(m_directCommandQueue->GetD3D12CommandQueue());
 
 	return true;
 }
 
 void D3D12RHI::Destroy()
 {
-	if (m_commandQueue)
+	if (m_copyCommandQueue)
 	{
-		delete m_commandQueue;
-		m_commandQueue = nullptr;
+		delete m_copyCommandQueue;
+		m_copyCommandQueue = nullptr;
+	}
+	if (m_directCommandQueue)
+	{
+		delete m_directCommandQueue;
+		m_directCommandQueue = nullptr;
 	}
 }
 
@@ -195,9 +201,17 @@ ComPtr<ID3D12RootSignature> D3D12RHI::CreateRootSignature()
 	return RootSignature;
 }
 
-Microsoft::WRL::ComPtr<ID3D12CommandQueue> D3D12RHI::GetD3D12CommandQueue() const
+CommandQueue* D3D12RHI::GetCommandQueue(D3D12_COMMAND_LIST_TYPE type)
 {
-	return m_commandQueue->GetD3D12CommandQueue();
+	switch(type)
+	{
+	case D3D12_COMMAND_LIST_TYPE_COPY:
+		return m_copyCommandQueue;
+	case D3D12_COMMAND_LIST_TYPE_DIRECT:
+		return m_directCommandQueue;
+	default:
+		return nullptr;
+	}
 }
 
 ComPtr<ID3DBlob> D3D12RHI::CreateShader(const std::wstring& ShaderFile, const std::string& EntryPoint, const std::string& TargetModel)

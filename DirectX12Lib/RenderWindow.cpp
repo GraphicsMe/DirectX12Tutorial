@@ -1,10 +1,8 @@
 #include "RenderWindow.h"
 #include "D3D12RHI.h"
 #include "WindowWin32.h"
-#include "CommandQueue.h"
-
 #include "d3dx12.h"
-
+#include "CommandQueue.h"
 
 RenderWindow& RenderWindow::Get()
 {
@@ -12,11 +10,11 @@ RenderWindow& RenderWindow::Get()
 	return renderWindow;
 }
 
-void RenderWindow::Initialize()
+void RenderWindow::Initialize(ComPtr<ID3D12CommandQueue> commandQueue)
 {
 	D3D12RHI& RHI = D3D12RHI::Get();
 	WindowWin32& Window = WindowWin32::Get();
-	m_swapChain = CreateSwapChain(Window.GetWindowHandle(), RHI.GetDXGIFactory(), RHI.GetD3D12CommandQueue(), Window.GetWidth(), Window.GetHeight(), BUFFER_COUNT);
+	m_swapChain = CreateSwapChain(Window.GetWindowHandle(), RHI.GetDXGIFactory(), commandQueue, Window.GetWidth(), Window.GetHeight(), BUFFER_COUNT);
 	
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 

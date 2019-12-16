@@ -27,8 +27,7 @@ public:
 
 	ComPtr<ID3D12Device> GetD3D12Device() { return m_device; }
 	ComPtr<IDXGIFactory4> GetDXGIFactory() { return m_dxgiFactory; }
-	CommandQueue* GetCommandQueue() { return m_commandQueue; }
-	ComPtr<ID3D12CommandQueue> GetD3D12CommandQueue() const;
+	CommandQueue* GetCommandQueue(D3D12_COMMAND_LIST_TYPE type);
 	ComPtr<ID3DBlob> CreateShader(const std::wstring& ShaderFile, const std::string& EntryPoint, const std::string& TargetModel);
 	ComPtr<ID3D12RootSignature> CreateRootSignature();
 	void SetResourceBarrier(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource> resource, 
@@ -48,7 +47,7 @@ private:
 	ComPtr<IDXGIFactory4> m_dxgiFactory;
 	ComPtr<ID3D12Device> m_device;
 	
-	CommandQueue* m_commandQueue;
-	
+	CommandQueue* m_copyCommandQueue;
+	CommandQueue* m_directCommandQueue;
 };
 

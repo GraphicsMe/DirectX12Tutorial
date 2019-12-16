@@ -23,7 +23,7 @@ public:
 
 	~Tutorial2() 
 	{
-		D3D12RHI::Get().GetCommandQueue()->Flush();
+		D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)->Flush();
 	}
 
 	void LoadContent()
@@ -32,11 +32,21 @@ public:
 
 		m_rootSignature = D3D12RHI::Get().CreateRootSignature();
 
-		SetupVertexBuffer();
-		SetupIndexBuffer();
+		CommandQueue* commandQueue = D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
+		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
+		commandList->SetName(L"Copy list");
+
+		ComPtr<ID3D12Resource> intermediateVertexBuffer;
+		ComPtr<ID3D12Resource> intermediateIndexBuffer;
+
+		SetupVertexBuffer(commandList, intermediateVertexBuffer);
+		SetupIndexBuffer(commandList, intermediateIndexBuffer);
 		SetupUniformBuffer();
 		SetupShaders();
 		SetupPiplineState();
+
+		uint64_t fenceValue = commandQueue->ExecuteCommandList(commandList);
+		commandQueue->WaitForFenceValue(fenceValue);
 	}
 
 	void OnUpdate()
@@ -47,7 +57,7 @@ public:
 	void OnRender()
 	{
 		D3D12RHI& RHI = D3D12RHI::Get();
-		CommandQueue* commandQueue = RHI.GetCommandQueue();
+		CommandQueue* commandQueue = RHI.GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
@@ -82,7 +92,44 @@ public:
 	}
 
 private:
-	void SetupVertexBuffer()
+	void UpdateBufferResource(ComPtr<ID3D12GraphicsCommandList> commandList,
+        ID3D12Resource** pDestinationResource, ID3D12Resource** pIntermediateResource,
+        size_t numElements, size_t elementSize, const void* bufferData, 
+        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE )
+	{
+		size_t bufferSize = numElements * elementSize;
+
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
+			D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_COPY_DEST will cause error
+			nullptr,
+			IID_PPV_ARGS(pDestinationResource)));
+
+		if (bufferData)
+		{
+			ThrowIfFailed(m_device->CreateCommittedResource(
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+				D3D12_HEAP_FLAG_NONE,
+				&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr,
+				IID_PPV_ARGS(pIntermediateResource)));
+
+			D3D12_SUBRESOURCE_DATA subresourceData = {};
+			subresourceData.pData = bufferData;
+			subresourceData.RowPitch = bufferSize;
+			subresourceData.SlicePitch = subresourceData.RowPitch;
+
+			UpdateSubresources(commandList.Get(), 
+				*pDestinationResource, *pIntermediateResource,
+				0, 0, 1, &subresourceData);
+		}
+		
+	}
+
+	void SetupVertexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
 	{
 		struct Vertex
 		{
@@ -99,39 +146,12 @@ private:
 
 		const UINT VertexBufferSize = sizeof(vertexBufferData);
 
-		D3D12_HEAP_PROPERTIES heapProps;
-		heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProps.CreationNodeMask = 1;
-		heapProps.VisibleNodeMask = 1;
+		UpdateBufferResource(commandList,
+			&m_vertexBuffer, &intermediateBuffer,
+			_countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
 
-		D3D12_RESOURCE_DESC vertexBufferResourceDesc;
-		vertexBufferResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferResourceDesc.Alignment = 0;
-		vertexBufferResourceDesc.Width = VertexBufferSize;
-		vertexBufferResourceDesc.Height = 1;
-		vertexBufferResourceDesc.DepthOrArraySize = 1;
-		vertexBufferResourceDesc.MipLevels = 1;
-		vertexBufferResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-		vertexBufferResourceDesc.SampleDesc.Count = 1;
-		vertexBufferResourceDesc.SampleDesc.Quality = 0;
-		vertexBufferResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		vertexBufferResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-		ThrowIfFailed(m_device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferResourceDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_vertexBuffer)));
-
-		// Copy the triangle data to the vertex buffer.
-		UINT8* pVertexDataBegin;
-		ThrowIfFailed(m_vertexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pVertexDataBegin)));
-		memcpy(pVertexDataBegin, vertexBufferData, sizeof(vertexBufferData));
-		m_vertexBuffer->Unmap(0, nullptr);
+		m_vertexBuffer->SetName(L"Vertex buffer");
+		intermediateBuffer->SetName(L"Intermediate Vertex buffer");
 
 		// Initialize the vertex buffer view.
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -139,45 +159,18 @@ private:
 		m_vertexBufferView.SizeInBytes = VertexBufferSize;
 	}
 
-	void SetupIndexBuffer()
+	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
 	{
 		uint32_t indexBufferData[3] = { 0, 1, 2 };
 
 		const UINT indexBufferSize = sizeof(indexBufferData);
 
-		D3D12_HEAP_PROPERTIES heapProps;
-		heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProps.CreationNodeMask = 1;
-		heapProps.VisibleNodeMask = 1;
+		UpdateBufferResource(commandList,
+			&m_indexBuffer, &intermediateBuffer,
+			_countof(indexBufferData), sizeof(uint32_t), indexBufferData);
 
-		D3D12_RESOURCE_DESC vertexBufferResourceDesc;
-		vertexBufferResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		vertexBufferResourceDesc.Alignment = 0;
-		vertexBufferResourceDesc.Width = indexBufferSize;
-		vertexBufferResourceDesc.Height = 1;
-		vertexBufferResourceDesc.DepthOrArraySize = 1;
-		vertexBufferResourceDesc.MipLevels = 1;
-		vertexBufferResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-		vertexBufferResourceDesc.SampleDesc.Count = 1;
-		vertexBufferResourceDesc.SampleDesc.Quality = 0;
-		vertexBufferResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		vertexBufferResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-		ThrowIfFailed(m_device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&vertexBufferResourceDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_indexBuffer)));
-
-		// Copy data to DirectX 12 driver memory:
-		UINT8* pVertexDataBegin;
-		ThrowIfFailed(m_indexBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pVertexDataBegin)));
-		memcpy(pVertexDataBegin, indexBufferData, sizeof(indexBufferData));
-		m_indexBuffer->Unmap(0, nullptr);
+		m_indexBuffer->SetName(L"Index buffer");
+		intermediateBuffer->SetName(L"Interdediate Index buffer");
 
 		// Initialize the vertex buffer view.
 		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
