@@ -4,6 +4,8 @@
 #include <dxgi1_4.h>
 #include "Common.h"
 
+
+class CommandQueue;
 class RenderWindow
 {
 private:
@@ -14,7 +16,7 @@ public:
 	~RenderWindow();
 
 	// swap chain & present
-	UINT Present();
+	UINT Present(uint64_t currentFenceValue, CommandQueue* commandQueue);
 	ComPtr<ID3D12Resource> GetBackBuffer();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetView();
 
@@ -26,8 +28,9 @@ private:
 	//ComPtr<ID3D12Device> m_d3d12Device;
 	
 	static const UINT BUFFER_COUNT = 2;
-	//int m_bufferCount;
 	UINT m_frameIndex;
+	uint64_t m_fenceValues[BUFFER_COUNT];
+
 	UINT m_rtvDescriptorSize;
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	ComPtr<ID3D12DescriptorHeap> m_renderTargetViewHeap;

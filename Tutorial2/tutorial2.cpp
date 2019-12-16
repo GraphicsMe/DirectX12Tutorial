@@ -75,11 +75,10 @@ public:
 		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
 
 		FillCommandLists(commandList);
-		commandQueue->ExecuteCommandList(commandList);
 		
-		RenderWindow::Get().Present();
+		uint64_t fenceValue = commandQueue->ExecuteCommandList(commandList);
 
-		//commandQueue->Flush();
+		RenderWindow::Get().Present(fenceValue, commandQueue);	
 	}
 
 private:

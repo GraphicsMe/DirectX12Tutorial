@@ -1,6 +1,7 @@
 #include "RenderWindow.h"
 #include "D3D12RHI.h"
 #include "WindowWin32.h"
+#include "CommandQueue.h"
 
 #include "d3dx12.h"
 
@@ -64,10 +65,12 @@ void RenderWindow::CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, Co
 	}
 }
 
-UINT RenderWindow::Present()
+UINT RenderWindow::Present(uint64_t currentFenceValue, CommandQueue* commandQueue)
 {
+	m_fenceValues[m_frameIndex] = currentFenceValue;
 	m_swapChain->Present(1, 0);
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+	commandQueue->WaitForFenceValue(m_fenceValues[m_frameIndex]);
 	return m_frameIndex;
 }
 
