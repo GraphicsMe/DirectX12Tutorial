@@ -6,6 +6,7 @@
 #include "CommandQueue.h"
 #include "D3D12RHI.h"
 #include "d3dx12.h"
+#include "RenderWindow.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -76,7 +77,7 @@ public:
 		FillCommandLists(commandList);
 		commandQueue->ExecuteCommandList(commandList);
 		
-		RHI.Present();
+		RenderWindow::Get().Present();
 
 		//commandQueue->Flush();
 	}
@@ -263,11 +264,12 @@ private:
 		D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
 		commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
 
-		auto BackBuffer = RHI.GetBackBuffer();
+		RenderWindow& renderWindow = RenderWindow::Get();
+		auto BackBuffer = renderWindow.GetBackBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = RHI.GetCurrentRenderTargetView();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentRenderTargetView();
 
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 

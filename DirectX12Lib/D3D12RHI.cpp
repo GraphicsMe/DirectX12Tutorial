@@ -39,7 +39,7 @@ ComPtr<IDXGIFactory4> D3D12RHI::CreateDXGIFactory()
 	return dxgiFactory;
 }
 
-ComPtr<IDXGIAdapter1> D3D12RHI::GetAdapter(ComPtr<IDXGIFactory4> factory)
+ComPtr<IDXGIAdapter1> D3D12RHI::ChooseAdapter(ComPtr<IDXGIFactory4> factory)
 {
 	ComPtr<IDXGIAdapter1> adapter;
 	int BestAdapterIndex = -1;
@@ -94,27 +94,6 @@ ComPtr<ID3D12Device> D3D12RHI::CreateDevice(ComPtr<IDXGIAdapter1> adapter)
 	return device;
 }
 
-ComPtr<IDXGISwapChain3> D3D12RHI::CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, int width, int height, int bufferCount)
-{
-	DXGI_SWAP_CHAIN_DESC1 Desc = {};
-	Desc.Width = width;
-	Desc.Height = height;
-	Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	Desc.Stereo = FALSE;
-	Desc.SampleDesc = {1, 0}; // count, quality
-	Desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	Desc.BufferCount = bufferCount;
-	Desc.Scaling = DXGI_SCALING_STRETCH;
-	Desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	Desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-	ComPtr<IDXGISwapChain1> swapchain1;
-	ThrowIfFailed(factory->CreateSwapChainForHwnd(m_commandQueue->GetD3D12CommandQueue().Get(), hwnd, &Desc, nullptr, nullptr, &swapchain1));
-
-	ComPtr<IDXGISwapChain3> swapchain3;
-	ThrowIfFailed(swapchain1.As(&swapchain3));
-	return swapchain3;
-}
-
 ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag, uint32_t numDescriptors)
 {
 	// create render target view
@@ -129,20 +108,7 @@ ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEA
 	return descriptorHeap;
 }
 
-void D3D12RHI::CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap)
-{
-	// create frame resource
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	UINT rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-	for (int i = 0; i < backBufferCount; ++i)
-	{
-		ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i])));
-		m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
-		rtvHandle.ptr += rtvDescriptorSize;  // offset handle
-	}
-}
 
 D3D12RHI& D3D12RHI::Get()
 {
@@ -152,26 +118,19 @@ D3D12RHI& D3D12RHI::Get()
 
 bool D3D12RHI::Initialize()
 {
-	ComPtr<IDXGIFactory4> dxgiFactory = CreateDXGIFactory();
-	ComPtr<IDXGIAdapter1> dxgiAdapter = GetAdapter(dxgiFactory);
+	// 0. create 
+	m_dxgiFactory = CreateDXGIFactory();
+	ComPtr<IDXGIAdapter1> dxgiAdapter = ChooseAdapter(m_dxgiFactory);
 	
 	// 1. create device
 	m_device = CreateDevice(dxgiAdapter);
 
 	// 2. create command queue
-	//m_commandQueue = CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	m_commandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	
-	// 3. create swap chain
-	WindowWin32& Window = WindowWin32::Get();
-	m_swapChain = CreateSwapChain(Window.GetWindowHandle(), dxgiFactory, Window.GetWidth(), Window.GetHeight(), backBufferCount);
+	// 3. create render window(swapchain)
+
 	
-	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-	m_renderTargetViewHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, backBufferCount);
-	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-	CreateRenderTargetViews(m_swapChain, m_renderTargetViewHeap);
 
 	return true;
 }
@@ -185,23 +144,7 @@ void D3D12RHI::Destroy()
 	}
 }
 
-UINT D3D12RHI::Present()
-{
-	m_swapChain->Present(1, 0);
-	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-	return m_frameIndex;
-}
 
-ComPtr<ID3D12Resource> D3D12RHI::GetBackBuffer()
-{
-	return m_renderTargets[m_frameIndex];
-}
-
-D3D12_CPU_DESCRIPTOR_HANDLE D3D12RHI::GetCurrentRenderTargetView()
-{
-	return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_renderTargetViewHeap->GetCPUDescriptorHandleForHeapStart(),
-        m_frameIndex, m_rtvDescriptorSize);
-}
 
 ComPtr<ID3D12RootSignature> D3D12RHI::CreateRootSignature()
 {
@@ -250,6 +193,11 @@ ComPtr<ID3D12RootSignature> D3D12RHI::CreateRootSignature()
 		signature = nullptr;
 	}
 	return RootSignature;
+}
+
+Microsoft::WRL::ComPtr<ID3D12CommandQueue> D3D12RHI::GetD3D12CommandQueue() const
+{
+	return m_commandQueue->GetD3D12CommandQueue();
 }
 
 ComPtr<ID3DBlob> D3D12RHI::CreateShader(const std::wstring& ShaderFile, const std::string& EntryPoint, const std::string& TargetModel)
