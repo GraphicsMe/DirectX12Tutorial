@@ -18,10 +18,12 @@ void RenderWindow::Initialize(ComPtr<ID3D12CommandQueue> commandQueue)
 	
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_renderTargetViewHeap = RHI.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, BUFFER_COUNT);
+	m_rtvHeap = RHI.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, BUFFER_COUNT);
 	m_rtvDescriptorSize = RHI.GetD3D12Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	CreateRenderTargetViews(m_swapChain, m_rtvHeap);
 
-	CreateRenderTargetViews(m_swapChain, m_renderTargetViewHeap);
+	m_dsvHeap = RHI.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 1);
+	CreateDepthView(m_dsvHeap);
 }
 
 RenderWindow::~RenderWindow()
@@ -63,6 +65,31 @@ void RenderWindow::CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, Co
 	}
 }
 
+void RenderWindow::CreateDepthView(ComPtr<ID3D12DescriptorHeap> descriptorHeap)
+{
+	D3D12_CLEAR_VALUE optimizedClearValue = {};
+	optimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+	optimizedClearValue.DepthStencil = { 1.0f, 0 };
+ 
+	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, WindowWin32::Get().GetWidth(), WindowWin32::Get().GetHeight(),
+			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&optimizedClearValue,
+		IID_PPV_ARGS(&m_depthBuffer)
+	));
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
+	dsv.Format = DXGI_FORMAT_D32_FLOAT;
+	dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsv.Texture2D.MipSlice = 0;
+	dsv.Flags = D3D12_DSV_FLAG_NONE;
+ 
+	D3D12RHI::Get().GetD3D12Device()->CreateDepthStencilView(m_depthBuffer.Get(), &dsv, descriptorHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
 UINT RenderWindow::Present(uint64_t currentFenceValue, CommandQueue* commandQueue)
 {
 	m_fenceValues[m_frameIndex] = currentFenceValue;
@@ -79,6 +106,10 @@ ComPtr<ID3D12Resource> RenderWindow::GetBackBuffer()
 
 D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetCurrentRenderTargetView()
 {
-	return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_renderTargetViewHeap->GetCPUDescriptorHandleForHeapStart(),
-        m_frameIndex, m_rtvDescriptorSize);
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetDepthStencilHandle()
+{
+	return m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
 }

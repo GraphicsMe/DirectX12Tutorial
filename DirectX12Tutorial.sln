@@ -3,11 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.779
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectX12Tutorial", "DirectX12Lib\DirectX12Lib.vcxproj", "{2B161A44-B3A5-4AAA-848D-E2D148CE27E7}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectX12Lib", "DirectX12Lib\DirectX12Lib.vcxproj", "{2B161A44-B3A5-4AAA-848D-E2D148CE27E7}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tutorial1", "Tutorial1\Tutorial1.vcxproj", "{CA960339-910B-46C7-8751-02EC28A12102}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tutorial2", "Tutorial2\Tutorial2.vcxproj", "{1326ED15-FD8C-4D4F-A9C5-BD4821EC2AC6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tutorial3", "Tutorial3\Tutorial3.vcxproj", "{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,14 @@ Global
 		{1326ED15-FD8C-4D4F-A9C5-BD4821EC2AC6}.Release|x64.Build.0 = Release|x64
 		{1326ED15-FD8C-4D4F-A9C5-BD4821EC2AC6}.Release|x86.ActiveCfg = Release|Win32
 		{1326ED15-FD8C-4D4F-A9C5-BD4821EC2AC6}.Release|x86.Build.0 = Release|Win32
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Debug|x64.ActiveCfg = Debug|x64
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Debug|x64.Build.0 = Debug|x64
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Debug|x86.ActiveCfg = Debug|Win32
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Debug|x86.Build.0 = Debug|Win32
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Release|x64.ActiveCfg = Release|x64
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Release|x64.Build.0 = Release|x64
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Release|x86.ActiveCfg = Release|Win32
+		{4A78F4D9-6005-4441-8FDE-CD57FBC8C2EE}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

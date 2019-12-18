@@ -72,7 +72,7 @@ public:
 		m_elapsedTime = fmodf(m_elapsedTime, 6.283185307179586f);
 		m_uboVS.modelMatrix = FMatrix::RotateY(m_elapsedTime);
 
-		FCamera camera(Vector3f(0.f, 0.f, -3.5f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		FCamera camera(Vector3f(0.f, 0.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_uboVS.viewMatrix = camera.GetViewMatrix();
 
 		const float FovVertical = MATH_PI / 4.f;
@@ -136,17 +136,26 @@ private:
 			float position[3];
 			float color[3];
 		};
-		/*                 2
-						  / \
-						 /	 \
-						1-----0
+		/*
+						  4--------5
+						 /| 	  /|
+						/ |	     / |
+						0-------1  |
+						| 7-----|--6
+						|/		| /
+						3-------2
 		*/
 
-		Vertex vertexBufferData[3] =
+		Vertex vertexBufferData[] =
 		{
-		  { { 1.0f,  -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f } },
-		  { { -1.0f,  -1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f } },
-		  { { 0.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f } }
+			{ { -1.f,  1.f, -1.f }, { 1.f, 0.f, 0.f } }, // 0
+			{ {  1.f,  1.f, -1.f }, { 0.f, 1.f, 0.f } }, // 1
+			{ {  1.f, -1.f, -1.f }, { 0.f, 0.f, 1.f } }, // 2
+			{ { -1.f, -1.f, -1.f }, { 1.f, 1.f, 0.f } }, // 3
+			{ { -1.f,  1.f,  1.f }, { 1.f, 0.f, 1.f } }, // 4
+			{ {  1.f,  1.f,  1.f }, { 0.f, 1.f, 1.f } }, // 5
+			{ {  1.f, -1.f,  1.f }, { 1.f, 1.f, 1.f } }, // 6
+			{ { -1.f, -1.f,  1.f }, { 0.f, 0.f, 0.f } }  // 7
 		};
 
 		const UINT VertexBufferSize = sizeof(vertexBufferData);
@@ -166,7 +175,20 @@ private:
 
 	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
 	{
-		uint32_t indexBufferData[3] = { 0, 1, 2 };
+		uint32_t indexBufferData[] = { 
+			0, 1, 2,
+			0, 2, 3,
+			2, 1, 5,
+			2, 5, 6,
+			4, 0, 3,
+			4, 3, 7,
+			3, 2, 6,
+			3, 6, 7,
+			0, 4, 5,
+			0, 5, 1,
+			5, 4, 7,
+			5, 7, 6
+		};
 
 		const UINT indexBufferSize = sizeof(indexBufferData);
 
@@ -222,13 +244,14 @@ private:
 			blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
 
 		psoDesc.BlendState = blendDesc;
-		psoDesc.DepthStencilState.DepthEnable = FALSE;
-		psoDesc.DepthStencilState.StencilEnable = FALSE;
+		psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
+		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 	}
 
@@ -254,17 +277,18 @@ private:
 		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentRenderTargetView();
-
-		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = renderWindow.GetDepthStencilHandle();
+		commandList->OMSetRenderTargets(1, &rtvHandle, true, &dsvHandle);
 
 		// Record commands.
 		const float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
 		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
 		commandList->IASetIndexBuffer(&m_indexBufferView);
 
-		commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+		commandList->DrawIndexedInstanced(m_indexBufferView.SizeInBytes / sizeof(uint32_t), 1, 0, 0, 0);
 
 		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 	}
@@ -357,7 +381,7 @@ private:
 int main()
 {
 	GameDesc Desc;
-	Desc.Caption = L"Tutorial 2 - Draw Triangle";
+	Desc.Caption = L"Tutorial 3 - Draw Cube";
 	Tutorial2 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);
 	return 0;
