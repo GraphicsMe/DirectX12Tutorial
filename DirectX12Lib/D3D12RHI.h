@@ -29,7 +29,6 @@ public:
 	ComPtr<IDXGIFactory4> GetDXGIFactory() { return m_dxgiFactory; }
 	CommandQueue* GetCommandQueue(D3D12_COMMAND_LIST_TYPE type);
 	ComPtr<ID3DBlob> CreateShader(const std::wstring& ShaderFile, const std::string& EntryPoint, const std::string& TargetModel);
-	ComPtr<ID3D12RootSignature> CreateRootSignature();
 	void SetResourceBarrier(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource> resource, 
 			D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);;
 	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag, uint32_t numDescriptors);

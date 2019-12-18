@@ -11,6 +11,8 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <chrono>
+#include <iostream>
+
 
 class Tutorial2 : public Game
 {
@@ -30,7 +32,7 @@ public:
 	{
 		m_device = D3D12RHI::Get().GetD3D12Device();
 
-		m_rootSignature = D3D12RHI::Get().CreateRootSignature();
+		m_rootSignature = CreateRootSignature();
 
 		CommandQueue* commandQueue = D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
@@ -41,7 +43,7 @@ public:
 
 		SetupVertexBuffer(commandList, intermediateVertexBuffer);
 		SetupIndexBuffer(commandList, intermediateIndexBuffer);
-		SetupUniformBuffer();
+		//SetupUniformBuffer();
 		SetupShaders();
 		SetupPiplineState();
 
@@ -78,9 +80,9 @@ public:
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 
-		ThrowIfFailed(m_uniformBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
-		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
-		m_uniformBuffer->Unmap(0, nullptr);
+		//ThrowIfFailed(m_uniformBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
+		//memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
+		//m_uniformBuffer->Unmap(0, nullptr);
 
 		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
 
@@ -212,6 +214,60 @@ private:
 		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/triangle.frag", "main", "ps_5_0");
 	}
 
+	ComPtr<ID3D12RootSignature> CreateRootSignature()
+	{
+		// create root signature
+		//D3D12_DESCRIPTOR_RANGE1 ranges[1];
+		//ranges[0].BaseShaderRegister = 0;
+		//ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		//ranges[0].NumDescriptors = 1;
+		//ranges[0].RegisterSpace = 0;
+		//ranges[0].OffsetInDescriptorsFromTableStart = 0;
+		//ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+
+		//D3D12_ROOT_PARAMETER1 rootParams[1];
+		//rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		//rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		//rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+		//rootParams[0].DescriptorTable.pDescriptorRanges = ranges;
+
+		//D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc = {};
+		//rootSigDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		//rootSigDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+		//rootSigDesc.Desc_1_1.NumParameters = 1;
+		//rootSigDesc.Desc_1_1.pParameters = rootParams;
+		//rootSigDesc.Desc_1_1.NumStaticSamplers = 0;
+		//rootSigDesc.Desc_1_1.pStaticSamplers = nullptr;
+
+		CD3DX12_ROOT_PARAMETER1 rootParams[1];
+		rootParams[0].InitAsConstants(sizeof(m_uboVS) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+
+		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc;
+		rootSigDesc.Init_1_1(_countof(rootParams), rootParams, 0, nullptr, rootSignatureFlags);
+
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		{
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
+		ComPtr<ID3D12RootSignature> RootSignature;
+		ComPtr<ID3DBlob> signatureBlob;
+		ComPtr<ID3DBlob> errorBlob;
+		ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSigDesc, featureData.HighestVersion, &signatureBlob, &errorBlob));
+		ThrowIfFailed(m_device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), 
+			signatureBlob->GetBufferSize(), IID_PPV_ARGS(&RootSignature)));
+
+		return RootSignature;
+	}
+
 	void SetupPiplineState()
 	{
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -222,28 +278,13 @@ private:
 
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
 		psoDesc.pRootSignature = m_rootSignature.Get();
-		psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
-		psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
+		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+		psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.Get());
+		psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.Get());
 
+		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-
-		D3D12_BLEND_DESC blendDesc;
-		blendDesc.AlphaToCoverageEnable = FALSE;
-		blendDesc.IndependentBlendEnable = FALSE;
-		const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
-		{
-			FALSE,FALSE,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_LOGIC_OP_NOOP,
-			D3D12_COLOR_WRITE_ENABLE_ALL,
-		};
-		for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-			blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
-
-		psoDesc.BlendState = blendDesc;
 		psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
 		psoDesc.SampleMask = UINT_MAX;
@@ -265,11 +306,13 @@ private:
 		commandList->RSSetViewports(1, &m_viewport);
 		commandList->RSSetScissorRects(1, &m_scissorRect);
 
-		ID3D12DescriptorHeap *pDescriptorHeaps[] = { m_uniformBufferHeap.Get() };
-		commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
+		//ID3D12DescriptorHeap *pDescriptorHeaps[] = { m_uniformBufferHeap.Get() };
+		//commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
 
-		D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
-		commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
+		//D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
+		//commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
+
+		commandList->SetGraphicsRoot32BitConstants(0, sizeof(m_uboVS) / 4, &m_uboVS, 0);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		auto BackBuffer = renderWindow.GetBackBuffer();

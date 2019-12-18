@@ -150,57 +150,6 @@ void D3D12RHI::Destroy()
 	}
 }
 
-
-
-ComPtr<ID3D12RootSignature> D3D12RHI::CreateRootSignature()
-{
-	// create root signature
-	D3D12_DESCRIPTOR_RANGE1 ranges[1];
-	ranges[0].BaseShaderRegister = 0;
-	ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	ranges[0].NumDescriptors = 1;
-	ranges[0].RegisterSpace = 0;
-	ranges[0].OffsetInDescriptorsFromTableStart = 0;
-	ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
-
-	D3D12_ROOT_PARAMETER1 rootParams[1];
-	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
-	rootParams[0].DescriptorTable.pDescriptorRanges = ranges;
-
-	D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc = {};
-	rootSigDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-	rootSigDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rootSigDesc.Desc_1_1.NumParameters = 1;
-	rootSigDesc.Desc_1_1.pParameters = rootParams;
-	rootSigDesc.Desc_1_1.NumStaticSamplers = 0;
-	rootSigDesc.Desc_1_1.pStaticSamplers = nullptr;
-
-	ComPtr<ID3D12RootSignature> RootSignature;
-	ID3DBlob* signature;
-	ID3DBlob* error;
-	try
-	{
-		ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSigDesc, &signature, &error));
-		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature)));
-		RootSignature->SetName(L"My Root Signature");
-	}
-	catch (std::exception e)
-	{
-		const char* errstr = (const char*)error->GetBufferPointer();
-		std::cout << errstr << std::endl;
-		error->Release();
-		error = nullptr;
-	}
-	if (signature)
-	{
-		signature->Release();
-		signature = nullptr;
-	}
-	return RootSignature;
-}
-
 CommandQueue* D3D12RHI::GetCommandQueue(D3D12_COMMAND_LIST_TYPE type)
 {
 	switch(type)
