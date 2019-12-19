@@ -128,7 +128,6 @@ private:
 				*pDestinationResource, *pIntermediateResource,
 				0, 0, 1, &subresourceData);
 		}
-		
 	}
 
 	void SetupVertexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
@@ -209,9 +208,9 @@ private:
 
 	void SetupShaders()
 	{
-		m_vertexShader = D3D12RHI::Get().CreateShader(L"../Resources/triangle.vert", "main", "vs_5_0");
+		m_vertexShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/triangle.vert", "main", "vs_5_0");
 
-		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/triangle.frag", "main", "ps_5_0");
+		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/triangle.frag", "main", "ps_5_0");
 	}
 
 	ComPtr<ID3D12RootSignature> CreateRootSignature()
