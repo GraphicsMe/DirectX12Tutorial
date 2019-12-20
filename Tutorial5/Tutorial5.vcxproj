@@ -20,10 +20,9 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{2B161A44-B3A5-4AAA-848D-E2D148CE27E7}</ProjectGuid>
-    <RootNamespace>DirectX12Tutorial</RootNamespace>
+    <ProjectGuid>{10C5473E-3B7C-4362-B0F3-C5DBB8E37E73}</ProjectGuid>
+    <RootNamespace>Tutorial5</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>DirectX12Lib</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -40,10 +39,10 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -71,15 +70,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>../DirectX12Lib;../ThirdParty/DirectXTex/DirectXTex</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
@@ -116,33 +116,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="ApplicationWin32.h" />
-    <ClInclude Include="Camera.h" />
-    <ClInclude Include="CommandQueue.h" />
-    <ClInclude Include="Common.h" />
-    <ClInclude Include="D3D12RHI.h" />
-    <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="Game.h" />
-    <ClInclude Include="MathLib.h" />
-    <ClInclude Include="MeshData.h" />
-    <ClInclude Include="ObjLoader.h" />
-    <ClInclude Include="RenderWindow.h" />
-    <ClInclude Include="Timer.h" />
-    <ClInclude Include="WindowWin32.h" />
+    <ClCompile Include="tutorial5.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="CommandQueue.cpp" />
-    <ClCompile Include="Common.cpp" />
-    <ClCompile Include="D3D12RHI.cpp" />
-    <ClCompile Include="Game.cpp" />
-    <ClCompile Include="ApplicationWin32.cpp" />
-    <ClCompile Include="MathLib.cpp" />
-    <ClCompile Include="MeshData.cpp" />
-    <ClCompile Include="ObjLoader.cpp" />
-    <ClCompile Include="RenderWindow.cpp" />
-    <ClCompile Include="Timer.cpp" />
-    <ClCompile Include="WindowWin32.cpp" />
+    <ProjectReference Include="..\DirectX12Lib\DirectX12Lib.vcxproj">
+      <Project>{2b161a44-b3a5-4aaa-848d-e2d148ce27e7}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ThirdParty\DirectXTex\DirectXTex\DirectXTex_Desktop_2017_Win10.vcxproj">
+      <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

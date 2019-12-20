@@ -46,8 +46,8 @@ VertexOutput vs_main(VertexIN IN)
 PixelOutput ps_main(VertexOutput IN)
 {
 	PixelOutput output;
-	float4 texColor = DiffuseTexture.Sample( LinearSampler, IN.tex );
 	//output.outFragColor = float4(IN.color, 1.0f);
+	float4 texColor = DiffuseTexture.Sample( LinearSampler, IN.tex );
 	output.outFragColor = texColor;
 	return output;
 }
