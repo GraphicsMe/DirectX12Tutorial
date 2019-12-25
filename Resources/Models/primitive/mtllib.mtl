@@ -1,0 +1,19 @@
+newmtl lion
+	map_Kd lion.png
+
+newmtl plant
+	map_Kd vase_plant.png
+
+newmtl cloth_r
+	map_Kd sponza_curtain_diff.png
+
+newmtl cloth_g
+	map_Kd sponza_curtain_green_diff.png
+
+newmtl quad
+	Pr 0.5
+	Pm 0.5
+	Kd 0.5 0.5 0.5
+
+newmtl sphere
+	map_Kd vase_plant.png

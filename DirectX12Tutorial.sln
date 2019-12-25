@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTex", "ThirdParty\Di
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tutorial5", "Tutorial5\Tutorial5.vcxproj", "{10C5473E-3B7C-4362-B0F3-C5DBB8E37E73}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tutorial6", "Tutorial6\Tutorial6.vcxproj", "{F23716F2-D543-4E11-904A-F32E8F4104BA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -111,6 +113,18 @@ Global
 		{10C5473E-3B7C-4362-B0F3-C5DBB8E37E73}.Release|x64.Build.0 = Release|x64
 		{10C5473E-3B7C-4362-B0F3-C5DBB8E37E73}.Release|x86.ActiveCfg = Release|Win32
 		{10C5473E-3B7C-4362-B0F3-C5DBB8E37E73}.Release|x86.Build.0 = Release|Win32
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Debug|x64.ActiveCfg = Debug|x64
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Debug|x64.Build.0 = Debug|x64
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Debug|x86.ActiveCfg = Debug|Win32
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Debug|x86.Build.0 = Debug|Win32
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Profile|x64.ActiveCfg = Release|x64
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Profile|x64.Build.0 = Release|x64
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Profile|x86.ActiveCfg = Release|Win32
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Profile|x86.Build.0 = Release|Win32
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Release|x64.ActiveCfg = Release|x64
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Release|x64.Build.0 = Release|x64
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Release|x86.ActiveCfg = Release|Win32
+		{F23716F2-D543-4E11-904A-F32E8F4104BA}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

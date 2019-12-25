@@ -26,3 +26,11 @@ void DoAssert(bool success, const wchar_t* file_name, int line);
 #else
 #define Assert(s)
 #endif
+
+inline std::wstring ToWideString(const std::string& str)
+{
+	int stringLength = ::MultiByteToWideChar(CP_ACP, 0, str.data(), (int)str.length(), 0, 0);
+	std::wstring wstr(stringLength, 0);
+	::MultiByteToWideChar(CP_ACP, 0, str.data(), (int)str.length(), &wstr[0], stringLength);
+	return wstr;
+}

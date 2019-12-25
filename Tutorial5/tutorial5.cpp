@@ -187,7 +187,8 @@ private:
 		m_vertexTexBufferView.BufferLocation = m_vertexTexBuffer->GetGPUVirtualAddress();
 		m_vertexTexBufferView.StrideInBytes = sizeof(VertexTex);
 		m_vertexTexBufferView.SizeInBytes = sizeof(vertexTexData);
-		m_vertexTexBuffer->SetName(L"Vertex Texcoord Buffer");	}
+		m_vertexTexBuffer->SetName(L"Vertex Texcoord Buffer");
+	}
 
 	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList)
 	{
@@ -509,7 +510,7 @@ private:
 int main()
 {
 	GameDesc Desc;
-	Desc.Caption = L"Tutorial 4 - Texture";
+	Desc.Caption = L"Tutorial 5 - Texture";
 	Tutorial2 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);
 	return 0;
