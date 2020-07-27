@@ -18,7 +18,7 @@ public:
 	// swap chain & present
 	UINT Present(uint64_t currentFenceValue, CommandQueue* commandQueue);
 	ComPtr<ID3D12Resource> GetBackBuffer();
-	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRenderTargetView();
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();
 
 private:
@@ -36,7 +36,7 @@ private:
 	UINT m_rtvDescriptorSize;
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	ComPtr<ID3D12Resource> m_renderTargets[BUFFER_COUNT];
+	ComPtr<ID3D12Resource> m_backBuffers[BUFFER_COUNT];
 	ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	ComPtr<ID3D12Resource> m_depthBuffer;
 };

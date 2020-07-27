@@ -64,7 +64,7 @@ ComPtr<ID3D12GraphicsCommandList> CommandQueue::GetCommandList()
 
 uint64_t CommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList)
 {
-	commandList->Close();
+	commandList->Close();  // finish recording command, should be called before ExecuteCommandLists
  
 	ID3D12CommandAllocator* commandAllocator;
 	UINT dataSize = sizeof(commandAllocator);

@@ -16,18 +16,13 @@
 #include <iostream>
 
 
-class Tutorial2 : public Game
+class Tutorial4 : public Game
 {
 public:
-	Tutorial2(const GameDesc& Desc) : Game(Desc) 
+	Tutorial4(const GameDesc& Desc) : Game(Desc) 
 	{
 		m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(Desc.Width), static_cast<float>(Desc.Height), 0.1f);
 		m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(Desc.Width), static_cast<LONG>(Desc.Height));
-	}
-
-	~Tutorial2() 
-	{
-		D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)->Flush();
 	}
 
 	void LoadContent()
@@ -306,7 +301,7 @@ private:
 		// Indicate that the back buffer will be used as a render target.
 		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentRenderTargetView();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentBackBufferView();
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = renderWindow.GetDepthStencilHandle();
 		commandList->OMSetRenderTargets(1, &rtvHandle, true, &dsvHandle);
 
@@ -479,7 +474,7 @@ int main()
 {
 	GameDesc Desc;
 	Desc.Caption = L"Tutorial 4 - Texture";
-	Tutorial2 tutorial(Desc);
+	Tutorial4 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);
 	return 0;
 }

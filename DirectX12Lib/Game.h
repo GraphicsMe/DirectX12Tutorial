@@ -2,12 +2,16 @@
 
 #include <string>
 
+class FCamera;
+
+
 struct GameDesc
 {
 	std::wstring Caption = L"The Practice of Direct3D 12 Programming";
 	int Width = 1024;
 	int Height = 768;
 };
+
 
 class Game
 {
@@ -24,6 +28,7 @@ public:
 	virtual void OnShutdown();
 
 private:
+	FCamera* m_Camera;
 	GameDesc m_GameDesc;
 };
 

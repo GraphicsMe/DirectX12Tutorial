@@ -23,11 +23,6 @@ public:
 		m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(Desc.Width), static_cast<LONG>(Desc.Height));
 	}
 
-	~Tutorial2() 
-	{
-		D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)->Flush();
-	}
-
 	void LoadContent()
 	{
 		m_device = D3D12RHI::Get().GetD3D12Device();
@@ -306,7 +301,7 @@ private:
 		// Indicate that the back buffer will be used as a render target.
 		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentRenderTargetView();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentBackBufferView();
 
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 

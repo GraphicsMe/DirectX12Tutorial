@@ -18,18 +18,13 @@
 #include <iostream>
 
 
-class Tutorial2 : public Game
+class Tutorial6 : public Game
 {
 public:
-	Tutorial2(const GameDesc& Desc) : Game(Desc) 
+	Tutorial6(const GameDesc& Desc) : Game(Desc) 
 	{
 		m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(Desc.Width), static_cast<float>(Desc.Height), 0.1f);
 		m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(Desc.Width), static_cast<LONG>(Desc.Height));
-	}
-
-	~Tutorial2() 
-	{
-		D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)->Flush();
 	}
 
 	void LoadContent()
@@ -80,6 +75,7 @@ public:
 		// Update Uniforms
 		m_elapsedTime += 0.001f * time;
 		m_elapsedTime = fmodf(m_elapsedTime, 6.283185307179586f);
+		//m_elapsedTime = MATH_PI / 4.f;
 		m_uboVS.modelMatrix = FMatrix::RotateY(m_elapsedTime);
 
 		FCamera camera(Vector3f(0.f, 0.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
@@ -148,27 +144,6 @@ private:
 				m_vertexBufferView[i].SizeInBytes = m_mesh_data->GetVertexSize(elmType);
 			}
 		}
-		
-		//UpdateBufferResource(commandList, &m_vertexPositionBuffer, &m_intermediateVertexBuffer[0], 
-		//m_mesh_data->GetVertexCount(), m_mesh_data->GetVertexStride(VET_Position), m_mesh_data->GetVertexData(VET_Position));
-		//m_vertexPositionBuffer->SetName(L"Vertex Position Buffer");
-		//m_vertexPositionBufferView.BufferLocation = m_vertexPositionBuffer->GetGPUVirtualAddress();
-		//m_vertexPositionBufferView.StrideInBytes = m_mesh_data->GetVertexStride(VET_Position);
-		//m_vertexPositionBufferView.SizeInBytes = m_mesh_data->GetVertexSize(VET_Position);
-
-		//UpdateBufferResource(commandList, &m_vertexColorBuffer, &m_intermediateVertexBuffer[1], 
-		//	m_mesh_data->GetVertexCount(), m_mesh_data->GetVertexStride(VET_Color), m_mesh_data->GetVertexData(VET_Color));
-		//m_vertexColorBuffer->SetName(L"Vertex Color Buffer");
-		//m_vertexColorBufferView.BufferLocation = m_vertexColorBuffer->GetGPUVirtualAddress();
-		//m_vertexColorBufferView.StrideInBytes = m_mesh_data->GetVertexStride(VET_Color);
-		//m_vertexColorBufferView.SizeInBytes = m_mesh_data->GetVertexSize(VET_Color);
-
-		//UpdateBufferResource(commandList, &m_vertexTexBuffer, &m_intermediateVertexBuffer[2], 
-		//	m_mesh_data->GetVertexCount(), m_mesh_data->GetVertexStride(VET_Texcoord), m_mesh_data->GetVertexData(VET_Texcoord));
-		//m_vertexTexBufferView.BufferLocation = m_vertexTexBuffer->GetGPUVirtualAddress();
-		//m_vertexTexBufferView.StrideInBytes = m_mesh_data->GetVertexStride(VET_Texcoord);
-		//m_vertexTexBufferView.SizeInBytes = m_mesh_data->GetVertexSize(VET_Texcoord);
-		//m_vertexTexBuffer->SetName(L"Vertex Texcoord Buffer");
 	}
 
 	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList)
@@ -283,6 +258,7 @@ private:
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
+		psoDesc.SampleDesc.Quality = 0;
 		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 	}
@@ -312,7 +288,7 @@ private:
 		// Indicate that the back buffer will be used as a render target.
 		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentRenderTargetView();
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentBackBufferView();
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = renderWindow.GetDepthStencilHandle();
 		commandList->OMSetRenderTargets(1, &rtvHandle, true, &dsvHandle);
 
@@ -476,15 +452,6 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView[VET_Max];
 	ComPtr<ID3D12Resource> m_intermediateVertexBuffer[VET_Max];
 
-	//ComPtr<ID3D12Resource> m_vertexPositionBuffer;
-	//D3D12_VERTEX_BUFFER_VIEW m_vertexPositionBufferView;
-
-	//ComPtr<ID3D12Resource> m_vertexColorBuffer;
-	//D3D12_VERTEX_BUFFER_VIEW m_vertexColorBufferView;
-
-	//ComPtr<ID3D12Resource> m_vertexTexBuffer;
-	//D3D12_VERTEX_BUFFER_VIEW m_vertexTexBufferView;
-
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
@@ -506,7 +473,7 @@ int main()
 	ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 	GameDesc Desc;
 	Desc.Caption = L"Tutorial 6 - Mesh Loader";
-	Tutorial2 tutorial(Desc);
+	Tutorial6 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);
 	CoUninitialize();
 	return 0;

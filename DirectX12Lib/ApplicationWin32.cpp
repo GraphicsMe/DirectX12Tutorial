@@ -1,6 +1,7 @@
 #include "ApplicationWin32.h"
 #include "Game.h"
 #include "D3D12RHI.h"
+#include "Timer.h"
 #include <iostream>
 
 
@@ -11,7 +12,7 @@ bool ApplicationWin32::Initialize(Game* game)
 	return true;
 }
 
-ApplicationWin32::~ApplicationWin32()
+void ApplicationWin32::Terminate()
 {
 	D3D12RHI::Get().Destroy();
 	WindowWin32::Get().Destroy();
@@ -26,6 +27,8 @@ ApplicationWin32& ApplicationWin32::ApplicationWin32::Get()
 void ApplicationWin32::Run(Game* game)
 {
 	Assert(game != nullptr);
+
+	FTimer::InitTiming();
 
 	if (!Initialize(game))
 	{
@@ -51,4 +54,6 @@ void ApplicationWin32::Run(Game* game)
 		game->OnRender();
 	}
 	game->OnShutdown();
+
+	this->Terminate();
 }

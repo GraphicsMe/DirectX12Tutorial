@@ -55,10 +55,10 @@ ComPtr<IDXGIAdapter1> D3D12RHI::ChooseAdapter(ComPtr<IDXGIFactory4> factory)
 			continue;
 		}
 
-		if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr)))
+		if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)))
 		{
 			float sizeGB = 1 << 30;
-			std::wcout << desc.Description << ": " << desc.DedicatedVideoMemory / sizeGB << "G" << std::endl;
+			std::wcout << "***Adapter: " << desc.Description << ": " << desc.DedicatedVideoMemory / sizeGB << "G" << std::endl;
 			if (desc.DedicatedVideoMemory > MaxGPUMemory)
 			{
 				BestAdapterIndex = adapterIndex;
@@ -119,7 +119,7 @@ D3D12RHI& D3D12RHI::Get()
 
 bool D3D12RHI::Initialize()
 {
-	// 0. create 
+	// 0. create dxgi factory
 	m_dxgiFactory = CreateDXGIFactory();
 	ComPtr<IDXGIAdapter1> dxgiAdapter = ChooseAdapter(m_dxgiFactory);
 	
@@ -140,11 +140,13 @@ void D3D12RHI::Destroy()
 {
 	if (m_copyCommandQueue)
 	{
+		m_copyCommandQueue->Flush();
 		delete m_copyCommandQueue;
 		m_copyCommandQueue = nullptr;
 	}
 	if (m_directCommandQueue)
 	{
+		m_directCommandQueue->Flush();
 		delete m_directCommandQueue;
 		m_directCommandQueue = nullptr;
 	}

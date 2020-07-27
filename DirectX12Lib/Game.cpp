@@ -5,6 +5,7 @@
 
 Game::Game(const GameDesc& Desc)
 	: m_GameDesc(Desc)
+	, m_Camera(nullptr)
 {
 }
 
