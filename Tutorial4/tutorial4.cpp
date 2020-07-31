@@ -16,16 +16,16 @@
 #include <iostream>
 
 
-class Tutorial4 : public Game
+class Tutorial4 : public FGame
 {
 public:
-	Tutorial4(const GameDesc& Desc) : Game(Desc) 
+	Tutorial4(const GameDesc& Desc) : FGame(Desc) 
 	{
 		m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(Desc.Width), static_cast<float>(Desc.Height), 0.1f);
 		m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(Desc.Width), static_cast<LONG>(Desc.Height));
 	}
 
-	void LoadContent()
+	void OnStartup()
 	{
 		m_device = D3D12RHI::Get().GetD3D12Device();
 
