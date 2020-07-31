@@ -46,7 +46,7 @@ ComPtr<IDXGIAdapter1> D3D12RHI::ChooseAdapter(ComPtr<IDXGIFactory4> factory)
 	int BestAdapterIndex = -1;
 	SIZE_T MaxGPUMemory = 0;
 	//这里Adapter被重复使用，每次调用EnumAdapters1前需要先Release再取地址，operator&刚好有这个作用(https://github.com/Microsoft/DirectXTK/wiki/ComPtr#initialization)
-	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != factory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != factory->EnumAdapters1(adapterIndex, adapter.ReleaseAndGetAddressOf()); ++adapterIndex)
 	{
 		DXGI_ADAPTER_DESC1 desc;
 		adapter->GetDesc1(&desc);
