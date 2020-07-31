@@ -40,8 +40,6 @@ private:
 	ComPtr<ID3D12Device> CreateDevice(ComPtr<IDXGIAdapter1> adapter);
 	
 	
-	void CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap);
-	
 private:
 	ComPtr<IDXGIFactory4> m_dxgiFactory;
 	ComPtr<ID3D12Device> m_device;

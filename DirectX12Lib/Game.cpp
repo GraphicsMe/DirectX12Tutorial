@@ -3,34 +3,29 @@
 
 #include <iostream>
 
-Game::Game(const GameDesc& Desc)
+FGame::FGame(const GameDesc& Desc)
 	: m_GameDesc(Desc)
-	, m_Camera(nullptr)
 {
 }
 
-Game::~Game()
+FGame::~FGame()
 {
 }
 
-void Game::OnStartup()
+void FGame::OnStartup()
 {
 	std::cout << "OnStartup" << std::endl;
 }
 
-void Game::LoadContent()
+void FGame::OnUpdate()
 {
 }
 
-void Game::OnUpdate()
+void FGame::OnRender()
 {
 }
 
-void Game::OnRender()
-{
-}
-
-void Game::OnShutdown()
+void FGame::OnShutdown()
 {
 	std::cout << "OnShutdown" << std::endl;
 }

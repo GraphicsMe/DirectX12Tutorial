@@ -3,13 +3,15 @@
 #include <algorithm>
 
 #include "WindowWin32.h"
+#include "Game.h"
 
 
 const TCHAR WindowWin32::AppWindowClass[] = L"DirectX12TutorialWindow";
 
 WindowWin32::WindowWin32()
 	: m_hwnd(nullptr)
-	, m_bIsClosed(false)
+	, Width(0)
+	, Height(0)
 {
 }
 
@@ -33,10 +35,8 @@ WindowWin32::~WindowWin32()
 	Destroy();
 }
 
-bool WindowWin32::Initialize(const GameDesc& Desc)
+bool WindowWin32::Initialize(FGame* Game)
 {
-	m_GameDesc = Desc;
-
 	HINSTANCE InstanceHandle = GetModuleHandle(nullptr);
 	WNDCLASSEX wc = {};
 	wc.cbSize = sizeof(wc);
@@ -44,65 +44,69 @@ bool WindowWin32::Initialize(const GameDesc& Desc)
 	wc.hInstance = InstanceHandle;
 	wc.lpszClassName = AppWindowClass;
 
+	Width = Game->GetWidth();
+	Height = Game->GetHeight();
 	int screenWidth = ::GetSystemMetrics(SM_CXSCREEN);
 	int screenHeight = ::GetSystemMetrics(SM_CYSCREEN);
-	int windowX = std::max<int>(0, (screenWidth - Desc.Width) / 2);
-	int windowY = std::max<int>(0, (screenHeight - Desc.Height) / 2);
+	int windowX = std::max<int>(0, (screenWidth - Width) / 2);
+	int windowY = std::max<int>(0, (screenHeight - Height) / 2);
 
 	RegisterClassEx(&wc);
 
-	RECT windowRect = { 0, 0, static_cast<LONG>(Desc.Width), static_cast<LONG>(Desc.Height) };
-    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+	RECT windowRect = { 0, 0, static_cast<LONG>(Width), static_cast<LONG>(Height) };
+	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 	m_hwnd = CreateWindowEx(
-		0,  // Optional window styles
-		AppWindowClass,  // Window class
-		Desc.Caption.c_str(),  // Window title
-		WS_OVERLAPPEDWINDOW,  // Window style
-		windowX, windowY, Desc.Width, Desc.Height,  // Position and Size
-		NULL,  // Parent window    
-		NULL,  // Menu
-		InstanceHandle,  // Instance handle
-		NULL  // Additional application data
+		0,									// Optional window styles
+		AppWindowClass,						// Window class
+		Game->GetWindowTitle().c_str(),		// Window title
+		WS_OVERLAPPEDWINDOW,				// Window style
+		windowX, windowY,					// Window Position
+		windowRect.right-windowRect.left,	// Width
+		windowRect.bottom - windowRect.top,	// Height
+		NULL,								// Parent window
+		NULL,								// Menu
+		InstanceHandle,						// Instance handle
+		Game								// Additional application data
 	);
 
-	::SetWindowLongPtr(m_hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
-	return true;
-}
-
-bool WindowWin32::IsClosed() const
-{
-	return m_bIsClosed;
-}
-
-void WindowWin32::Show()
-{
 	::ShowWindow(m_hwnd, SW_SHOWNORMAL);
+
+	return true;
 }
 
 LRESULT WindowWin32::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	WindowWin32* win = reinterpret_cast<WindowWin32*>(::GetWindowLongPtr(hWnd, GWLP_USERDATA));
-
-	if (win != nullptr)
+	FGame* Game = nullptr;
+	if (uMsg == WM_CREATE)
 	{
-		return win->HandleMessage(uMsg, wParam, lParam);
+		LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
+		SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+		Game = reinterpret_cast<FGame*>(pCreateStruct->lpCreateParams);
 	}
 	else
 	{
-		return ::DefWindowProc(hWnd, uMsg, wParam, lParam);
+		Game = reinterpret_cast<FGame*>(::GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	}
-}
-
-LRESULT WindowWin32::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
+	
 	switch (uMsg)
 	{
+	case WM_KEYDOWN:
+		Game->OnKeyDown(static_cast<uint8_t>(wParam));
+		if (wParam == VK_ESCAPE)
+		{
+			::PostQuitMessage(0);
+		}
+		break;
+
+	case WM_KEYUP:
+		Game->OnKeyUp(static_cast<uint8_t>(wParam));
+		break;
+
 	case WM_DESTROY:
-		m_bIsClosed = true;
 		::PostQuitMessage(0);
-		return 0;
+		break;
 	}
 
-	return ::DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+	return ::DefWindowProc(hWnd, uMsg, wParam, lParam);
 }

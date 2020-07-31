@@ -2,8 +2,8 @@
 
 #include <string>
 #include <Windows.h>
-#include "Game.h"
 
+class FGame;
 
 class WindowWin32
 {
@@ -14,26 +14,22 @@ private:
 	WindowWin32();
 
 public:
-	bool Initialize(const GameDesc& Desc);
+	bool Initialize(FGame* Game);
 	~WindowWin32();
 
 	static WindowWin32& Get();
 	void Destroy();
 
-	bool IsClosed() const;
-	int GetWidth() const { return m_GameDesc.Width; }
-	int GetHeight() const { return m_GameDesc.Height; }
+	int GetWidth() const { return Width; }
+	int GetHeight() const { return Height; }
 	HWND GetWindowHandle() const { return m_hwnd; }
-	void Show();
 
 
 private:
 	static LRESULT WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-	LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
 	
 private:
 	HWND m_hwnd;
-	bool m_bIsClosed;
-	GameDesc m_GameDesc;
+	int Width, Height;
 };
 

@@ -29,10 +29,10 @@ void RenderWindow::Initialize(ComPtr<ID3D12CommandQueue> commandQueue)
 	CreateDepthView(m_dsvHeap);
 }
 
-RenderWindow::~RenderWindow()
+void RenderWindow::Destroy()
 {
-}
 
+}
 
 ComPtr<IDXGISwapChain3> RenderWindow::CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, ComPtr<ID3D12CommandQueue> commandQueue, int width, int height, int bufferCount)
 {

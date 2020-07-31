@@ -13,22 +13,28 @@ struct GameDesc
 };
 
 
-class Game
+class FGame
 {
 public:
-	Game(const GameDesc& Desc);
-	virtual ~Game();
+	FGame(const GameDesc& Desc);
+	virtual ~FGame();
 
 	const GameDesc& GetDesc() const { return m_GameDesc; }
 
 	virtual void OnStartup();
-	virtual void LoadContent();
 	virtual void OnUpdate();
 	virtual void OnRender();
 	virtual void OnShutdown();
 
+	virtual void OnKeyDown(uint8_t Key) {}
+	virtual void OnKeyUp(uint8_t Key) {}
+
+	int GetWidth() const { return m_GameDesc.Width; }
+	int GetHeight() const { return m_GameDesc.Height; }
+	std::wstring GetWindowTitle() const { return m_GameDesc.Caption; }
+
 private:
-	FCamera* m_Camera;
+	FCamera* m_Camera = nullptr;
 	GameDesc m_GameDesc;
 };
 

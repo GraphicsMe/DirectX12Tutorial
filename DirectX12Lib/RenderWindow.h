@@ -10,10 +10,13 @@ class RenderWindow
 {
 private:
 	RenderWindow() = default;
+	~RenderWindow() = default;
+
 public:
 	static RenderWindow& Get();
 	void Initialize(ComPtr<ID3D12CommandQueue>);
-	~RenderWindow();
+	
+	void Destroy();
 
 	// swap chain & present
 	UINT Present(uint64_t currentFenceValue, CommandQueue* commandQueue);

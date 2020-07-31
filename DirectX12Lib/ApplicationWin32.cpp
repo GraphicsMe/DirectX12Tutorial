@@ -5,9 +5,9 @@
 #include <iostream>
 
 
-bool ApplicationWin32::Initialize(Game* game)
+bool ApplicationWin32::Initialize(FGame* game)
 {
-	WindowWin32::Get().Initialize(game->GetDesc());
+	WindowWin32::Get().Initialize(game);
 	D3D12RHI::Get().Initialize();
 	return true;
 }
@@ -24,10 +24,8 @@ ApplicationWin32& ApplicationWin32::ApplicationWin32::Get()
 	return Singleton;
 }
 
-void ApplicationWin32::Run(Game* game)
+void ApplicationWin32::Run(FGame* game)
 {
-	Assert(game != nullptr);
-
 	FTimer::InitTiming();
 
 	if (!Initialize(game))
@@ -36,15 +34,12 @@ void ApplicationWin32::Run(Game* game)
 	}
 
 	game->OnStartup();
-	game->LoadContent();
 
-	WindowWin32& Window = WindowWin32::Get();
-	Window.Show();
-
-	while (!Window.IsClosed())
+	MSG msg = {};
+	do
 	{
-		MSG msg = {};
-		while(::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		bool GotMessage = ::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE);
+		if (GotMessage)
 		{
 			::TranslateMessage(&msg);
 			::DispatchMessage(&msg);
@@ -52,7 +47,8 @@ void ApplicationWin32::Run(Game* game)
 
 		game->OnUpdate();
 		game->OnRender();
-	}
+	}while(msg.message != WM_QUIT);
+
 	game->OnShutdown();
 
 	this->Terminate();

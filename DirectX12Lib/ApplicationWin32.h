@@ -2,7 +2,7 @@
 #include "WindowWin32.h"
 
 
-class Game;
+class FGame;
 class D3D12RHI;
 
 class ApplicationWin32
@@ -10,12 +10,12 @@ class ApplicationWin32
 public:
 	static ApplicationWin32& Get();
 
-	void Run(Game* game);
+	void Run(FGame* game);
 
 	
 private:
 	//ApplicationWin32() = default;
-	bool Initialize(Game* game);
+	bool Initialize(FGame* game);
 	void Terminate();
 };
 
