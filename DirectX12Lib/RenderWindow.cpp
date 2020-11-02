@@ -36,30 +36,14 @@ void RenderWindow::Destroy()
 
 ComPtr<IDXGISwapChain3> RenderWindow::CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, ComPtr<ID3D12CommandQueue> commandQueue, int width, int height, int bufferCount)
 {
-	DXGI_FORMAT BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels;
-	QualityLevels.Format = BackBufferFormat;
-	QualityLevels.SampleCount = MSAA_SAMPLE;
-	QualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
-	QualityLevels.NumQualityLevels = 0;
-	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CheckFeatureSupport(
-		D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
-		&QualityLevels,
-		sizeof(QualityLevels)));
-
 	DXGI_SWAP_CHAIN_DESC1 Desc = {};
 	Desc.Width = width;
 	Desc.Height = height;
-	Desc.Format = BackBufferFormat;
-	Desc.Stereo = FALSE;
-	Desc.SampleDesc.Count = 1;
-	Desc.SampleDesc.Quality = 0;
-	Desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	Desc.BufferCount = bufferCount;
-	Desc.Scaling = DXGI_SCALING_STRETCH;
+	Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	Desc.SampleDesc.Count = 1;
+	Desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	Desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	Desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-	Desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	ComPtr<IDXGISwapChain1> swapchain1;
 	ThrowIfFailed(factory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &Desc, nullptr, nullptr, &swapchain1));
 

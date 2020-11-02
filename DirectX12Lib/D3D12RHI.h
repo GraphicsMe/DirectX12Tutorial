@@ -34,7 +34,7 @@ public:
 	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag, uint32_t numDescriptors);
 
 private:
-
+	void EnableDebugLayer();
 	ComPtr<IDXGIFactory4> CreateDXGIFactory();
 	ComPtr<IDXGIAdapter1> ChooseAdapter(ComPtr<IDXGIFactory4> factory);
 	ComPtr<ID3D12Device> CreateDevice(ComPtr<IDXGIAdapter1> adapter);

@@ -13,25 +13,27 @@
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxguid.lib")
+//#pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
 using namespace std;
-//using namespace std::chrono;
 
+void D3D12RHI::EnableDebugLayer()
+{
+#ifdef _DEBUG
+	ComPtr<ID3D12Debug> debugInterface;
+	ComPtr<ID3D12Debug1> debugController1;
+	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
+	ThrowIfFailed(debugInterface.As(&debugController1));
+	debugController1->EnableDebugLayer();
+	debugController1->SetEnableGPUBasedValidation(true);
+#endif
+}
 
 ComPtr<IDXGIFactory4> D3D12RHI::CreateDXGIFactory()
 {
 	UINT dxgiFactoryFlags = 0;
 #ifdef _DEBUG
-	ComPtr<ID3D12Debug> debugInterface;
-	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
-	//ThrowIfFailed(debugInterface->QueryInterface(IID_PPV_ARGS(&debugController1)));
-	ComPtr<ID3D12Debug1> debugController1;
-	ThrowIfFailed(debugInterface.As(&debugController1));
-	debugController1->EnableDebugLayer();
-	debugController1->SetEnableGPUBasedValidation(true);
-
 	dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 
@@ -45,7 +47,6 @@ ComPtr<IDXGIAdapter1> D3D12RHI::ChooseAdapter(ComPtr<IDXGIFactory4> factory)
 	ComPtr<IDXGIAdapter1> adapter;
 	int BestAdapterIndex = -1;
 	SIZE_T MaxGPUMemory = 0;
-	//这里Adapter被重复使用，每次调用EnumAdapters1前需要先Release再取地址，operator&刚好有这个作用(https://github.com/Microsoft/DirectXTK/wiki/ComPtr#initialization)
 	for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != factory->EnumAdapters1(adapterIndex, adapter.ReleaseAndGetAddressOf()); ++adapterIndex)
 	{
 		DXGI_ADAPTER_DESC1 desc;
@@ -73,8 +74,7 @@ ComPtr<IDXGIAdapter1> D3D12RHI::ChooseAdapter(ComPtr<IDXGIFactory4> factory)
 		return nullptr;
 	}
 
-	HRESULT hr = factory->EnumAdapters1(BestAdapterIndex, &adapter);
-	Assert(hr == S_OK);
+	ThrowIfFailed(factory->EnumAdapters1(BestAdapterIndex, adapter.ReleaseAndGetAddressOf()));
 	return adapter;
 }
 
@@ -119,18 +119,20 @@ D3D12RHI& D3D12RHI::Get()
 
 bool D3D12RHI::Initialize()
 {
-	// 0. create dxgi factory
+	// 0. enable debug layer
+	EnableDebugLayer();
+	// 1. create dxgi factory
 	m_dxgiFactory = CreateDXGIFactory();
 	ComPtr<IDXGIAdapter1> dxgiAdapter = ChooseAdapter(m_dxgiFactory);
 	
-	// 1. create device
+	// 2. create device
 	m_device = CreateDevice(dxgiAdapter);
 
-	// 2. create command queue
+	// 3. create command queue
 	m_copyCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COPY);
 	m_directCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-	// 3. create render window(swapchain)
+	// 4. create render window(swapchain)
 	RenderWindow::Get().Initialize(m_directCommandQueue->GetD3D12CommandQueue());
 
 	return true;

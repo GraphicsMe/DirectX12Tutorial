@@ -33,13 +33,14 @@ public:
 		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
 		commandList->SetName(L"Copy list");
 
+		SetupShaders();
+
 		ComPtr<ID3D12Resource> intermediateVertexBuffer;
 		ComPtr<ID3D12Resource> intermediateIndexBuffer;
-
 		SetupVertexBuffer(commandList, intermediateVertexBuffer);
 		SetupIndexBuffer(commandList, intermediateIndexBuffer);
+
 		SetupUniformBuffer();
-		SetupShaders();
 		SetupPiplineState();
 
 		uint64_t fenceValue = commandQueue->ExecuteCommandList(commandList);
@@ -75,9 +76,9 @@ public:
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 
-		ThrowIfFailed(m_uniformBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
+		//ThrowIfFailed(m_uniformBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
 		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
-		m_uniformBuffer->Unmap(0, nullptr);
+		//m_uniformBuffer->Unmap(0, nullptr);
 
 		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
 
@@ -123,7 +124,6 @@ private:
 				*pDestinationResource, *pIntermediateResource,
 				0, 0, 1, &subresourceData);
 		}
-		
 	}
 
 	void SetupVertexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
@@ -142,8 +142,8 @@ private:
 		Vertex vertexBufferData[3] =
 		{
 		  { { 1.0f,  -1.0f, 0.0f },{ 1.0f, 0.0f, 0.0f } },
-		  { { -1.0f,  -1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f } },
-		  { { 0.0f, 1.0f, 0.0f },{ 0.0f, 0.0f, 1.0f } }
+		  { { -1.0f, -1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f } },
+		  { { 0.0f,  1.0f,  0.0f },{ 0.0f, 0.0f, 1.0f } }
 		};
 
 		const UINT VertexBufferSize = sizeof(vertexBufferData);
@@ -151,9 +151,6 @@ private:
 		UpdateBufferResource(commandList,
 			&m_vertexBuffer, &intermediateBuffer,
 			_countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
-
-		m_vertexBuffer->SetName(L"Vertex buffer");
-		intermediateBuffer->SetName(L"Intermediate Vertex buffer");
 
 		// Initialize the vertex buffer view.
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -190,52 +187,22 @@ private:
 	ComPtr<ID3D12RootSignature> CreateRootSignature()
 	{
 		// create root signature
-		D3D12_DESCRIPTOR_RANGE1 ranges[1];
-		ranges[0].BaseShaderRegister = 0;
-		ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-		ranges[0].NumDescriptors = 1;
-		ranges[0].RegisterSpace = 0;
-		ranges[0].OffsetInDescriptorsFromTableStart = 0;
-		ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 
-		D3D12_ROOT_PARAMETER1 rootParams[1];
-		rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
-		rootParams[0].DescriptorTable.pDescriptorRanges = ranges;
+		CD3DX12_ROOT_PARAMETER1 rootParams[1];
+		rootParams[0].InitAsDescriptorTable(1, ranges, D3D12_SHADER_VISIBILITY_VERTEX);
 
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSigDesc = {};
-		rootSigDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSigDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-		rootSigDesc.Desc_1_1.NumParameters = 1;
-		rootSigDesc.Desc_1_1.pParameters = rootParams;
-		rootSigDesc.Desc_1_1.NumStaticSamplers = 0;
-		rootSigDesc.Desc_1_1.pStaticSamplers = nullptr;
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init_1_1(1, rootParams, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		ComPtr<ID3D12RootSignature> RootSignature;
 		ID3DBlob* signature;
 		ID3DBlob* error;
-		try
-		{
-			ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSigDesc, &signature, &error));
-			ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature)));
-			RootSignature->SetName(L"My Root Signature");
-		}
-		catch (std::exception e)
-		{
-			const char* errstr = (const char*)error->GetBufferPointer();
-			std::cout << errstr << std::endl;
-			error->Release();
-			error = nullptr;
-		}
-		if (signature)
-		{
-			signature->Release();
-			signature = nullptr;
-		}
+		ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
+		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature)));
 		return RootSignature;
 	}
-
 
 	void SetupPiplineState()
 	{
@@ -244,7 +211,6 @@ private:
 		  { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		  { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 		};
-
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -319,30 +285,11 @@ private:
 
 	void SetupUniformBuffer()
 	{
-		D3D12_HEAP_PROPERTIES heapProps;
-		heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-		heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapProps.CreationNodeMask = 1;
-		heapProps.VisibleNodeMask = 1;
-	
-		D3D12_RESOURCE_DESC uboResourceDesc;
-		uboResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		uboResourceDesc.Alignment = 0;
-		uboResourceDesc.Width = (sizeof(m_uboVS) + 255) & ~255;
-		uboResourceDesc.Height = 1;
-		uboResourceDesc.DepthOrArraySize = 1;
-		uboResourceDesc.MipLevels = 1;
-		uboResourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-		uboResourceDesc.SampleDesc.Count = 1;
-		uboResourceDesc.SampleDesc.Quality = 0;
-		uboResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		uboResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
+		int AlignedSize = (sizeof(m_uboVS) + 255) & ~255;    // CB size is required to be 256-byte aligned.
 		ThrowIfFailed(m_device->CreateCommittedResource(
-			&heapProps,
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
-			&uboResourceDesc,
+			&CD3DX12_RESOURCE_DESC::Buffer(AlignedSize),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&m_uniformBuffer)));
@@ -352,21 +299,18 @@ private:
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 		cbvDesc.BufferLocation = m_uniformBuffer->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = (sizeof(m_uboVS) + 255) & ~255;    // CB size is required to be 256-byte aligned.
+		cbvDesc.SizeInBytes = AlignedSize;
 
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle(m_uniformBufferHeap->GetCPUDescriptorHandleForHeapStart());
-		cbvHandle.ptr = cbvHandle.ptr + m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 0;
-
 		m_device->CreateConstantBufferView(&cbvDesc, cbvHandle);
 
 		// We do not intend to read from this resource on the CPU. (End is less than or equal to begin)
 		D3D12_RANGE readRange;
 		readRange.Begin = 0;
 		readRange.End = 0;
-
 		ThrowIfFailed(m_uniformBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
 		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
-		m_uniformBuffer->Unmap(0, &readRange);
+		//m_uniformBuffer->Unmap(0, &readRange);
 	}
 
 private:
