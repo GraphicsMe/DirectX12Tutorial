@@ -32,7 +32,7 @@ class LinearAllocationPage
 	friend class LinearAllocator;
 
 public:
-	LinearAllocationPage(ID3D12Resource* pResource, uint32_t SizeInBytes);
+	LinearAllocationPage(ComPtr<ID3D12Resource> pResource, uint32_t SizeInBytes);
 	~LinearAllocationPage();
 
 	bool HasSpace(uint32_t SizeInBytes, uint32_t Alignment);

@@ -3,12 +3,12 @@
 #include "D3D12RHI.h"
 #include "CommandQueue.h"
 
-LinearAllocationPage::LinearAllocationPage(ID3D12Resource* pResource, uint32_t SizeInBytes)
-	: m_d3d12Resource(pResource)
+LinearAllocationPage::LinearAllocationPage(ComPtr<ID3D12Resource> Resource, uint32_t SizeInBytes)
+	: m_d3d12Resource(Resource)
 	, m_PageSize(SizeInBytes)
 {
 	this->Map();
-	GpuAddress = pResource->GetGPUVirtualAddress();
+	GpuAddress = Resource->GetGPUVirtualAddress();
 }
 
 LinearAllocationPage::~LinearAllocationPage()
@@ -157,7 +157,7 @@ LinearAllocationPage* LinearAllocator::CreateNewPage(uint32_t PageSize)
 		DefaultUsage = D3D12_RESOURCE_STATE_GENERIC_READ;
 	}
 
-	ID3D12Resource* pBuffer = nullptr;
+	ComPtr<ID3D12Resource> pBuffer;
 	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateCommittedResource(
 		&HeapProps,
 		D3D12_HEAP_FLAG_NONE,
