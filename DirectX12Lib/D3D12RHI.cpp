@@ -1,4 +1,4 @@
-#include <chrono>
+﻿#include <chrono>
 #include <iostream>
 #include <D3Dcompiler.h>
 #include <dxgidebug.h>
@@ -111,6 +111,18 @@ ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEA
 
 
 
+FAllocation D3D12RHI::ReserveUploadMemory(uint32_t SizeInBytes)
+{
+	return m_CpuLinearAllocator.Allocate(SizeInBytes);
+}
+
+D3D12RHI::D3D12RHI()
+	: m_CpuLinearAllocator(ELinearAllocatorType::CpuWritable)
+	, m_GpuLinearAllocator(ELinearAllocatorType::GpuExclusive)
+{
+
+}
+
 D3D12RHI& D3D12RHI::Get()
 {
 	static D3D12RHI Singleton;
@@ -152,6 +164,9 @@ void D3D12RHI::Destroy()
 		delete m_directCommandQueue;
 		m_directCommandQueue = nullptr;
 	}
+	m_CpuLinearAllocator.Destroy();
+	m_GpuLinearAllocator.Destroy();
+
 	RenderWindow::Get().Destroy();
 }
 
@@ -204,4 +219,9 @@ void D3D12RHI::SetResourceBarrier(ComPtr<ID3D12GraphicsCommandList> commandList,
 	BarrierDesc.Transition.StateAfter = stateAfter;
 	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	commandList->ResourceBarrier(1, &BarrierDesc);
+}
+
+ID3D12Device* FD3D12Device::GetDevice()
+{
+	return GetParentAdapter()->GetD3DDevice();
 }

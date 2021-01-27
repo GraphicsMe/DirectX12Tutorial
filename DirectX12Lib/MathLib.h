@@ -1,6 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include <math.h>
+#include <stdint.h>
 
 const float MATH_PI = 3.141592654f;
 
@@ -182,3 +183,15 @@ struct FMatrix
 //inline Vector4f operator*(const FMatrix& mat, const Vector4f& vec);
 
 inline Vector4f operator*(const Vector4f& vec, const FMatrix& mat);
+
+template <typename T>
+T AlignUpWithMask(T Value, uint32_t Mask)
+{
+	return (T)(((uint32_t)Value + Mask) & (~Mask));
+}
+
+template <typename T>
+T AlignUp(T Value, uint32_t Alignment)
+{
+	return AlignUpWithMask(Value, Alignment - 1);
+}

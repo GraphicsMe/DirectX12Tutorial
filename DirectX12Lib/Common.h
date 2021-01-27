@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <wrl.h>
 #include <exception>
 #include <system_error>
+#include <stdint.h>
 
 using namespace Microsoft::WRL;
 

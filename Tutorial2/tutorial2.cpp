@@ -1,4 +1,4 @@
-#include "ApplicationWin32.h"
+﻿#include "ApplicationWin32.h"
 #include "Game.h"
 #include "Common.h"
 #include "MathLib.h"
@@ -35,10 +35,8 @@ public:
 
 		SetupShaders();
 
-		ComPtr<ID3D12Resource> intermediateVertexBuffer;
-		ComPtr<ID3D12Resource> intermediateIndexBuffer;
-		SetupVertexBuffer(commandList, intermediateVertexBuffer);
-		SetupIndexBuffer(commandList, intermediateIndexBuffer);
+		SetupVertexBuffer(commandList);
+		SetupIndexBuffer(commandList);
 
 		SetupUniformBuffer();
 		SetupPiplineState();
@@ -91,11 +89,11 @@ public:
 
 private:
 	void UpdateBufferResource(ComPtr<ID3D12GraphicsCommandList> commandList,
-        ID3D12Resource** pDestinationResource, ID3D12Resource** pIntermediateResource,
-        size_t numElements, size_t elementSize, const void* bufferData, 
+        ID3D12Resource** pDestinationResource,
+        uint32_t numElements, uint32_t elementSize, const void* bufferData,
         D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE )
 	{
-		size_t bufferSize = numElements * elementSize;
+		uint32_t bufferSize = numElements * elementSize;
 
 		ThrowIfFailed(m_device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -107,13 +105,7 @@ private:
 
 		if (bufferData)
 		{
-			ThrowIfFailed(m_device->CreateCommittedResource(
-				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-				D3D12_HEAP_FLAG_NONE,
-				&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(pIntermediateResource)));
+			FAllocation Allocation = D3D12RHI::Get().ReserveUploadMemory(bufferSize);
 
 			D3D12_SUBRESOURCE_DATA subresourceData = {};
 			subresourceData.pData = bufferData;
@@ -121,12 +113,14 @@ private:
 			subresourceData.SlicePitch = subresourceData.RowPitch;
 
 			UpdateSubresources(commandList.Get(), 
-				*pDestinationResource, *pIntermediateResource,
-				0, 0, 1, &subresourceData);
+				*pDestinationResource,
+				Allocation.D3d12Resource,
+				Allocation.Offset,
+				0, 1, &subresourceData);
 		}
 	}
 
-	void SetupVertexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
+	void SetupVertexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList)
 	{
 		struct Vertex
 		{
@@ -149,7 +143,7 @@ private:
 		const UINT VertexBufferSize = sizeof(vertexBufferData);
 
 		UpdateBufferResource(commandList,
-			&m_vertexBuffer, &intermediateBuffer,
+			&m_vertexBuffer,
 			_countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
 
 		// Initialize the vertex buffer view.
@@ -158,18 +152,17 @@ private:
 		m_vertexBufferView.SizeInBytes = VertexBufferSize;
 	}
 
-	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource>& intermediateBuffer)
+	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList)
 	{
 		uint32_t indexBufferData[3] = { 0, 1, 2 };
 
 		const UINT indexBufferSize = sizeof(indexBufferData);
 
 		UpdateBufferResource(commandList,
-			&m_indexBuffer, &intermediateBuffer,
+			&m_indexBuffer,
 			_countof(indexBufferData), sizeof(uint32_t), indexBufferData);
 
 		m_indexBuffer->SetName(L"Index buffer");
-		intermediateBuffer->SetName(L"Interdediate Index buffer");
 
 		// Initialize the vertex buffer view.
 		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
