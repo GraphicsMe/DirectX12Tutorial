@@ -118,6 +118,8 @@
   <ItemGroup>
     <ClInclude Include="ApplicationWin32.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CommandContext.h" />
+    <ClInclude Include="CommandListManager.h" />
     <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="D3D12RHI.h" />
@@ -134,6 +136,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CommandContext.cpp" />
+    <ClCompile Include="CommandListManager.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="Common.cpp" />
     <ClCompile Include="D3D12RHI.cpp" />
