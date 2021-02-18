@@ -22,17 +22,18 @@ public:
 	void Flush();
  
 	ComPtr<ID3D12CommandQueue> GetD3D12CommandQueue() const;
+	ID3D12CommandAllocator* RequestAllocator();
 
 protected:
-	ComPtr<ID3D12CommandAllocator> CreateCommandAllocator();
+	ID3D12CommandAllocator* CreateCommandAllocator();
 	ComPtr<ID3D12GraphicsCommandList> CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator);
 
 private:
     // Keep track of command allocators that are "in-flight"
     struct CommandAllocatorEntry
     {
-		uint64_t fenceValue;
-		ComPtr<ID3D12CommandAllocator> commandAllocator;
+		uint64_t FenceValue;
+		ID3D12CommandAllocator* CommandAllocator;
     };
  
     using CommandAllocatorQueue = std::queue<CommandAllocatorEntry>;

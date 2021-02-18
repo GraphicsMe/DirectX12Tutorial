@@ -32,32 +32,21 @@ CommandQueue::~CommandQueue()
 
 ComPtr<ID3D12GraphicsCommandList> CommandQueue::GetCommandList()
 {
-	ComPtr<ID3D12CommandAllocator> commandAllocator;
 	ComPtr<ID3D12GraphicsCommandList> commandList;
-	if ( !m_CommandAllocatorQueue.empty() && IsFenceComplete(m_CommandAllocatorQueue.front().fenceValue))
-	{
-		commandAllocator = m_CommandAllocatorQueue.front().commandAllocator;
-		m_CommandAllocatorQueue.pop();
- 
-		ThrowIfFailed(commandAllocator->Reset());
-	}
-	else
-	{
-		commandAllocator = CreateCommandAllocator();
-	}
-
+	
+	ID3D12CommandAllocator* Allocator = RequestAllocator();
 	if (!m_CommandListQueue.empty())
 	{
 		commandList = m_CommandListQueue.front();
 		m_CommandListQueue.pop();
  
-		ThrowIfFailed(commandList->Reset(commandAllocator.Get(), nullptr));
+		ThrowIfFailed(commandList->Reset(Allocator, nullptr));
 	}
 	else
 	{
-		commandList = CreateCommandList(commandAllocator);
+		commandList = CreateCommandList(Allocator);
 	}
-	ThrowIfFailed(commandList->SetPrivateDataInterface(__uuidof(ID3D12CommandAllocator), commandAllocator.Get()));
+	ThrowIfFailed(commandList->SetPrivateDataInterface(__uuidof(ID3D12CommandAllocator), Allocator));
 
 	return commandList;
 }
@@ -120,9 +109,26 @@ Microsoft::WRL::ComPtr<ID3D12CommandQueue> CommandQueue::GetD3D12CommandQueue() 
 	return m_d3d12CommandQueue;
 }
 
-ComPtr<ID3D12CommandAllocator> CommandQueue::CreateCommandAllocator()
+ID3D12CommandAllocator* CommandQueue::RequestAllocator()
 {
-	ComPtr<ID3D12CommandAllocator> CommandAllocator;
+	ID3D12CommandAllocator* Allocator = nullptr;
+	if (!m_CommandAllocatorQueue.empty() && IsFenceComplete(m_CommandAllocatorQueue.front().FenceValue))
+	{
+		Allocator = m_CommandAllocatorQueue.front().CommandAllocator;
+		m_CommandAllocatorQueue.pop();
+
+		ThrowIfFailed(Allocator->Reset());
+	}
+	else
+	{
+		Allocator = CreateCommandAllocator();
+	}
+	return Allocator;
+}
+
+ID3D12CommandAllocator* CommandQueue::CreateCommandAllocator()
+{
+	ID3D12CommandAllocator* CommandAllocator;
 	ThrowIfFailed(m_d3d12Device->CreateCommandAllocator(m_CommandListType, IID_PPV_ARGS(&CommandAllocator)));
 	return CommandAllocator;
 }

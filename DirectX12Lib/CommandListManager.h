@@ -20,11 +20,11 @@ public:
 	CommandQueue& GetQueue(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 	void CreateNewCommandList(
-		D3D12_COMMAND_LIST_TYPE Type,
-		ComPtr<ID3D12GraphicsCommandList> List,
-		ComPtr< ID3D12CommandAllocator> Allocator);
+		D3D12_COMMAND_LIST_TYPE Type, 
+		ID3D12GraphicsCommandList** List, 
+		ID3D12CommandAllocator** Allocator);
 
-	bool IsFenceComplete
+	bool IsFenceComplete() const;
 
 
 private:
