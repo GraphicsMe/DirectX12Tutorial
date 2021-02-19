@@ -11,7 +11,7 @@
 #include "LinearAllocator.h"
 
 class WindowWin32;
-class CommandQueue;
+class FCommandQueue;
 class FD3D12Device;
 class FD3D12Adapter;
 

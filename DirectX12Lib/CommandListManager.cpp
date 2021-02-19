@@ -30,7 +30,7 @@ void FCommandListManager::Destroy()
 	m_CopyQueue.Destroy();
 }
 
-CommandQueue& FCommandListManager::GetQueue(D3D12_COMMAND_LIST_TYPE Type /*= D3D12_COMMAND_LIST_TYPE_DIRECT*/)
+FCommandQueue& FCommandListManager::GetQueue(D3D12_COMMAND_LIST_TYPE Type /*= D3D12_COMMAND_LIST_TYPE_DIRECT*/)
 {
 	switch (Type)
 	{

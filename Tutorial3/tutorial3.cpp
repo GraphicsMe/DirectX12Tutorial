@@ -1,4 +1,4 @@
-#include "ApplicationWin32.h"
+﻿#include "ApplicationWin32.h"
 #include "Game.h"
 #include "Common.h"
 #include "MathLib.h"
@@ -29,7 +29,7 @@ public:
 
 		m_rootSignature = CreateRootSignature();
 
-		CommandQueue* commandQueue = D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
+		FCommandQueue* commandQueue = D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
 		commandList->SetName(L"Copy list");
 
@@ -54,7 +54,7 @@ public:
 	void OnRender()
 	{
 		D3D12RHI& RHI = D3D12RHI::Get();
-		CommandQueue* commandQueue = RHI.GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		FCommandQueue* commandQueue = RHI.GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();

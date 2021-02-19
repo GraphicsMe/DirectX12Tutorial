@@ -5,7 +5,7 @@
 #include "Common.h"
 
 
-class CommandQueue;
+class FCommandQueue;
 class RenderWindow
 {
 private:
@@ -19,7 +19,7 @@ public:
 	void Destroy();
 
 	// swap chain & present
-	UINT Present(uint64_t currentFenceValue, CommandQueue* commandQueue);
+	UINT Present(uint64_t currentFenceValue, FCommandQueue* commandQueue);
 	ComPtr<ID3D12Resource> GetBackBuffer();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();

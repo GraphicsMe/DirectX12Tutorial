@@ -13,11 +13,11 @@ public:
 	void Create(ID3D12Device* Device);
 	void Destroy();
 
-	CommandQueue& GetGraphicsQueue() { return m_GraphicsQueue; }
-	CommandQueue& GetComputeQueue() { return m_ComputeQueue; }
-	CommandQueue& GetCopyQueue() { return m_CopyQueue; }
+	FCommandQueue& GetGraphicsQueue() { return m_GraphicsQueue; }
+	FCommandQueue& GetComputeQueue() { return m_ComputeQueue; }
+	FCommandQueue& GetCopyQueue() { return m_CopyQueue; }
 
-	CommandQueue& GetQueue(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT);
+	FCommandQueue& GetQueue(D3D12_COMMAND_LIST_TYPE Type = D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 	void CreateNewCommandList(
 		D3D12_COMMAND_LIST_TYPE Type, 
@@ -29,7 +29,7 @@ public:
 
 private:
 	ID3D12Device* m_Device;
-	CommandQueue m_GraphicsQueue;
-	CommandQueue m_ComputeQueue;
-	CommandQueue m_CopyQueue;
+	FCommandQueue m_GraphicsQueue;
+	FCommandQueue m_ComputeQueue;
+	FCommandQueue m_CopyQueue;
 };

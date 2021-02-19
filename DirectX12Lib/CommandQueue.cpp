@@ -1,7 +1,7 @@
 ﻿#include "CommandQueue.h"
 
 
-CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE type)
+FCommandQueue::FCommandQueue(D3D12_COMMAND_LIST_TYPE type)
 	: m_d3d12Device(nullptr)
 	, m_CommandListType(type)
 	, m_FenceValue(0)
@@ -9,12 +9,12 @@ CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE type)
 
 }
 
-CommandQueue::~CommandQueue()
+FCommandQueue::~FCommandQueue()
 {
 	Destroy();
 }
 
-void CommandQueue::Create(ID3D12Device* Device)
+void FCommandQueue::Create(ID3D12Device* Device)
 {
 	m_d3d12Device = Device;
 
@@ -32,7 +32,7 @@ void CommandQueue::Create(ID3D12Device* Device)
 	Assert(m_FenceEvent && "Failed to create fence event handle.");
 }
 
-void CommandQueue::Destroy()
+void FCommandQueue::Destroy()
 {
 	if (!m_FenceEvent)
 	{
@@ -52,7 +52,7 @@ void CommandQueue::Destroy()
 	m_FenceEvent = nullptr;
 }
 
-ComPtr<ID3D12GraphicsCommandList> CommandQueue::GetCommandList()
+ComPtr<ID3D12GraphicsCommandList> FCommandQueue::GetCommandList()
 {
 	ComPtr<ID3D12GraphicsCommandList> commandList;
 	
@@ -73,7 +73,7 @@ ComPtr<ID3D12GraphicsCommandList> CommandQueue::GetCommandList()
 	return commandList;
 }
 
-uint64_t CommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList)
+uint64_t FCommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList)
 {
 	commandList->Close();  // finish recording command, should be called before ExecuteCommandLists
  
@@ -98,7 +98,7 @@ uint64_t CommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> comm
 	return fenceValue;
 }
 
-uint64_t CommandQueue::Signal()
+uint64_t FCommandQueue::Signal()
 {
     uint64_t fenceValueForSignal = ++m_FenceValue;
     ThrowIfFailed(m_d3d12CommandQueue->Signal(m_d3d12Fence.Get(), fenceValueForSignal));
@@ -106,12 +106,12 @@ uint64_t CommandQueue::Signal()
     return fenceValueForSignal;
 }
 
-bool CommandQueue::IsFenceComplete(uint64_t fenceValue)
+bool FCommandQueue::IsFenceComplete(uint64_t fenceValue)
 {
 	return m_d3d12Fence->GetCompletedValue() >= fenceValue;
 }
 
-void CommandQueue::WaitForFenceValue(uint64_t fenceValue)
+void FCommandQueue::WaitForFenceValue(uint64_t fenceValue)
 {
 	if (m_d3d12Fence->GetCompletedValue() < fenceValue)
     {
@@ -120,13 +120,13 @@ void CommandQueue::WaitForFenceValue(uint64_t fenceValue)
     }
 }
 
-void CommandQueue::Flush()
+void FCommandQueue::Flush()
 {
 	uint64_t fenceValueForSignal = Signal();
     WaitForFenceValue(fenceValueForSignal);
 }
 
-ID3D12CommandAllocator* CommandQueue::RequestAllocator()
+ID3D12CommandAllocator* FCommandQueue::RequestAllocator()
 {
 	ID3D12CommandAllocator* Allocator = nullptr;
 	if (!m_CommandAllocatorQueue.empty() && IsFenceComplete(m_CommandAllocatorQueue.front().FenceValue))
@@ -143,14 +143,14 @@ ID3D12CommandAllocator* CommandQueue::RequestAllocator()
 	return Allocator;
 }
 
-ID3D12CommandAllocator* CommandQueue::CreateCommandAllocator()
+ID3D12CommandAllocator* FCommandQueue::CreateCommandAllocator()
 {
 	ID3D12CommandAllocator* CommandAllocator;
 	ThrowIfFailed(m_d3d12Device->CreateCommandAllocator(m_CommandListType, IID_PPV_ARGS(&CommandAllocator)));
 	return CommandAllocator;
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> CommandQueue::CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator)
+Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> FCommandQueue::CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator)
 {
 	ComPtr<ID3D12GraphicsCommandList> commandList;
 	ThrowIfFailed(m_d3d12Device->CreateCommandList(0, m_CommandListType, allocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));

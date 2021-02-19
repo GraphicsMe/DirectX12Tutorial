@@ -94,7 +94,7 @@ void RenderWindow::CreateDepthView(ComPtr<ID3D12DescriptorHeap> descriptorHeap)
 	D3D12RHI::Get().GetD3D12Device()->CreateDepthStencilView(m_depthBuffer.Get(), &dsv, descriptorHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
-UINT RenderWindow::Present(uint64_t currentFenceValue, CommandQueue* commandQueue)
+UINT RenderWindow::Present(uint64_t currentFenceValue, FCommandQueue* commandQueue)
 {
 	m_fenceValues[m_frameIndex] = currentFenceValue;
 	m_swapChain->Present(1, 0);

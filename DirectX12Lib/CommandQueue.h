@@ -4,11 +4,11 @@
 #include <queue>
 #include <d3d12.h>
 
-class CommandQueue
+class FCommandQueue
 {
 public:
-	CommandQueue(D3D12_COMMAND_LIST_TYPE type);
-	virtual ~CommandQueue();
+	FCommandQueue(D3D12_COMMAND_LIST_TYPE type);
+	virtual ~FCommandQueue();
 
 	void Create(ID3D12Device* Device);
 	void Destroy();
