@@ -2,6 +2,9 @@
 #include "MathLib.h"
 #include "D3D12RHI.h"
 #include "CommandQueue.h"
+#include "CommandListManager.h"
+
+extern FCommandListManager g_CommandListManager;
 
 LinearAllocationPage::LinearAllocationPage(ComPtr<ID3D12Resource> Resource, uint32_t SizeInBytes)
 	: m_d3d12Resource(Resource)
@@ -105,9 +108,8 @@ LinearAllocationPage* LinearAllocator::AllocateLargePage(uint32_t SizeInBytes)
 
 LinearAllocationPage* LinearAllocator::RequestPage(uint32_t SizeInBytes)
 {
-	CommandQueue* commandQueue = D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
 	LinearAllocationPage* Page = nullptr;
-	while (!m_RetiredPages.empty() && commandQueue->IsFenceComplete(m_RetiredPages.front()->GetFenceValue()))
+	while (!m_RetiredPages.empty() && g_CommandListManager.IsFenceComplete(m_RetiredPages.front()->GetFenceValue()))
 	{
 		Page = m_RetiredPages.front();
 		m_RetiredPages.pop_front();

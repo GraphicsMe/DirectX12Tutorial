@@ -10,6 +10,7 @@
 #include "Camera.h"
 #include "CommandQueue.h"
 #include "RenderWindow.h"
+#include "CommandListManager.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -17,6 +18,8 @@
 #pragma comment(lib, "d3dcompiler.lib")
 
 using namespace std;
+
+FCommandListManager g_CommandListManager;
 
 void D3D12RHI::EnableDebugLayer()
 {
@@ -109,8 +112,6 @@ ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEA
 	return descriptorHeap;
 }
 
-
-
 FAllocation D3D12RHI::ReserveUploadMemory(uint32_t SizeInBytes)
 {
 	return m_CpuLinearAllocator.Allocate(SizeInBytes);
@@ -141,46 +142,26 @@ bool D3D12RHI::Initialize()
 	m_device = CreateDevice(dxgiAdapter);
 
 	// 3. create command queue
-	m_copyCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COPY);
-	m_directCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	//m_copyCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COPY);
+	//m_directCommandQueue = new CommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	// 3. create command list manager as well as command queues
+	g_CommandListManager.Create(m_device.Get());
 
 	// 4. create render window(swapchain)
-	RenderWindow::Get().Initialize(m_directCommandQueue->GetD3D12CommandQueue());
+	RenderWindow::Get().Initialize();
 
 	return true;
 }
 
 void D3D12RHI::Destroy()
 {
-	if (m_copyCommandQueue)
-	{
-		m_copyCommandQueue->Flush();
-		delete m_copyCommandQueue;
-		m_copyCommandQueue = nullptr;
-	}
-	if (m_directCommandQueue)
-	{
-		m_directCommandQueue->Flush();
-		delete m_directCommandQueue;
-		m_directCommandQueue = nullptr;
-	}
+	g_CommandListManager.Destroy();
+
 	m_CpuLinearAllocator.Destroy();
 	m_GpuLinearAllocator.Destroy();
 
 	RenderWindow::Get().Destroy();
-}
-
-CommandQueue* D3D12RHI::GetCommandQueue(D3D12_COMMAND_LIST_TYPE type)
-{
-	switch(type)
-	{
-	case D3D12_COMMAND_LIST_TYPE_COPY:
-		return m_copyCommandQueue;
-	case D3D12_COMMAND_LIST_TYPE_DIRECT:
-		return m_directCommandQueue;
-	default:
-		return nullptr;
-	}
 }
 
 ComPtr<ID3DBlob> D3D12RHI::CreateShader(const std::wstring& ShaderFile, const std::string& EntryPoint, const std::string& TargetModel)

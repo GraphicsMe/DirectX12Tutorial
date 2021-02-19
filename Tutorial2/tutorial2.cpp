@@ -7,11 +7,15 @@
 #include "D3D12RHI.h"
 #include "d3dx12.h"
 #include "RenderWindow.h"
+#include "CommandListManager.h"
+
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <chrono>
 #include <iostream>
+
+extern FCommandListManager g_CommandListManager;
 
 
 class Tutorial2 : public FGame
@@ -29,8 +33,8 @@ public:
 
 		m_rootSignature = CreateRootSignature();
 
-		CommandQueue* commandQueue = D3D12RHI::Get().GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY);
-		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
+		CommandQueue& commandQueue = g_CommandListManager.GetCopyQueue();
+		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue.GetCommandList();
 		commandList->SetName(L"Copy list");
 
 		SetupShaders();
@@ -41,8 +45,8 @@ public:
 		SetupUniformBuffer();
 		SetupPiplineState();
 
-		uint64_t fenceValue = commandQueue->ExecuteCommandList(commandList);
-		commandQueue->WaitForFenceValue(fenceValue);
+		uint64_t fenceValue = commandQueue.ExecuteCommandList(commandList);
+		commandQueue.WaitForFenceValue(fenceValue);
 	}
 
 	void OnUpdate()
@@ -53,7 +57,7 @@ public:
 	void OnRender()
 	{
 		D3D12RHI& RHI = D3D12RHI::Get();
-		CommandQueue* commandQueue = RHI.GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		CommandQueue& commandQueue = g_CommandListManager.GetGraphicsQueue();
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
@@ -78,13 +82,13 @@ public:
 		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
 		//m_uniformBuffer->Unmap(0, nullptr);
 
-		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue->GetCommandList();
+		ComPtr<ID3D12GraphicsCommandList> commandList = commandQueue.GetCommandList();
 
 		FillCommandLists(commandList);
 		
-		uint64_t fenceValue = commandQueue->ExecuteCommandList(commandList);
+		uint64_t fenceValue = commandQueue.ExecuteCommandList(commandList);
 
-		RenderWindow::Get().Present(fenceValue, commandQueue);	
+		RenderWindow::Get().Present(fenceValue, &commandQueue);	
 	}
 
 private:

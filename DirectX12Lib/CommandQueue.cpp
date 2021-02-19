@@ -1,33 +1,55 @@
-#include "CommandQueue.h"
+﻿#include "CommandQueue.h"
 
 
-CommandQueue::CommandQueue(ComPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type)
-	: m_d3d12Device(device)
+CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE type)
+	: m_d3d12Device(nullptr)
 	, m_CommandListType(type)
 	, m_FenceValue(0)
 {
+
+}
+
+CommandQueue::~CommandQueue()
+{
+	Destroy();
+}
+
+void CommandQueue::Create(ID3D12Device* Device)
+{
+	m_d3d12Device = Device;
+
 	D3D12_COMMAND_QUEUE_DESC Desc = {};
-	Desc.Type = type;
+	Desc.Type = m_CommandListType;
 	Desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	Desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	Desc.NodeMask = 0;
 
 	ThrowIfFailed(m_d3d12Device->CreateCommandQueue(&Desc, IID_PPV_ARGS(&m_d3d12CommandQueue)));
 	ThrowIfFailed(m_d3d12Device->CreateFence(m_FenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_d3d12Fence)));
-     
-    m_FenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+
+	m_FenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
 
 	Assert(m_FenceEvent && "Failed to create fence event handle.");
 }
 
-CommandQueue::~CommandQueue()
+void CommandQueue::Destroy()
 {
+	if (!m_FenceEvent)
+	{
+		return;
+	}
+
 	Flush();
-	
 	m_CommandListQueue.empty();
+	while (!m_CommandAllocatorQueue.empty())
+	{
+		m_CommandAllocatorQueue.front().CommandAllocator->Release();
+		m_CommandAllocatorQueue.pop();
+	}
 	m_CommandAllocatorQueue.empty();
 
 	::CloseHandle(m_FenceEvent);
+	m_FenceEvent = nullptr;
 }
 
 ComPtr<ID3D12GraphicsCommandList> CommandQueue::GetCommandList()
@@ -102,11 +124,6 @@ void CommandQueue::Flush()
 {
 	uint64_t fenceValueForSignal = Signal();
     WaitForFenceValue(fenceValueForSignal);
-}
-
-Microsoft::WRL::ComPtr<ID3D12CommandQueue> CommandQueue::GetD3D12CommandQueue() const
-{
-	return m_d3d12CommandQueue;
 }
 
 ID3D12CommandAllocator* CommandQueue::RequestAllocator()

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -14,7 +14,7 @@ private:
 
 public:
 	static RenderWindow& Get();
-	void Initialize(ComPtr<ID3D12CommandQueue>);
+	void Initialize();
 	
 	void Destroy();
 
@@ -25,7 +25,7 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();
 
 private:
-	ComPtr<IDXGISwapChain3> CreateSwapChain(HWND hwnd, ComPtr<IDXGIFactory4> factory, ComPtr<ID3D12CommandQueue> commandQueue, int width, int height, int bufferCount);
+	ComPtr<IDXGISwapChain3> CreateSwapChain(HWND hwnd, IDXGIFactory4* factory, ID3D12CommandQueue* commandQueue, int width, int height, int bufferCount);
 	void CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 	void CreateDepthView(ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 

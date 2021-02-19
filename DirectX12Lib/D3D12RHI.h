@@ -108,8 +108,7 @@ public:
 	void Destroy();
 
 	ComPtr<ID3D12Device> GetD3D12Device() { return m_device; }
-	ComPtr<IDXGIFactory4> GetDXGIFactory() { return m_dxgiFactory; }
-	CommandQueue* GetCommandQueue(D3D12_COMMAND_LIST_TYPE type);
+	IDXGIFactory4* GetDXGIFactory() { return m_dxgiFactory.Get(); }
 	ComPtr<ID3DBlob> CreateShader(const std::wstring& ShaderFile, const std::string& EntryPoint, const std::string& TargetModel);
 	void SetResourceBarrier(ComPtr<ID3D12GraphicsCommandList> commandList, ComPtr<ID3D12Resource> resource, 
 			D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);;
@@ -127,9 +126,6 @@ private:
 private:
 	ComPtr<IDXGIFactory4> m_dxgiFactory;
 	ComPtr<ID3D12Device> m_device;
-	
-	CommandQueue* m_copyCommandQueue;
-	CommandQueue* m_directCommandQueue;
 
 	LinearAllocator m_CpuLinearAllocator;
 	LinearAllocator m_GpuLinearAllocator;

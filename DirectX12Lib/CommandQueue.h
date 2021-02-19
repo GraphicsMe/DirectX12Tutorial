@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Common.h"
 #include <queue>
@@ -7,8 +7,11 @@
 class CommandQueue
 {
 public:
-	CommandQueue(ComPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE type);
+	CommandQueue(D3D12_COMMAND_LIST_TYPE type);
 	virtual ~CommandQueue();
+
+	void Create(ID3D12Device* Device);
+	void Destroy();
 	
 	ComPtr<ID3D12GraphicsCommandList> GetCommandList();
 
@@ -21,7 +24,7 @@ public:
 	void WaitForFenceValue(uint64_t fenceValue);
 	void Flush();
  
-	ComPtr<ID3D12CommandQueue> GetD3D12CommandQueue() const;
+	ID3D12CommandQueue* GetD3D12CommandQueue() const { return m_d3d12CommandQueue.Get(); }
 	ID3D12CommandAllocator* RequestAllocator();
 
 protected:
@@ -40,7 +43,7 @@ private:
     using CommandListQueue = std::queue< ComPtr<ID3D12GraphicsCommandList> >;
  
 	D3D12_COMMAND_LIST_TYPE		m_CommandListType;
-	ComPtr<ID3D12Device>		m_d3d12Device;
+	ID3D12Device*				m_d3d12Device;
 	ComPtr<ID3D12CommandQueue>	m_d3d12CommandQueue;
 	ComPtr<ID3D12Fence>			m_d3d12Fence;
 	HANDLE						m_FenceEvent;

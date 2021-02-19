@@ -10,7 +10,7 @@ public:
 	FCommandListManager();
 	~FCommandListManager();
 
-	void Create(ComPtr<ID3D12Device> Device);
+	void Create(ID3D12Device* Device);
 	void Destroy();
 
 	CommandQueue& GetGraphicsQueue() { return m_GraphicsQueue; }
@@ -24,11 +24,11 @@ public:
 		ID3D12GraphicsCommandList** List, 
 		ID3D12CommandAllocator** Allocator);
 
-	bool IsFenceComplete() const;
+	bool IsFenceComplete(uint64_t FenceValue);
 
 
 private:
-	ComPtr<ID3D12Device> Device;
+	ID3D12Device* m_Device;
 	CommandQueue m_GraphicsQueue;
 	CommandQueue m_ComputeQueue;
 	CommandQueue m_CopyQueue;
