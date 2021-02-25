@@ -19,7 +19,7 @@ public:
 	void Destroy();
 
 	// swap chain & present
-	UINT Present(uint64_t currentFenceValue, FCommandQueue* commandQueue);
+	UINT Present();
 	ComPtr<ID3D12Resource> GetBackBuffer();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();
@@ -34,7 +34,6 @@ private:
 	
 	static const UINT BUFFER_COUNT = 2;
 	UINT m_frameIndex;
-	uint64_t m_fenceValues[BUFFER_COUNT];
 
 	UINT m_rtvDescriptorSize;
 	ComPtr<IDXGISwapChain3> m_swapChain;

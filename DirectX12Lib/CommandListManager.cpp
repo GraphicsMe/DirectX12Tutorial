@@ -1,5 +1,7 @@
 ﻿#include "CommandListManager.h"
 
+#define GET_QUEUE_TYPE(f) ((D3D12_COMMAND_LIST_TYPE)(f >> 56))
+
 FCommandListManager::FCommandListManager()
 	: m_Device(nullptr)
 	, m_GraphicsQueue(D3D12_COMMAND_LIST_TYPE_DIRECT)
@@ -60,6 +62,12 @@ void FCommandListManager::CreateNewCommandList(D3D12_COMMAND_LIST_TYPE Type, ID3
 
 bool FCommandListManager::IsFenceComplete(uint64_t FenceValue)
 {
-	return GetQueue(D3D12_COMMAND_LIST_TYPE(FenceValue >> 56)).IsFenceComplete(FenceValue);
+	return GetQueue(GET_QUEUE_TYPE(FenceValue)).IsFenceComplete(FenceValue);
+}
+
+void FCommandListManager::WaitForFence(uint64_t FenceValue)
+{
+	FCommandQueue& Producer = GetQueue(GET_QUEUE_TYPE(FenceValue));
+	Producer.WaitForFenceValue(FenceValue);
 }
 

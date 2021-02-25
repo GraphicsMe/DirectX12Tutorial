@@ -1,6 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 
 class FGame;
@@ -27,7 +31,7 @@ public:
 
 private:
 	static LRESULT WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-	
+
 private:
 	HWND m_hwnd;
 	int Width, Height;

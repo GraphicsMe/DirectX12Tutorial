@@ -25,6 +25,7 @@ public:
 		ID3D12CommandAllocator** Allocator);
 
 	bool IsFenceComplete(uint64_t FenceValue);
+	void WaitForFence(uint64_t FenceValue);
 
 
 private:

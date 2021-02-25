@@ -20,12 +20,13 @@ public:
 	uint64_t ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList);
 
 	uint64_t Signal();
-	bool IsFenceComplete(uint64_t fenceValue);
-	void WaitForFenceValue(uint64_t fenceValue);
+	bool IsFenceComplete(uint64_t FenceValue);
+	void WaitForFenceValue(uint64_t FenceValue);
 	void Flush();
  
 	ID3D12CommandQueue* GetD3D12CommandQueue() const { return m_d3d12CommandQueue.Get(); }
 	ID3D12CommandAllocator* RequestAllocator();
+	void DiscardAllocator(uint64_t FenceValue, ID3D12CommandAllocator* CommandAllocator);
 
 protected:
 	ID3D12CommandAllocator* CreateCommandAllocator();
@@ -39,7 +40,6 @@ private:
 		ID3D12CommandAllocator* CommandAllocator;
     };
  
-    using CommandAllocatorQueue = std::queue<CommandAllocatorEntry>;
     using CommandListQueue = std::queue< ComPtr<ID3D12GraphicsCommandList> >;
  
 	D3D12_COMMAND_LIST_TYPE		m_CommandListType;
@@ -47,9 +47,12 @@ private:
 	ComPtr<ID3D12CommandQueue>	m_d3d12CommandQueue;
 	ComPtr<ID3D12Fence>			m_d3d12Fence;
 	HANDLE						m_FenceEvent;
-	uint64_t					m_FenceValue;
+	uint64_t					m_NextFenceValue;
+	uint64_t					m_LastCompletedFenceValue;
  
-	CommandAllocatorQueue		m_CommandAllocatorQueue;
+	std::queue< CommandAllocatorEntry>		m_ReadyAllocators;
+	std::vector<ID3D12CommandAllocator*>	m_AllocatorPool;
+
 	CommandListQueue			m_CommandListQueue;
 };
 

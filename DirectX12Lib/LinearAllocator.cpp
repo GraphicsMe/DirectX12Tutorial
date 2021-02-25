@@ -78,6 +78,11 @@ FAllocation LinearAllocator::Allocate(uint32_t SizeInBytes, uint32_t Alignment /
 	return allocation;
 }
 
+void LinearAllocator::CleanupUsedPages(uint64_t FenceID)
+{
+
+}
+
 void LinearAllocator::Destroy()
 {
 	while (!m_RetiredPages.empty())

@@ -10,6 +10,7 @@
 #include "Camera.h"
 #include "CommandQueue.h"
 #include "RenderWindow.h"
+#include "CommandContext.h"
 #include "CommandListManager.h"
 
 #pragma comment(lib, "dxgi.lib")
@@ -19,6 +20,7 @@
 
 using namespace std;
 
+FContextManager g_ContextManager;
 FCommandListManager g_CommandListManager;
 
 void D3D12RHI::EnableDebugLayer()

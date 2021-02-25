@@ -1,5 +1,7 @@
 ﻿#pragma once
-
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <wrl.h>
 #include <exception>
 #include <system_error>

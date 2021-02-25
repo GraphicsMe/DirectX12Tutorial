@@ -1,7 +1,6 @@
-#pragma once
+﻿#pragma once
 
 #include "Common.h"
-#include <Windows.h>
 #include <wchar.h>
 
 #define MAX_STRING_LEN 512

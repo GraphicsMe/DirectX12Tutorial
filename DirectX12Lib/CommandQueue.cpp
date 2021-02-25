@@ -1,10 +1,12 @@
 ﻿#include "CommandQueue.h"
 
+#define SET_FENCE(f) ((uint64_t)m_CommandListType << 56 | f)
 
 FCommandQueue::FCommandQueue(D3D12_COMMAND_LIST_TYPE type)
 	: m_d3d12Device(nullptr)
 	, m_CommandListType(type)
-	, m_FenceValue(0)
+	, m_NextFenceValue(SET_FENCE(1))
+	, m_LastCompletedFenceValue(SET_FENCE(0))
 {
 
 }
@@ -25,7 +27,7 @@ void FCommandQueue::Create(ID3D12Device* Device)
 	Desc.NodeMask = 0;
 
 	ThrowIfFailed(m_d3d12Device->CreateCommandQueue(&Desc, IID_PPV_ARGS(&m_d3d12CommandQueue)));
-	ThrowIfFailed(m_d3d12Device->CreateFence(m_FenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_d3d12Fence)));
+	ThrowIfFailed(m_d3d12Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_d3d12Fence)));
 
 	m_FenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
 
@@ -41,12 +43,12 @@ void FCommandQueue::Destroy()
 
 	Flush();
 	m_CommandListQueue.empty();
-	while (!m_CommandAllocatorQueue.empty())
+	//Assert(m_ReadyAllocators.empty());
+	for (uint32_t i = 0; i < m_AllocatorPool.size(); ++i)
 	{
-		m_CommandAllocatorQueue.front().CommandAllocator->Release();
-		m_CommandAllocatorQueue.pop();
+		m_AllocatorPool[i]->Release();
 	}
-	m_CommandAllocatorQueue.empty();
+	m_AllocatorPool.clear();
 
 	::CloseHandle(m_FenceEvent);
 	m_FenceEvent = nullptr;
@@ -55,13 +57,13 @@ void FCommandQueue::Destroy()
 ComPtr<ID3D12GraphicsCommandList> FCommandQueue::GetCommandList()
 {
 	ComPtr<ID3D12GraphicsCommandList> commandList;
-	
+
 	ID3D12CommandAllocator* Allocator = RequestAllocator();
 	if (!m_CommandListQueue.empty())
 	{
 		commandList = m_CommandListQueue.front();
 		m_CommandListQueue.pop();
- 
+
 		ThrowIfFailed(commandList->Reset(Allocator, nullptr));
 	}
 	else
@@ -76,71 +78,81 @@ ComPtr<ID3D12GraphicsCommandList> FCommandQueue::GetCommandList()
 uint64_t FCommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList)
 {
 	commandList->Close();  // finish recording command, should be called before ExecuteCommandLists
- 
-	ID3D12CommandAllocator* commandAllocator;
-	UINT dataSize = sizeof(commandAllocator);
-	ThrowIfFailed(commandList->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator));
- 
+
+	//ID3D12CommandAllocator* commandAllocator;
+	//UINT dataSize = sizeof(commandAllocator);
+	//ThrowIfFailed(commandList->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator));
+
 	ID3D12CommandList* const ppCommandLists[] = {
 		commandList.Get()
 	};
- 
+
 	m_d3d12CommandQueue->ExecuteCommandLists(1, ppCommandLists);
 	uint64_t fenceValue = Signal();
- 
-	m_CommandAllocatorQueue.emplace(CommandAllocatorEntry{ fenceValue, commandAllocator });
+
+	//m_ReadyAllocators.emplace(CommandAllocatorEntry{ fenceValue, commandAllocator });
 
 	//can be reused the next time the GetCommandList method is called.
 	m_CommandListQueue.push(commandList);
 
-	commandAllocator->Release();
+	//commandAllocator->Release();
 
 	return fenceValue;
 }
 
 uint64_t FCommandQueue::Signal()
 {
-    uint64_t fenceValueForSignal = ++m_FenceValue;
-    ThrowIfFailed(m_d3d12CommandQueue->Signal(m_d3d12Fence.Get(), fenceValueForSignal));
- 
-    return fenceValueForSignal;
+	ThrowIfFailed(m_d3d12CommandQueue->Signal(m_d3d12Fence.Get(), m_NextFenceValue));
+
+	return m_NextFenceValue++;
 }
 
-bool FCommandQueue::IsFenceComplete(uint64_t fenceValue)
+bool FCommandQueue::IsFenceComplete(uint64_t FenceValue)
 {
-	return m_d3d12Fence->GetCompletedValue() >= fenceValue;
+	if (FenceValue > m_LastCompletedFenceValue)
+	{
+		m_LastCompletedFenceValue = std::max(m_LastCompletedFenceValue, m_d3d12Fence->GetCompletedValue());
+	}
+	return FenceValue <= m_LastCompletedFenceValue;
 }
 
-void FCommandQueue::WaitForFenceValue(uint64_t fenceValue)
+void FCommandQueue::WaitForFenceValue(uint64_t FenceValue)
 {
-	if (m_d3d12Fence->GetCompletedValue() < fenceValue)
-    {
-        ThrowIfFailed(m_d3d12Fence->SetEventOnCompletion(fenceValue, m_FenceEvent));
-        ::WaitForSingleObject(m_FenceEvent, INFINITE);
-    }
+	if (IsFenceComplete(FenceValue))
+		return;
+
+	ThrowIfFailed(m_d3d12Fence->SetEventOnCompletion(FenceValue, m_FenceEvent));
+	::WaitForSingleObject(m_FenceEvent, INFINITE);
+	m_LastCompletedFenceValue = FenceValue;
 }
 
 void FCommandQueue::Flush()
 {
 	uint64_t fenceValueForSignal = Signal();
-    WaitForFenceValue(fenceValueForSignal);
+	WaitForFenceValue(fenceValueForSignal);
 }
 
 ID3D12CommandAllocator* FCommandQueue::RequestAllocator()
 {
 	ID3D12CommandAllocator* Allocator = nullptr;
-	if (!m_CommandAllocatorQueue.empty() && IsFenceComplete(m_CommandAllocatorQueue.front().FenceValue))
+	if (!m_ReadyAllocators.empty() && IsFenceComplete(m_ReadyAllocators.front().FenceValue))
 	{
-		Allocator = m_CommandAllocatorQueue.front().CommandAllocator;
-		m_CommandAllocatorQueue.pop();
+		Allocator = m_ReadyAllocators.front().CommandAllocator;
+		m_ReadyAllocators.pop();
 
 		ThrowIfFailed(Allocator->Reset());
 	}
 	else
 	{
 		Allocator = CreateCommandAllocator();
+		m_AllocatorPool.push_back(Allocator);
 	}
 	return Allocator;
+}
+
+void FCommandQueue::DiscardAllocator(uint64_t FenceValue, ID3D12CommandAllocator* CommandAllocator)
+{
+	m_ReadyAllocators.emplace(CommandAllocatorEntry{ FenceValue, CommandAllocator });
 }
 
 ID3D12CommandAllocator* FCommandQueue::CreateCommandAllocator()
@@ -150,7 +162,7 @@ ID3D12CommandAllocator* FCommandQueue::CreateCommandAllocator()
 	return CommandAllocator;
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> FCommandQueue::CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator)
+ComPtr<ID3D12GraphicsCommandList> FCommandQueue::CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator)
 {
 	ComPtr<ID3D12GraphicsCommandList> commandList;
 	ThrowIfFailed(m_d3d12Device->CreateCommandList(0, m_CommandListType, allocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
