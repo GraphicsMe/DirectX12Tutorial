@@ -8,7 +8,7 @@
 #include "d3dx12.h"
 #include "RenderWindow.h"
 #include "CommandListManager.h"
-
+#include "CommandContext.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -33,20 +33,17 @@ public:
 
 		m_rootSignature = CreateRootSignature();
 
-		FCommandQueue& CommandQueue = g_CommandListManager.GetCopyQueue();
-		ComPtr<ID3D12GraphicsCommandList> commandList = CommandQueue.GetCommandList();
-		commandList->SetName(L"Copy list");
+		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_COPY);
 
 		SetupShaders();
 
-		SetupVertexBuffer(commandList);
-		SetupIndexBuffer(commandList);
+		SetupVertexBuffer(CommandContext.GetCommandList());
+		SetupIndexBuffer(CommandContext.GetCommandList());
 
 		SetupUniformBuffer();
 		SetupPiplineState();
 
-		uint64_t fenceValue = CommandQueue.ExecuteCommandList(commandList);
-		CommandQueue.WaitForFenceValue(fenceValue);
+		CommandContext.FinishFrame(true);
 	}
 
 	void OnUpdate()
@@ -56,8 +53,10 @@ public:
 	
 	void OnRender()
 	{
-		D3D12RHI& RHI = D3D12RHI::Get();
-		FCommandQueue& CommandQueue = g_CommandListManager.GetGraphicsQueue();
+		static int count = 0;
+		++count;
+		FCommandContext& CommandContext = FCommandContext::Begin();
+
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
@@ -82,13 +81,11 @@ public:
 		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
 		//m_uniformBuffer->Unmap(0, nullptr);
 
-		ComPtr<ID3D12GraphicsCommandList> commandList = CommandQueue.GetCommandList();
-
-		FillCommandLists(commandList);
+		FillCommandLists(CommandContext.GetCommandList());
 		
-		uint64_t fenceValue = CommandQueue.ExecuteCommandList(commandList);
+		CommandContext.FinishFrame(true);
 
-		RenderWindow::Get().Present(fenceValue, &CommandQueue);	
+		RenderWindow::Get().Present();	
 	}
 
 private:
