@@ -114,16 +114,8 @@ ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEA
 	return descriptorHeap;
 }
 
-FAllocation D3D12RHI::ReserveUploadMemory(uint32_t SizeInBytes)
-{
-	return m_CpuLinearAllocator.Allocate(SizeInBytes);
-}
-
 D3D12RHI::D3D12RHI()
-	: m_CpuLinearAllocator(ELinearAllocatorType::CpuWritable)
-	, m_GpuLinearAllocator(ELinearAllocatorType::GpuExclusive)
 {
-
 }
 
 D3D12RHI& D3D12RHI::Get()
@@ -159,9 +151,6 @@ bool D3D12RHI::Initialize()
 void D3D12RHI::Destroy()
 {
 	g_CommandListManager.Destroy();
-
-	m_CpuLinearAllocator.Destroy();
-	m_GpuLinearAllocator.Destroy();
 
 	RenderWindow::Get().Destroy();
 }

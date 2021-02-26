@@ -37,8 +37,8 @@ public:
 
 		SetupShaders();
 
-		SetupVertexBuffer(CommandContext.GetCommandList());
-		SetupIndexBuffer(CommandContext.GetCommandList());
+		SetupVertexBuffer(CommandContext);
+		SetupIndexBuffer(CommandContext);
 
 		SetupUniformBuffer();
 		SetupPiplineState();
@@ -89,7 +89,7 @@ public:
 	}
 
 private:
-	void UpdateBufferResource(ComPtr<ID3D12GraphicsCommandList> commandList,
+	void UpdateBufferResource(FCommandContext& CommandContext,
         ID3D12Resource** pDestinationResource,
         uint32_t numElements, uint32_t elementSize, const void* bufferData,
         D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE )
@@ -106,14 +106,14 @@ private:
 
 		if (bufferData)
 		{
-			FAllocation Allocation = D3D12RHI::Get().ReserveUploadMemory(bufferSize);
+			FAllocation Allocation = CommandContext.ReserveUploadMemory(bufferSize);
 
 			D3D12_SUBRESOURCE_DATA subresourceData = {};
 			subresourceData.pData = bufferData;
 			subresourceData.RowPitch = bufferSize;
 			subresourceData.SlicePitch = subresourceData.RowPitch;
 
-			UpdateSubresources(commandList.Get(), 
+			UpdateSubresources(CommandContext.GetCommandList(),
 				*pDestinationResource,
 				Allocation.D3d12Resource,
 				Allocation.Offset,
@@ -121,7 +121,7 @@ private:
 		}
 	}
 
-	void SetupVertexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList)
+	void SetupVertexBuffer(FCommandContext& CommandContext)
 	{
 		struct Vertex
 		{
@@ -143,7 +143,7 @@ private:
 
 		const UINT VertexBufferSize = sizeof(vertexBufferData);
 
-		UpdateBufferResource(commandList,
+		UpdateBufferResource(CommandContext,
 			&m_vertexBuffer,
 			_countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
 
@@ -153,13 +153,13 @@ private:
 		m_vertexBufferView.SizeInBytes = VertexBufferSize;
 	}
 
-	void SetupIndexBuffer(ComPtr<ID3D12GraphicsCommandList> commandList)
+	void SetupIndexBuffer(FCommandContext& CommandContext)
 	{
 		uint32_t indexBufferData[3] = { 0, 1, 2 };
 
 		const UINT indexBufferSize = sizeof(indexBufferData);
 
-		UpdateBufferResource(commandList,
+		UpdateBufferResource(CommandContext,
 			&m_indexBuffer,
 			_countof(indexBufferData), sizeof(uint32_t), indexBufferData);
 

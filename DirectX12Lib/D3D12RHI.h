@@ -114,8 +114,6 @@ public:
 			D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);;
 	ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flag, uint32_t numDescriptors);
 
-	FAllocation ReserveUploadMemory(uint32_t SizeInBytes);
-
 private:
 	void EnableDebugLayer();
 	ComPtr<IDXGIFactory4> CreateDXGIFactory();
@@ -126,8 +124,5 @@ private:
 private:
 	ComPtr<IDXGIFactory4> m_dxgiFactory;
 	ComPtr<ID3D12Device> m_device;
-
-	LinearAllocator m_CpuLinearAllocator;
-	LinearAllocator m_GpuLinearAllocator;
 };
 
