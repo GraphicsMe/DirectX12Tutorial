@@ -9,6 +9,7 @@
 #include "RenderWindow.h"
 #include "CommandListManager.h"
 #include "CommandContext.h"
+#include "RootSignature.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -31,7 +32,9 @@ public:
 	{
 		m_device = D3D12RHI::Get().GetD3D12Device();
 
-		m_rootSignature = CreateRootSignature();
+		m_rootSignature.Reset(1, 0);
+		m_rootSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 0, 1, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_rootSignature.Finalize(L"Tutorial2", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_COPY);
 
@@ -178,26 +181,6 @@ private:
 		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/triangle.frag", "main", "ps_5_0");
 	}
 
-	ComPtr<ID3D12RootSignature> CreateRootSignature()
-	{
-		// create root signature
-		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-
-		CD3DX12_ROOT_PARAMETER1 rootParams[1];
-		rootParams[0].InitAsDescriptorTable(1, ranges, D3D12_SHADER_VISIBILITY_VERTEX);
-
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init_1_1(1, rootParams, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		ComPtr<ID3D12RootSignature> RootSignature;
-		ID3DBlob* signature;
-		ID3DBlob* error;
-		ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature)));
-		return RootSignature;
-	}
-
 	void SetupPiplineState()
 	{
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -208,7 +191,7 @@ private:
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-		psoDesc.pRootSignature = m_rootSignature.Get();
+		psoDesc.pRootSignature = m_rootSignature.GetSignature();
 		psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
 		psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
 
@@ -246,7 +229,7 @@ private:
 		commandList->SetPipelineState(m_pipelineState.Get());
 
 		// Set necessary state.
-		commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+		commandList->SetGraphicsRootSignature(m_rootSignature.GetSignature());
 		commandList->RSSetViewports(1, &m_viewport);
 		commandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -320,7 +303,7 @@ private:
 
 	ComPtr<ID3D12Device> m_device;
 
-	ComPtr<ID3D12RootSignature> m_rootSignature;
+	FRootSignature m_rootSignature;
 	ComPtr<ID3D12PipelineState> m_pipelineState;
 
 	ComPtr<ID3DBlob> m_vertexShader;
