@@ -56,6 +56,20 @@ FCommandContext& FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE Type, const std:
 	return *NewContext;
 }
 
+void FCommandContext::InitializeBuffer(FD3D12Resource& Dest, const void* Data, uint32_t NumBytes, size_t Offset /*= 0*/)
+{
+	FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	FAllocation Allocation = CommandContext.ReserveUploadMemory(NumBytes);
+	memcpy(Allocation.CPU, Data, NumBytes);
+
+	CommandContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_COPY_DEST, true);
+	CommandContext.m_CommandList->CopyBufferRegion(Dest.GetResource(), Offset, Allocation.D3d12Resource, 0, NumBytes);
+	CommandContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_GENERIC_READ, true);
+
+	CommandContext.FinishFrame(true);
+}
+
 FCommandContext::~FCommandContext()
 {
 	if (m_CommandList)

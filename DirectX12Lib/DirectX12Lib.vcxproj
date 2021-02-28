@@ -128,6 +128,7 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DescriptorAllocator.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="GpuBuffer.h" />
     <ClInclude Include="LinearAllocator.h" />
     <ClInclude Include="MathLib.h" />
     <ClInclude Include="MeshData.h" />
@@ -149,6 +150,7 @@
     <ClCompile Include="DescriptorAllocator.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="ApplicationWin32.cpp" />
+    <ClCompile Include="GpuBuffer.cpp" />
     <ClCompile Include="LinearAllocator.cpp" />
     <ClCompile Include="MathLib.cpp" />
     <ClCompile Include="MeshData.cpp" />

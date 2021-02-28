@@ -10,6 +10,7 @@
 #include "CommandListManager.h"
 #include "CommandContext.h"
 #include "RootSignature.h"
+#include "GpuBuffer.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -38,8 +39,7 @@ public:
 
 		SetupShaders();
 
-		SetupVertexBuffer(CommandContext);
-		SetupIndexBuffer(CommandContext);
+		SetupMesh(CommandContext);
 
 		SetupUniformBuffer();
 		SetupPiplineState();
@@ -90,39 +90,7 @@ public:
 	}
 
 private:
-	void UpdateBufferResource(FCommandContext& CommandContext,
-        ID3D12Resource** pDestinationResource,
-        uint32_t numElements, uint32_t elementSize, const void* bufferData,
-        D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE )
-	{
-		uint32_t bufferSize = numElements * elementSize;
-
-		ThrowIfFailed(m_device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-			D3D12_RESOURCE_STATE_COMMON, // D3D12_RESOURCE_STATE_COPY_DEST will cause error
-			nullptr,
-			IID_PPV_ARGS(pDestinationResource)));
-
-		if (bufferData)
-		{
-			FAllocation Allocation = CommandContext.ReserveUploadMemory(bufferSize);
-
-			D3D12_SUBRESOURCE_DATA subresourceData = {};
-			subresourceData.pData = bufferData;
-			subresourceData.RowPitch = bufferSize;
-			subresourceData.SlicePitch = subresourceData.RowPitch;
-
-			UpdateSubresources(CommandContext.GetCommandList(),
-				*pDestinationResource,
-				Allocation.D3d12Resource,
-				Allocation.Offset,
-				0, 1, &subresourceData);
-		}
-	}
-
-	void SetupVertexBuffer(FCommandContext& CommandContext)
+	void SetupMesh(FCommandContext& CommandContext)
 	{
 		struct Vertex
 		{
@@ -143,33 +111,11 @@ private:
 		};
 
 		const UINT VertexBufferSize = sizeof(vertexBufferData);
+		m_VertexBuffer.Create(L"VertexBuffer", _countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
 
-		UpdateBufferResource(CommandContext,
-			&m_vertexBuffer,
-			_countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
-
-		// Initialize the vertex buffer view.
-		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-		m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-		m_vertexBufferView.SizeInBytes = VertexBufferSize;
-	}
-
-	void SetupIndexBuffer(FCommandContext& CommandContext)
-	{
 		uint32_t indexBufferData[3] = { 0, 1, 2 };
-
 		const UINT indexBufferSize = sizeof(indexBufferData);
-
-		UpdateBufferResource(CommandContext,
-			&m_indexBuffer,
-			_countof(indexBufferData), sizeof(uint32_t), indexBufferData);
-
-		m_indexBuffer->SetName(L"Index buffer");
-
-		// Initialize the vertex buffer view.
-		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-		m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
-		m_indexBufferView.SizeInBytes = indexBufferSize;
+		m_IndexBuffer.Create(L"IndexBuffer", _countof(indexBufferData), sizeof(uint32_t), indexBufferData);
 	}
 
 	void SetupShaders()
@@ -188,31 +134,20 @@ private:
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
 		psoDesc.pRootSignature = m_rootSignature.GetSignature();
-		psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
-		psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
+		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+		psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.Get());
+		psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.Get());
 
+		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		//two sided
 		psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 
-		D3D12_BLEND_DESC blendDesc;
-		blendDesc.AlphaToCoverageEnable = FALSE;
-		blendDesc.IndependentBlendEnable = FALSE;
-		const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
-		{
-			FALSE,FALSE,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-			D3D12_LOGIC_OP_NOOP,
-			D3D12_COLOR_WRITE_ENABLE_ALL,
-		};
-		for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-			blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
-
-		psoDesc.BlendState = blendDesc;
+		// disable depth stencil
 		psoDesc.DepthStencilState.DepthEnable = FALSE;
 		psoDesc.DepthStencilState.StencilEnable = FALSE;
+
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 1;
@@ -247,8 +182,8 @@ private:
 		const float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
 		commandList->ClearRenderTargetView(BackBuffer.GetRTV(), clearColor, 0, nullptr);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		CommandContext.SetVertexBuffer(0, m_vertexBufferView);
-		CommandContext.SetIndexBuffer(m_indexBufferView);
+		CommandContext.SetVertexBuffer(0, m_VertexBuffer.VertexBufferView());
+		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
 
 		commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
 
@@ -301,11 +236,8 @@ private:
 	ComPtr<ID3DBlob> m_vertexShader;
 	ComPtr<ID3DBlob> m_pixelShader;
 
-	ComPtr<ID3D12Resource> m_vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-
-	ComPtr<ID3D12Resource> m_indexBuffer;
-	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+	FGpuBuffer m_VertexBuffer;
+	FGpuBuffer m_IndexBuffer;
 
 	ComPtr<ID3D12Resource> m_uniformBuffer;
 	ComPtr<ID3D12DescriptorHeap> m_uniformBufferHeap;

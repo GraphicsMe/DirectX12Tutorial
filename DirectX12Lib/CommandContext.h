@@ -9,6 +9,7 @@
 
 class FCommandContext;
 class FRootSignature;
+class FD3D12Resource;
 
 class FContextManager
 {
@@ -43,6 +44,7 @@ private:
 public:
 	static void DestroyAllContexts();
 	static FCommandContext& Begin(D3D12_COMMAND_LIST_TYPE Type=D3D12_COMMAND_LIST_TYPE_DIRECT, const std::wstring& ID = L"");
+	static void InitializeBuffer(FD3D12Resource& Dest, const void* Data, uint32_t NumBytes, size_t Offset = 0);
 
 public:
 	~FCommandContext();
