@@ -24,8 +24,6 @@ class Tutorial2 : public FGame
 public:
 	Tutorial2(const GameDesc& Desc) : FGame(Desc) 
 	{
-		m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(Desc.Width), static_cast<float>(Desc.Height), 0.1f);
-		m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(Desc.Width), static_cast<LONG>(Desc.Height));
 	}
 
 	void OnStartup()
@@ -84,7 +82,7 @@ public:
 		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
 		//m_uniformBuffer->Unmap(0, nullptr);
 
-		FillCommandLists(CommandContext.GetCommandList());
+		FillCommandLists(CommandContext, CommandContext.GetCommandList());
 		
 		CommandContext.FinishFrame(true);
 
@@ -223,15 +221,14 @@ private:
 		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
 	}
 
-	void FillCommandLists(ComPtr<ID3D12GraphicsCommandList> commandList)
+	void FillCommandLists(FCommandContext& CommandContext, ComPtr<ID3D12GraphicsCommandList> commandList)
 	{
 		D3D12RHI& RHI = D3D12RHI::Get();
 		commandList->SetPipelineState(m_pipelineState.Get());
 
 		// Set necessary state.
-		commandList->SetGraphicsRootSignature(m_rootSignature.GetSignature());
-		commandList->RSSetViewports(1, &m_viewport);
-		commandList->RSSetScissorRects(1, &m_scissorRect);
+		CommandContext.SetRootSignature(m_rootSignature);
+		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
 		ID3D12DescriptorHeap *pDescriptorHeaps[] = { m_uniformBufferHeap.Get() };
 		commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
@@ -240,24 +237,22 @@ private:
 		commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
-		auto BackBuffer = renderWindow.GetBackBuffer();
+		auto BackBuffer = renderWindow.GetBackBuffer2();
 		// Indicate that the back buffer will be used as a render target.
-		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = renderWindow.GetCurrentBackBufferView();
-
-		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+		commandList->OMSetRenderTargets(1, &BackBuffer.GetRTV(), FALSE, nullptr);
 
 		// Record commands.
 		const float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		commandList->IASetIndexBuffer(&m_indexBufferView);
+		commandList->ClearRenderTargetView(BackBuffer.GetRTV(), clearColor, 0, nullptr);
+		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		CommandContext.SetVertexBuffer(0, m_vertexBufferView);
+		CommandContext.SetIndexBuffer(m_indexBufferView);
 
 		commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
 
-		RHI.SetResourceBarrier(commandList, BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}
 
 	void SetupUniformBuffer()
@@ -297,9 +292,6 @@ private:
 		FMatrix modelMatrix;
 		FMatrix viewMatrix;
 	} m_uboVS;
-
-	D3D12_VIEWPORT m_viewport;
-	D3D12_RECT m_scissorRect;
 
 	ComPtr<ID3D12Device> m_device;
 

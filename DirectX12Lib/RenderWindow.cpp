@@ -25,9 +25,12 @@ void RenderWindow::Initialize()
 	
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_rtvHeap = RHI.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, BUFFER_COUNT);
-	m_rtvDescriptorSize = RHI.GetD3D12Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	CreateRenderTargetViews(m_swapChain, m_rtvHeap);
+	for (int i = 0; i < BUFFER_COUNT; ++i)
+	{
+		ComPtr<ID3D12Resource> BackBuffer;
+		ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&BackBuffer)));
+		m_BackBuffers[i].CreateFromSwapChain(L"BackBuffer", BackBuffer.Detach());
+	}
 
 	m_dsvHeap = RHI.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 1);
 	CreateDepthView(m_dsvHeap);
@@ -54,19 +57,6 @@ ComPtr<IDXGISwapChain3> RenderWindow::CreateSwapChain(HWND hwnd, IDXGIFactory4* 
 	ComPtr<IDXGISwapChain3> swapchain3;
 	ThrowIfFailed(swapchain1.As(&swapchain3));
 	return swapchain3;
-}
-
-void RenderWindow::CreateRenderTargetViews(ComPtr<IDXGISwapChain3> swapChain, ComPtr<ID3D12DescriptorHeap> descriptorHeap)
-{
-	// create frame resource
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(descriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-	for (int i = 0; i < BUFFER_COUNT; ++i)
-	{
-		ThrowIfFailed(swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i])));
-		D3D12RHI::Get().GetD3D12Device()->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr, rtvHandle);
-		rtvHandle.Offset(m_rtvDescriptorSize);  // offset handle
-	}
 }
 
 void RenderWindow::CreateDepthView(ComPtr<ID3D12DescriptorHeap> descriptorHeap)
@@ -103,12 +93,17 @@ UINT RenderWindow::Present()
 
 ComPtr<ID3D12Resource> RenderWindow::GetBackBuffer()
 {
-	return m_backBuffers[m_frameIndex];
+	return m_BackBuffers[m_frameIndex].GetResource();
+}
+
+FColorBuffer& RenderWindow::GetBackBuffer2()
+{
+	return m_BackBuffers[m_frameIndex];
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetCurrentBackBufferView()
 {
-	return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+	return m_BackBuffers[m_frameIndex].GetRTV();
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetDepthStencilHandle()

@@ -1,5 +1,8 @@
 ﻿#include "CommandContext.h"
 #include "CommandListManager.h"
+#include "RootSignature.h"
+
+#include "d3dx12.h"
 
 extern FContextManager g_ContextManager;
 extern FCommandListManager g_CommandListManager;
@@ -150,6 +153,8 @@ void FCommandContext::TransitionResource(FD3D12Resource& Resource, D3D12_RESOURC
 		BarrierDesc.Transition.StateBefore = OldState;
 		BarrierDesc.Transition.StateAfter = NewState;
 		BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		
+		Resource.m_CurrentState = NewState;
 	}
 
 	if (Flush || m_NumBarriersToFlush == 16)
@@ -182,6 +187,67 @@ void FCommandContext::SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_T
 	{
 		BindDescriptorHeaps();
 	}
+}
+
+void FCommandContext::SetRootSignature(const FRootSignature& RootSignature)
+{
+	if (RootSignature.GetSignature() == m_CurGraphicsRootSignature)
+		return;
+	m_CurGraphicsRootSignature = RootSignature.GetSignature();
+	m_CommandList->SetGraphicsRootSignature(m_CurGraphicsRootSignature);
+}
+
+void FCommandContext::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY Topology)
+{
+	m_CommandList->IASetPrimitiveTopology(Topology);
+}
+
+void FCommandContext::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& View)
+{
+	m_CommandList->IASetIndexBuffer(&View);
+}
+
+void FCommandContext::SetVertexBuffer(UINT Slot, const D3D12_VERTEX_BUFFER_VIEW& View)
+{
+	SetVertexBuffers(Slot, 1, &View);
+}
+
+void FCommandContext::SetVertexBuffers(UINT StartSlot, UINT Count, const D3D12_VERTEX_BUFFER_VIEW View[])
+{
+	m_CommandList->IASetVertexBuffers(StartSlot, Count, View);
+}
+
+void FCommandContext::SetScissor(UINT left, UINT top, UINT right, UINT bottom)
+{
+	SetScissor(CD3DX12_RECT(left, top, right, bottom));
+}
+
+void FCommandContext::SetScissor(const D3D12_RECT& rect)
+{
+	m_CommandList->RSSetScissorRects(1, &rect);
+}
+
+void FCommandContext::SetViewport(FLOAT x, FLOAT y, FLOAT w, FLOAT h, FLOAT minDepth /*= 0.0f*/, FLOAT maxDepth /*= 1.0f*/)
+{
+	D3D12_VIEWPORT vp;
+	vp.Width = w;
+	vp.Height = h;
+	vp.MinDepth = minDepth;
+	vp.MaxDepth = maxDepth;
+	vp.TopLeftX = x;
+	vp.TopLeftY = y;
+	SetViewport(vp);
+}
+
+void FCommandContext::SetViewport(const D3D12_VIEWPORT& vp)
+{
+	m_CommandList->RSSetViewports(1, &vp);
+}
+
+void FCommandContext::SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h)
+{
+	SetViewport((float)x, (float)y, (float)w, (float)h);
+	SetScissor(x, y, x+w, h+h);
 }
 
 void FCommandContext::BindDescriptorHeaps()

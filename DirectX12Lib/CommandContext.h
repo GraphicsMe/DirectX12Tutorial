@@ -8,6 +8,7 @@
 #include "LinearAllocator.h"
 
 class FCommandContext;
+class FRootSignature;
 
 class FContextManager
 {
@@ -59,6 +60,18 @@ public:
 
 	void SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr);
 	void SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_TYPE Type[], ID3D12DescriptorHeap* HeapPtrs[]);
+
+	void SetRootSignature(const FRootSignature& RootSignature);
+	void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY Topology);
+	void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& View);
+	void SetVertexBuffer(UINT Slot, const D3D12_VERTEX_BUFFER_VIEW& View);
+	void SetVertexBuffers(UINT StartSlot, UINT Count, const D3D12_VERTEX_BUFFER_VIEW View[]);
+
+	void SetViewport(const D3D12_VIEWPORT& vp);
+	void SetScissor(const D3D12_RECT& rect);
+	void SetScissor(UINT left, UINT top, UINT right, UINT bottom);
+	void SetViewport(FLOAT x, FLOAT y, FLOAT w, FLOAT h, FLOAT minDepth = 0.0f, FLOAT maxDepth = 1.0f);
+	void SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h);
 
 protected:
 	void BindDescriptorHeaps();

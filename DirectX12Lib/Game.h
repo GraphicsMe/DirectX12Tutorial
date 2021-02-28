@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 
@@ -33,7 +33,7 @@ public:
 	int GetHeight() const { return m_GameDesc.Height; }
 	std::wstring GetWindowTitle() const { return m_GameDesc.Caption; }
 
-private:
+protected:
 	FCamera* m_Camera = nullptr;
 	GameDesc m_GameDesc;
 };

@@ -123,6 +123,11 @@ ComPtr<ID3D12DescriptorHeap> D3D12RHI::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEA
 	return descriptorHeap;
 }
 
+D3D12_CPU_DESCRIPTOR_HANDLE D3D12RHI::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE Type, UINT Count /*= 1*/)
+{
+	return g_DescriptorAllocator[Type].Allocate(Count);
+}
+
 D3D12RHI::D3D12RHI()
 {
 }
