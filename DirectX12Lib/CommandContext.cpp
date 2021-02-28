@@ -134,3 +134,69 @@ void FCommandContext::FlushResourceBarriers()
 		m_NumBarriersToFlush = 0;
 	}
 }
+
+void FCommandContext::TransitionResource(FD3D12Resource& Resource, D3D12_RESOURCE_STATES NewState, bool Flush /*= false*/)
+{
+	D3D12_RESOURCE_STATES OldState = Resource.m_CurrentState;
+
+	if (OldState != NewState)
+	{
+		Assert(m_NumBarriersToFlush < 16);
+		D3D12_RESOURCE_BARRIER& BarrierDesc = m_ResourceBarrierBuffer[m_NumBarriersToFlush++];
+
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = Resource.GetResource();
+		BarrierDesc.Transition.StateBefore = OldState;
+		BarrierDesc.Transition.StateAfter = NewState;
+		BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	}
+
+	if (Flush || m_NumBarriersToFlush == 16)
+	{
+		FlushResourceBarriers();
+	}
+}
+
+void FCommandContext::SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr)
+{
+	if (m_CurrentDescriptorHeaps[Type] != HeapPtr)
+	{
+		m_CurrentDescriptorHeaps[Type] = HeapPtr;
+		BindDescriptorHeaps();
+	}
+}
+
+void FCommandContext::SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_TYPE Type[], ID3D12DescriptorHeap* HeapPtrs[])
+{
+	bool Changed = false;
+	for (uint32_t i = 0; i < HeapCount; ++i)
+	{
+		if (m_CurrentDescriptorHeaps[Type[i]] != HeapPtrs[i])
+		{
+			m_CurrentDescriptorHeaps[Type[i]] = HeapPtrs[i];
+			Changed = true;
+		}
+	}
+	if (Changed)
+	{
+		BindDescriptorHeaps();
+	}
+}
+
+void FCommandContext::BindDescriptorHeaps()
+{
+	uint32_t NonNullHeaps = 0;
+	ID3D12DescriptorHeap* HeapsToBind[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
+	for (uint32_t i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
+	{
+		if (m_CurrentDescriptorHeaps[i] != nullptr)
+		{
+			HeapsToBind[NonNullHeaps++] = m_CurrentDescriptorHeaps[i];
+		}
+	}
+	if (NonNullHeaps > 0)
+	{
+		m_CommandList->SetDescriptorHeaps(NonNullHeaps, HeapsToBind);
+	}
+}

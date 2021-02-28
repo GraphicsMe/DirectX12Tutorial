@@ -55,6 +55,13 @@ public:
 	void FlushResourceBarriers();
 	ID3D12GraphicsCommandList* GetCommandList() { return m_CommandList; }
 
+	void TransitionResource(FD3D12Resource& Resource, D3D12_RESOURCE_STATES NewState, bool Flush = false);
+
+	void SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr);
+	void SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_TYPE Type[], ID3D12DescriptorHeap* HeapPtrs[]);
+
+protected:
+	void BindDescriptorHeaps();
 
 protected:
 	std::wstring m_ID;
@@ -67,6 +74,8 @@ protected:
 
 	D3D12_RESOURCE_BARRIER m_ResourceBarrierBuffer[16];
 	UINT m_NumBarriersToFlush;
+
+	ID3D12DescriptorHeap* m_CurrentDescriptorHeaps[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
 
 	D3D12_COMMAND_LIST_TYPE m_Type;
 

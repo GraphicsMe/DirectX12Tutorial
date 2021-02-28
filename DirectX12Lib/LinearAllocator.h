@@ -1,9 +1,10 @@
 ﻿#pragma once
 
-#include "Common.h"
 #include <deque>
 #include <memory>
 #include <d3d12.h>
+#include "Common.h"
+#include "D3D12Resource.h"
 
 const static uint32_t DEFAULT_ALIGN = 256;
 const static uint32_t GpuAllocatorPageSize = 0x10000;	// 64k
@@ -27,12 +28,12 @@ struct FAllocation
 	D3D12_GPU_VIRTUAL_ADDRESS GpuAddress;
 };
 
-class LinearAllocationPage
+class LinearAllocationPage : public FD3D12Resource
 {
 	friend class LinearAllocator;
 
 public:
-	LinearAllocationPage(ComPtr<ID3D12Resource> pResource, uint32_t SizeInBytes);
+	LinearAllocationPage(ID3D12Resource* pResource, D3D12_RESOURCE_STATES State, uint32_t SizeInBytes);
 	~LinearAllocationPage();
 
 	bool HasSpace(uint32_t SizeInBytes, uint32_t Alignment);

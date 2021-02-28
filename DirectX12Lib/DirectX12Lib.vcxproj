@@ -122,6 +122,7 @@
     <ClInclude Include="CommandListManager.h" />
     <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="D3D12Resource.h" />
     <ClInclude Include="D3D12RHI.h" />
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DescriptorAllocator.h" />
@@ -130,7 +131,9 @@
     <ClInclude Include="MathLib.h" />
     <ClInclude Include="MeshData.h" />
     <ClInclude Include="ObjLoader.h" />
+    <ClInclude Include="PixelBuffer.h" />
     <ClInclude Include="RenderWindow.h" />
+    <ClInclude Include="RootSignature.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="WindowWin32.h" />
   </ItemGroup>
@@ -141,13 +144,16 @@
     <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="Common.cpp" />
     <ClCompile Include="D3D12RHI.cpp" />
+    <ClCompile Include="DescriptorAllocator.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="ApplicationWin32.cpp" />
     <ClCompile Include="LinearAllocator.cpp" />
     <ClCompile Include="MathLib.cpp" />
     <ClCompile Include="MeshData.cpp" />
     <ClCompile Include="ObjLoader.cpp" />
+    <ClCompile Include="PixelBuffer.cpp" />
     <ClCompile Include="RenderWindow.cpp" />
+    <ClCompile Include="RootSignature.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="WindowWin32.cpp" />
   </ItemGroup>

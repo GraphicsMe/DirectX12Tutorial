@@ -1,56 +1,49 @@
-#include "DescriptorAllocator.h"
+﻿#include "DescriptorAllocator.h"
 #include "D3D12RHI.h"
 
-bool DescriptorAllocation::IsNull() const
-{
-	return true;
-}
 
-
-DescriptorAllocatorPage::DescriptorAllocatorPage(D3D12_DESCRIPTOR_HEAP_TYPE Type, uint32_t Num)
+DescriptorAllocator::DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE Type)
 	: m_HeapType(Type)
-	, m_NumDescriptorsInHeap(Num)
-{
-	ComPtr<ID3D12Device> device = D3D12RHI::Get().GetD3D12Device();
- 
-    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-    heapDesc.Type = m_HeapType;
-    heapDesc.NumDescriptors = m_NumDescriptorsInHeap;
-	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
- 
-    ThrowIfFailed( device->CreateDescriptorHeap( &heapDesc, IID_PPV_ARGS( &m_d3d12DescriptorHeap ) ) );
- 
-    m_BaseDescriptor = m_d3d12DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    m_DescriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize( m_HeapType );
-    m_NumFreeHandles = m_NumDescriptorsInHeap;
-}
-
-void DescriptorAllocatorPage::AddNewBlock(uint32_t offset, uint32_t numDescriptors)
-{
-
-}
-
-DescriptorAllocator::DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE Type, uint32_t NumPerHeap /*= 256*/)
-	: m_HeapType(Type)
-	, m_NumDescriptorsPerHeap(NumPerHeap)
 {
 }
 
-DescriptorAllocation DescriptorAllocator::Allocate(uint32_t Count /*= 1*/)
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocator::Allocate(uint32_t Count)
 {
-	DescriptorAllocation allocation;
-	for (auto iter = m_AvailableHeaps.begin(); iter != m_AvailableHeaps.end(); ++iter)
+	if (m_CurrentHeap == nullptr || m_RemainingFreeHandles < Count)
 	{
-		auto AllocatorPage = m_HeapPool[*iter];
-		allocation = AllocatorPage->Allocate(Count);
+		m_CurrentHeap = RequestNewHeap(m_HeapType);
+		m_CurrentCpuAddress = m_CurrentHeap->GetCPUDescriptorHandleForHeapStart();
+		m_RemainingFreeHandles = sm_NumDescriptorsPerHeap;
+		if (m_DescriptorSize == 0)
+		{
+			m_DescriptorSize = D3D12RHI::Get().GetD3D12Device()->GetDescriptorHandleIncrementSize(m_HeapType);
+		}
 	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE Result = m_CurrentCpuAddress;
+	m_CurrentCpuAddress.ptr += Count * m_DescriptorSize;
+	m_RemainingFreeHandles -= Count;
+
+	return Result;
 }
 
-DescriptorAllocatorPage DescriptorAllocator::CreateAllocatorPage()
+void DescriptorAllocator::DestroyAll()
 {
-	DescriptorAllocatorPage* NewPage = new DescriptorAllocatorPage(m_HeapType, m_NumDescriptorsPerHeap);
-	m_HeapPool.emplace_back(NewPage);
-	m_AvailableHeaps.insert(m_HeapPool.size() - 1);
- 
-	return m_HeapPool.back();
+	sm_DescriptorPool.clear();
+}
+
+std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> > DescriptorAllocator::sm_DescriptorPool;
+
+ID3D12DescriptorHeap* DescriptorAllocator::RequestNewHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type)
+{
+	D3D12_DESCRIPTOR_HEAP_DESC Desc = {};
+	Desc.NumDescriptors = sm_NumDescriptorsPerHeap;
+	Desc.Type = Type;
+	Desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	Desc.NodeMask = 1;
+
+	ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateDescriptorHeap(&Desc, IID_PPV_ARGS(&descriptorHeap)));
+	sm_DescriptorPool.emplace_back(descriptorHeap);
+	return descriptorHeap.Get();
 }

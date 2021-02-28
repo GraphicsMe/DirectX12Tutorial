@@ -6,8 +6,8 @@
 
 extern FCommandListManager g_CommandListManager;
 
-LinearAllocationPage::LinearAllocationPage(ComPtr<ID3D12Resource> Resource, uint32_t SizeInBytes)
-	: m_d3d12Resource(Resource)
+LinearAllocationPage::LinearAllocationPage(ID3D12Resource* Resource, D3D12_RESOURCE_STATES State, uint32_t SizeInBytes)
+	: FD3D12Resource(Resource, State)
 	, m_PageSize(SizeInBytes)
 {
 	this->Map();
@@ -23,7 +23,7 @@ void LinearAllocationPage::Map()
 {
 	if (m_CpuAddress == nullptr)
 	{
-		m_d3d12Resource->Map(0, nullptr, &m_CpuAddress);
+		m_Resource->Map(0, nullptr, &m_CpuAddress);
 	}
 }
 
@@ -31,7 +31,7 @@ void LinearAllocationPage::Unmap()
 {
 	if (m_CpuAddress)
 	{
-		m_d3d12Resource->Unmap(0, nullptr);
+		m_Resource->Unmap(0, nullptr);
 		m_CpuAddress = nullptr;
 	}
 }
@@ -70,7 +70,7 @@ FAllocation LinearAllocator::Allocate(uint32_t SizeInBytes, uint32_t Alignment /
 
 	Assert (m_CurrentPage != nullptr);
 	FAllocation allocation;
-	allocation.D3d12Resource = m_CurrentPage->m_d3d12Resource.Get();
+	allocation.D3d12Resource = m_CurrentPage->GetResource();
 	allocation.Offset = m_CurrentOffset;
 	allocation.CPU = (uint8_t*)m_CurrentPage->m_CpuAddress + m_CurrentOffset;
 	allocation.GpuAddress = m_CurrentPage->GpuAddress + m_CurrentOffset;
@@ -164,7 +164,7 @@ LinearAllocationPage* LinearAllocator::CreateNewPage(uint32_t PageSize)
 		DefaultUsage = D3D12_RESOURCE_STATE_GENERIC_READ;
 	}
 
-	ComPtr<ID3D12Resource> pBuffer;
+	ID3D12Resource* pBuffer = nullptr;
 	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateCommittedResource(
 		&HeapProps,
 		D3D12_HEAP_FLAG_NONE,
@@ -175,5 +175,5 @@ LinearAllocationPage* LinearAllocator::CreateNewPage(uint32_t PageSize)
 
 	pBuffer->SetName(L"LinearAllocatorPage");
 
-	return new LinearAllocationPage(pBuffer, PageSize);
+	return new LinearAllocationPage(pBuffer, DefaultUsage, PageSize);
 }

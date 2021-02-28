@@ -12,6 +12,7 @@
 #include "RenderWindow.h"
 #include "CommandContext.h"
 #include "CommandListManager.h"
+#include "DescriptorAllocator.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -22,6 +23,14 @@ using namespace std;
 
 FContextManager g_ContextManager;
 FCommandListManager g_CommandListManager;
+
+DescriptorAllocator g_DescriptorAllocator[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] =
+{
+	D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+	D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+	D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+	D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+};
 
 void D3D12RHI::EnableDebugLayer()
 {
