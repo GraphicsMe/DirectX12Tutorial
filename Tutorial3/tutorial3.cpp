@@ -11,6 +11,7 @@
 #include "CommandContext.h"
 #include "RootSignature.h"
 #include "GpuBuffer.h"
+#include "PipelineState.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -74,7 +75,7 @@ public:
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 
-		FillCommandLists(CommandContext, CommandContext.GetCommandList());
+		FillCommandLists(CommandContext);
 		
 		CommandContext.FinishFrame(true);
 
@@ -148,35 +149,26 @@ private:
 		  { "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 		};
 
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.pRootSignature = m_rootSignature.GetSignature();
-		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-		psoDesc.VS = CD3DX12_SHADER_BYTECODE(m_vertexShader.Get());
-		psoDesc.PS = CD3DX12_SHADER_BYTECODE(m_pixelShader.Get());
-
-		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.SampleDesc.Count = 1;
-		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+		m_PipelineState.SetRootSignature(m_rootSignature);
+		m_PipelineState.SetRasterizerState(FPipelineState::RasterizerDefault);
+		m_PipelineState.SetBlendState(FPipelineState::BlendDisable);
+		m_PipelineState.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		m_PipelineState.SetInputLayout(_countof(inputElementDescs), inputElementDescs);
+		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
+		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_pixelShader.Get()));
+		m_PipelineState.Finalize();
 	}
 
-	void FillCommandLists(FCommandContext& CommandContext, ComPtr<ID3D12GraphicsCommandList> commandList)
+	void FillCommandLists(FCommandContext& CommandContext)
 	{
-		D3D12RHI& RHI = D3D12RHI::Get();
-		commandList->SetPipelineState(m_pipelineState.Get());
-
 		// Set necessary state.
 		CommandContext.SetRootSignature(m_rootSignature);
+		CommandContext.SetPipelineState(m_PipelineState);
 		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
-		commandList->SetGraphicsRoot32BitConstants(0, sizeof(m_uboVS) / 4, &m_uboVS, 0);
+		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer2();
@@ -209,7 +201,7 @@ private:
 	ComPtr<ID3D12Device> m_device;
 
 	FRootSignature m_rootSignature;
-	ComPtr<ID3D12PipelineState> m_pipelineState;
+	FGraphicsPipelineState m_PipelineState;
 
 	ComPtr<ID3DBlob> m_vertexShader;
 	ComPtr<ID3DBlob> m_pixelShader;

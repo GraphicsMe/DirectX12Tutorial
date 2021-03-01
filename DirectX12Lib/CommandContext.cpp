@@ -3,6 +3,7 @@
 #include "RootSignature.h"
 #include "DepthBuffer.h"
 #include "ColorBuffer.h"
+#include "PipelineState.h"
 
 #include "d3dx12.h"
 
@@ -205,6 +206,16 @@ void FCommandContext::SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_T
 	}
 }
 
+void FCommandContext::SetPipelineState(const FPipelineState& PipelineState)
+{
+	ID3D12PipelineState* PipelineStateObj = PipelineState.GetPipelineStateObject();
+	if (PipelineStateObj == m_CurPipelineState)
+		return;
+
+	m_CommandList->SetPipelineState(PipelineStateObj);
+	m_CurPipelineState = PipelineStateObj;
+}
+
 void FCommandContext::SetRootSignature(const FRootSignature& RootSignature)
 {
 	if (RootSignature.GetSignature() == m_CurGraphicsRootSignature)
@@ -284,6 +295,11 @@ void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_
 void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[])
 {
 	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, true, nullptr);
+}
+
+void FCommandContext::SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents)
+{
+	m_CommandList->SetGraphicsRoot32BitConstants(RootIndex, NumConstants, Contents, 0);
 }
 
 void FCommandContext::Draw(UINT VertexCount, UINT VertexStartOffset /*= 0*/)

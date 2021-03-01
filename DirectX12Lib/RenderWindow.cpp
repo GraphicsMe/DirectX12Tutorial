@@ -89,3 +89,13 @@ D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetDepthStencilHandle()
 {
 	return m_DepthBuffer.GetDSV();
 }
+
+const DXGI_FORMAT& RenderWindow::GetColorFormat() const
+{
+	return m_BackBuffers[0].GetFormat();
+}
+
+const DXGI_FORMAT& RenderWindow::GetDepthFormat() const
+{
+	return m_DepthBuffer.GetFormat();
+}

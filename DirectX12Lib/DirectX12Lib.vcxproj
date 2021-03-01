@@ -134,6 +134,7 @@
     <ClInclude Include="MathLib.h" />
     <ClInclude Include="MeshData.h" />
     <ClInclude Include="ObjLoader.h" />
+    <ClInclude Include="PipelineState.h" />
     <ClInclude Include="PixelBuffer.h" />
     <ClInclude Include="RenderWindow.h" />
     <ClInclude Include="RootSignature.h" />
@@ -157,6 +158,7 @@
     <ClCompile Include="MathLib.cpp" />
     <ClCompile Include="MeshData.cpp" />
     <ClCompile Include="ObjLoader.cpp" />
+    <ClCompile Include="PipelineState.cpp" />
     <ClCompile Include="PixelBuffer.cpp" />
     <ClCompile Include="RenderWindow.cpp" />
     <ClCompile Include="RootSignature.cpp" />

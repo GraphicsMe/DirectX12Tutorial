@@ -12,6 +12,7 @@ class FDepthBuffer;
 class FCommandContext;
 class FRootSignature;
 class FD3D12Resource;
+class FPipelineState;
 
 class FContextManager
 {
@@ -65,6 +66,7 @@ public:
 	void SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr);
 	void SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_TYPE Type[], ID3D12DescriptorHeap* HeapPtrs[]);
 
+	void SetPipelineState(const FPipelineState& PipelineState);
 	void SetRootSignature(const FRootSignature& RootSignature);
 	void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY Topology);
 	void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& View);
@@ -81,6 +83,8 @@ public:
 	void ClearDepth(FDepthBuffer& Target);
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[]);
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV);
+
+	void SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents);
 
 	void Draw(UINT VertexCount, UINT VertexStartOffset = 0);
 	void DrawIndexed(UINT IndexCount, UINT StartIndexLocation = 0, INT BaseVertexLocation = 0);

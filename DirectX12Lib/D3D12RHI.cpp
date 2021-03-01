@@ -13,6 +13,7 @@
 #include "CommandContext.h"
 #include "CommandListManager.h"
 #include "DescriptorAllocator.h"
+#include "PipelineState.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -156,6 +157,8 @@ bool D3D12RHI::Initialize()
 	// 3. create command list manager as well as command queues
 	g_CommandListManager.Create(m_device.Get());
 
+	FPipelineState::Initialize();
+
 	// 4. create render window(swapchain)
 	RenderWindow::Get().Initialize();
 
@@ -165,6 +168,7 @@ bool D3D12RHI::Initialize()
 void D3D12RHI::Destroy()
 {
 	g_CommandListManager.Destroy();
+	FPipelineState::DestroyAll();
 
 	RenderWindow::Get().Destroy();
 }

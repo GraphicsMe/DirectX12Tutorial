@@ -27,9 +27,11 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();
 
+	const DXGI_FORMAT& GetColorFormat() const;
+	const DXGI_FORMAT& GetDepthFormat() const;
+
 private:
 	ComPtr<IDXGISwapChain3> CreateSwapChain(HWND hwnd, IDXGIFactory4* factory, ID3D12CommandQueue* commandQueue, int width, int height, int bufferCount);
-	void CreateDepthView(ComPtr<ID3D12DescriptorHeap> descriptorHeap);
 
 private:
 	//ComPtr<ID3D12Device> m_d3d12Device;
