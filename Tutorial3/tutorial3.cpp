@@ -176,31 +176,24 @@ private:
 		CommandContext.SetRootSignature(m_rootSignature);
 		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
-		//ID3D12DescriptorHeap *pDescriptorHeaps[] = { m_uniformBufferHeap.Get() };
-		//commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
-
-		//D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
-		//commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
-
 		commandList->SetGraphicsRoot32BitConstants(0, sizeof(m_uboVS) / 4, &m_uboVS, 0);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
-		auto BackBuffer = renderWindow.GetBackBuffer2();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer2();
+		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-
-		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = renderWindow.GetDepthStencilHandle();
-		commandList->OMSetRenderTargets(1, &BackBuffer.GetRTV(), true, &dsvHandle);
+		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
 
 		// Record commands.
-		const float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-		commandList->ClearRenderTargetView(BackBuffer.GetRTV(), clearColor, 0, nullptr);
-		commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+		CommandContext.ClearColor(BackBuffer);
+		CommandContext.ClearDepth(DepthBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		CommandContext.SetVertexBuffer(0, m_VertexBuffer.VertexBufferView());
 		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
 
-		commandList->DrawIndexedInstanced(m_IndexBuffer.GetElementCount(), 1, 0, 0, 0);
+		CommandContext.DrawIndexed(m_IndexBuffer.GetElementCount());
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}

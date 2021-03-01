@@ -1,6 +1,8 @@
 ﻿#include "CommandContext.h"
 #include "CommandListManager.h"
 #include "RootSignature.h"
+#include "DepthBuffer.h"
+#include "ColorBuffer.h"
 
 #include "d3dx12.h"
 
@@ -262,6 +264,46 @@ void FCommandContext::SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h)
 {
 	SetViewport((float)x, (float)y, (float)w, (float)h);
 	SetScissor(x, y, x+w, h+h);
+}
+
+void FCommandContext::ClearColor(FColorBuffer& Target)
+{
+	m_CommandList->ClearRenderTargetView(Target.GetRTV(), Target.GetClearColor().data, 0, nullptr);
+}
+
+void FCommandContext::ClearDepth(FDepthBuffer& Target)
+{
+	m_CommandList->ClearDepthStencilView(Target.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, Target.GetClearDepth(), Target.GetClearStencil(), 0, nullptr);
+}
+
+void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV)
+{
+	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, true, &DSV);
+}
+
+void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[])
+{
+	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, true, nullptr);
+}
+
+void FCommandContext::Draw(UINT VertexCount, UINT VertexStartOffset /*= 0*/)
+{
+	DrawInstanced(VertexCount, 1, VertexStartOffset, 0);
+}
+
+void FCommandContext::DrawIndexed(UINT IndexCount, UINT StartIndexLocation /*= 0*/, INT BaseVertexLocation /*= 0*/)
+{
+	DrawIndexedInstanced(IndexCount, 1, StartIndexLocation, BaseVertexLocation, 0);
+}
+
+void FCommandContext::DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation /*= 0*/, UINT StartInstanceLocation /*= 0*/)
+{
+	m_CommandList->DrawInstanced(VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
+}
+
+void FCommandContext::DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
+{
+	m_CommandList->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 }
 
 void FCommandContext::BindDescriptorHeaps()

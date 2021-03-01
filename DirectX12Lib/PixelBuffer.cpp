@@ -45,7 +45,7 @@ void FPixelBuffer::AssociateWithResource(ID3D12Device* Device, const std::wstrin
 #endif
 }
 
-void FPixelBuffer::CreateTextureResource(ID3D12Device* Device, const std::wstring& Name, const D3D12_RESOURCE_DESC& ResourceDesc, D3D12_CLEAR_VALUE ClearValue, D3D12_GPU_VIRTUAL_ADDRESS GpuAddress)
+void FPixelBuffer::CreateTextureResource(ID3D12Device* Device, const std::wstring& Name, const D3D12_RESOURCE_DESC& ResourceDesc, D3D12_CLEAR_VALUE ClearValue)
 {
 	Destroy();
 

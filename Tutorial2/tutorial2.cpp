@@ -173,19 +173,20 @@ private:
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		auto BackBuffer = renderWindow.GetBackBuffer2();
+		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-
-		commandList->OMSetRenderTargets(1, &BackBuffer.GetRTV(), FALSE, nullptr);
+		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		// Record commands.
-		const float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-		commandList->ClearRenderTargetView(BackBuffer.GetRTV(), clearColor, 0, nullptr);
+		CommandContext.ClearColor(BackBuffer);
+		CommandContext.ClearDepth(DepthBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		CommandContext.SetVertexBuffer(0, m_VertexBuffer.VertexBufferView());
 		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
 
-		commandList->DrawIndexedInstanced(3, 1, 0, 0, 0);
+		CommandContext.DrawIndexed(m_IndexBuffer.GetElementCount());
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}

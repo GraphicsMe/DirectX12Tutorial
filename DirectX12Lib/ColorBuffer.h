@@ -7,7 +7,7 @@
 class FColorBuffer : public FPixelBuffer
 {
 public:
-	FColorBuffer(const Vector3f& Color = Vector3f(0.f))
+	FColorBuffer(const Vector3f& Color = Vector3f(0.2f))
 		: m_ClearColor(Color)
 		, m_NumMipMaps(0)
 		, m_SampleCount(1)
@@ -18,7 +18,7 @@ public:
 
 	void CreateFromSwapChain(const std::wstring& Name, ID3D12Resource* BaseResource);
 	void Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips,
-		DXGI_FORMAT Format, D3D12_GPU_VIRTUAL_ADDRESS VidMemPtr = 0);
+		DXGI_FORMAT Format);
 
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetSRV(void) const { return m_SRVHandle; }
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetRTV(void) const { return m_RTVHandle; }

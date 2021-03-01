@@ -32,8 +32,7 @@ void RenderWindow::Initialize()
 		m_BackBuffers[i].CreateFromSwapChain(L"BackBuffer", BackBuffer.Detach());
 	}
 
-	m_dsvHeap = RHI.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 1);
-	CreateDepthView(m_dsvHeap);
+	m_DepthBuffer.Create(L"DepthBuffer", Window.GetWidth(), Window.GetHeight(), DXGI_FORMAT_D32_FLOAT);
 }
 
 void RenderWindow::Destroy()
@@ -59,31 +58,6 @@ ComPtr<IDXGISwapChain3> RenderWindow::CreateSwapChain(HWND hwnd, IDXGIFactory4* 
 	return swapchain3;
 }
 
-void RenderWindow::CreateDepthView(ComPtr<ID3D12DescriptorHeap> descriptorHeap)
-{
-	D3D12_CLEAR_VALUE optimizedClearValue = {};
-	optimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-	optimizedClearValue.DepthStencil = { 1.0f, 0 };
- 
-	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, WindowWin32::Get().GetWidth(), WindowWin32::Get().GetHeight(),
-			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		&optimizedClearValue,
-		IID_PPV_ARGS(&m_depthBuffer)
-	));
-
-	D3D12_DEPTH_STENCIL_VIEW_DESC dsv = {};
-	dsv.Format = DXGI_FORMAT_D32_FLOAT;
-	dsv.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	dsv.Texture2D.MipSlice = 0;
-	dsv.Flags = D3D12_DSV_FLAG_NONE;
- 
-	D3D12RHI::Get().GetD3D12Device()->CreateDepthStencilView(m_depthBuffer.Get(), &dsv, descriptorHeap->GetCPUDescriptorHandleForHeapStart());
-}
-
 UINT RenderWindow::Present()
 {
 	m_swapChain->Present(1, 0);
@@ -101,6 +75,11 @@ FColorBuffer& RenderWindow::GetBackBuffer2()
 	return m_BackBuffers[m_frameIndex];
 }
 
+FDepthBuffer & RenderWindow::GetDepthBuffer()
+{
+	return m_DepthBuffer;
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetCurrentBackBufferView()
 {
 	return m_BackBuffers[m_frameIndex].GetRTV();
@@ -108,5 +87,5 @@ D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetCurrentBackBufferView()
 
 D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetDepthStencilHandle()
 {
-	return m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	return m_DepthBuffer.GetDSV();
 }

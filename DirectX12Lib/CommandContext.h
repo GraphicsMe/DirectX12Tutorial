@@ -7,6 +7,8 @@
 
 #include "LinearAllocator.h"
 
+class FColorBuffer;
+class FDepthBuffer;
 class FCommandContext;
 class FRootSignature;
 class FD3D12Resource;
@@ -74,6 +76,18 @@ public:
 	void SetScissor(UINT left, UINT top, UINT right, UINT bottom);
 	void SetViewport(FLOAT x, FLOAT y, FLOAT w, FLOAT h, FLOAT minDepth = 0.0f, FLOAT maxDepth = 1.0f);
 	void SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h);
+
+	void ClearColor(FColorBuffer& Target);
+	void ClearDepth(FDepthBuffer& Target);
+	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[]);
+	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV);
+
+	void Draw(UINT VertexCount, UINT VertexStartOffset = 0);
+	void DrawIndexed(UINT IndexCount, UINT StartIndexLocation = 0, INT BaseVertexLocation = 0);
+	void DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount,
+		UINT StartVertexLocation = 0, UINT StartInstanceLocation = 0);
+	void DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation,
+		INT BaseVertexLocation, UINT StartInstanceLocation);
 
 protected:
 	void BindDescriptorHeaps();

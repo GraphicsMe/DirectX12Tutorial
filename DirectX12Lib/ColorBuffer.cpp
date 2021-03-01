@@ -10,7 +10,7 @@ void FColorBuffer::CreateFromSwapChain(const std::wstring& Name, ID3D12Resource*
 	Device->CreateRenderTargetView(m_Resource.Get(), nullptr, m_RTVHandle);
 }
 
-void FColorBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips, DXGI_FORMAT Format, D3D12_GPU_VIRTUAL_ADDRESS VidMemPtr /*= 0*/)
+void FColorBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips, DXGI_FORMAT Format)
 {
 	NumMips = (NumMips == 0) ? ComputeNumMips(Width, Height) : NumMips;
 	
@@ -28,7 +28,7 @@ void FColorBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Hei
 	ClearValue.Color[3] = m_ClearColor.x;
 
 	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
-	CreateTextureResource(Device, Name, ResDesc, ClearValue, VidMemPtr);
+	CreateTextureResource(Device, Name, ResDesc, ClearValue);
 	CreateDerivedViews(Device, Format, 1, NumMips);
 }
 

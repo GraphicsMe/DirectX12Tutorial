@@ -4,6 +4,7 @@
 #include <dxgi1_4.h>
 #include "Common.h"
 #include "ColorBuffer.h"
+#include "DepthBuffer.h"
 
 class FCommandQueue;
 class RenderWindow
@@ -22,6 +23,7 @@ public:
 	UINT Present();
 	ComPtr<ID3D12Resource> GetBackBuffer();
 	FColorBuffer& GetBackBuffer2();
+	FDepthBuffer& GetDepthBuffer();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();
 
@@ -37,7 +39,6 @@ private:
 
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	FColorBuffer m_BackBuffers[BUFFER_COUNT];
-	ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
-	ComPtr<ID3D12Resource> m_depthBuffer;
+	FDepthBuffer m_DepthBuffer;
 };
 
