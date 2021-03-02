@@ -51,6 +51,7 @@ D3D12_INDEX_BUFFER_VIEW FGpuBuffer::IndexBufferView(size_t Offset, uint32_t Size
 	return IBView;
 }
 
+
 D3D12_RESOURCE_DESC FGpuBuffer::DescribeBuffer()
 {
 	Assert(m_BufferSize != 0);
@@ -70,4 +71,68 @@ D3D12_RESOURCE_DESC FGpuBuffer::DescribeBuffer()
 	return Desc;
 }
 
+void FConstBuffer::CreateUpload(const std::wstring& Name, uint32_t Size)
+{
+	Destroy();
 
+	//CB size is required to be 256 - byte aligned.
+	Size = AlignUp(Size, 256);
+
+	m_ElementCount = 1;
+	m_ElementSize = Size;
+	m_BufferSize = Size;
+
+	D3D12_RESOURCE_DESC ResDesc = DescribeBuffer();
+
+	m_CurrentState = D3D12_RESOURCE_STATE_GENERIC_READ;
+
+	D3D12_HEAP_PROPERTIES HeapProps;
+	HeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+	HeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	HeapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	HeapProps.CreationNodeMask = 1;
+	HeapProps.VisibleNodeMask = 1;
+
+	ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateCommittedResource(
+		&HeapProps, D3D12_HEAP_FLAG_NONE,
+		&ResDesc, m_CurrentState, nullptr, IID_PPV_ARGS(&m_Resource)
+	));
+
+	m_GpuAddress = m_Resource->GetGPUVirtualAddress();
+
+	Map();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FConstBuffer::CreateConstantBufferView(uint32_t Offset, uint32_t Size)
+{
+	Assert(Offset + Size <= m_BufferSize);
+
+	//CB size is required to be 256 - byte aligned.
+	Size = AlignUp(Size, 256);
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC CBVDesc;
+	CBVDesc.BufferLocation = m_GpuAddress + (size_t)Offset;
+	CBVDesc.SizeInBytes = Size;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE hCBV = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	D3D12RHI::Get().GetD3D12Device()->CreateConstantBufferView(&CBVDesc, hCBV);
+	return hCBV;
+}
+
+void* FConstBuffer::Map()
+{
+	if (m_MappedData == nullptr)
+	{
+		m_Resource->Map(0, nullptr, &m_MappedData);
+	}
+	return m_MappedData;
+}
+
+void FConstBuffer::Unmap()
+{
+	if (m_MappedData == nullptr)
+	{
+		m_Resource->Unmap(0, nullptr);
+		m_MappedData = nullptr;
+	}
+}

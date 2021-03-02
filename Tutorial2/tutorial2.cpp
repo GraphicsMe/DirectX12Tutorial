@@ -45,7 +45,7 @@ public:
 		SetupUniformBuffer();
 		SetupPiplineState();
 
-		CommandContext.FinishFrame(true);
+		CommandContext.Finish(true);
 	}
 
 	void OnUpdate()
@@ -79,13 +79,11 @@ public:
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 
-		//ThrowIfFailed(m_uniformBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
-		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
-		//m_uniformBuffer->Unmap(0, nullptr);
+		memcpy(m_ConstBuffer.Map(), &m_uboVS, sizeof(m_uboVS));
 
-		FillCommandLists(CommandContext, CommandContext.GetCommandList());
+		FillCommandLists(CommandContext);
 		
-		CommandContext.FinishFrame(true);
+		CommandContext.Finish(true);
 
 		RenderWindow::Get().Present();	
 	}
@@ -146,18 +144,14 @@ private:
 		m_PipelineState.Finalize();
 	}
 
-	void FillCommandLists(FCommandContext& CommandContext, ComPtr<ID3D12GraphicsCommandList> commandList)
+	void FillCommandLists(FCommandContext& CommandContext)
 	{
 		// Set necessary state.
 		CommandContext.SetRootSignature(m_rootSignature);
 		CommandContext.SetPipelineState(m_PipelineState);
 		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
-		ID3D12DescriptorHeap *pDescriptorHeaps[] = { m_uniformBufferHeap.Get() };
-		commandList->SetDescriptorHeaps(_countof(pDescriptorHeaps), pDescriptorHeaps);
-
-		D3D12_GPU_DESCRIPTOR_HANDLE srvHandle(m_uniformBufferHeap->GetGPUDescriptorHandleForHeapStart());
-		commandList->SetGraphicsRootDescriptorTable(0, srvHandle);
+		CommandContext.SetDynamicDescriptor(0, 0, m_ConstBuffer.CreateConstantBufferView(0, sizeof(m_uboVS)));
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		auto BackBuffer = renderWindow.GetBackBuffer2();
@@ -181,32 +175,7 @@ private:
 
 	void SetupUniformBuffer()
 	{
-		int AlignedSize = (sizeof(m_uboVS) + 255) & ~255;    // CB size is required to be 256-byte aligned.
-		ThrowIfFailed(m_device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(AlignedSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_uniformBuffer)));
-
-		m_uniformBufferHeap = D3D12RHI::Get().CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1);
-		m_uniformBufferHeap->SetName(L"Constant Buffer Upload Resource Heap");
-
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = m_uniformBuffer->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = AlignedSize;
-
-		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle(m_uniformBufferHeap->GetCPUDescriptorHandleForHeapStart());
-		m_device->CreateConstantBufferView(&cbvDesc, cbvHandle);
-
-		// We do not intend to read from this resource on the CPU. (End is less than or equal to begin)
-		D3D12_RANGE readRange;
-		readRange.Begin = 0;
-		readRange.End = 0;
-		ThrowIfFailed(m_uniformBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_mappedUniformBuffer)));
-		memcpy(m_mappedUniformBuffer, &m_uboVS, sizeof(m_uboVS));
-		//m_uniformBuffer->Unmap(0, &readRange);
+		m_ConstBuffer.CreateUpload(L"ConstBuffer", sizeof(m_uboVS));
 	}
 
 private:
@@ -227,10 +196,7 @@ private:
 
 	FGpuBuffer m_VertexBuffer;
 	FGpuBuffer m_IndexBuffer;
-
-	ComPtr<ID3D12Resource> m_uniformBuffer;
-	ComPtr<ID3D12DescriptorHeap> m_uniformBufferHeap;
-	UINT8* m_mappedUniformBuffer;
+	FConstBuffer m_ConstBuffer;
 
 	float m_elapsedTime;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;

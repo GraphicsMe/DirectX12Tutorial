@@ -70,7 +70,7 @@ void FCommandContext::InitializeBuffer(FD3D12Resource& Dest, const void* Data, u
 	CommandContext.m_CommandList->CopyBufferRegion(Dest.GetResource(), Offset, Allocation.D3d12Resource, 0, NumBytes);
 	CommandContext.TransitionResource(Dest, D3D12_RESOURCE_STATE_GENERIC_READ, true);
 
-	CommandContext.FinishFrame(true);
+	CommandContext.Finish(true);
 }
 
 FCommandContext::~FCommandContext()
@@ -93,6 +93,8 @@ FCommandContext::FCommandContext(D3D12_COMMAND_LIST_TYPE Type)
 	: m_Type(Type)
 	, m_CpuLinearAllocator(ELinearAllocatorType::CpuWritable)
 	, m_GpuLinearAllocator(ELinearAllocatorType::GpuExclusive)
+	, m_DynamicSamplerDescriptorHeap(*this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
+	, m_DynamicViewDescriptorHeap(*this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
 {
 	m_CommandList = nullptr;
 	m_CurrentAllocator = nullptr;
@@ -117,7 +119,7 @@ void FCommandContext::Reset(void)
 	//todo: bind descriptor heaps
 }
 
-uint64_t FCommandContext::FinishFrame(bool WaitForCompletion /*= false*/)
+uint64_t FCommandContext::Finish(bool WaitForCompletion /*= false*/)
 {
 	FlushResourceBarriers();
 
@@ -131,6 +133,8 @@ uint64_t FCommandContext::FinishFrame(bool WaitForCompletion /*= false*/)
 
 	m_CpuLinearAllocator.CleanupUsedPages(FenceValue);
 	m_GpuLinearAllocator.CleanupUsedPages(FenceValue);
+	m_DynamicViewDescriptorHeap.CleanupUsedHeaps(FenceValue);
+	m_DynamicSamplerDescriptorHeap.CleanupUsedHeaps(FenceValue);
 	
 	if (WaitForCompletion)
 	{
@@ -206,6 +210,16 @@ void FCommandContext::SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_T
 	}
 }
 
+void FCommandContext::SetDynamicDescriptor(UINT RootIndex, UINT Offset, D3D12_CPU_DESCRIPTOR_HANDLE Handle)
+{
+	SetDynamicDescriptors(RootIndex, Offset, 1, &Handle);
+}
+
+void FCommandContext::SetDynamicDescriptors(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[])
+{
+	m_DynamicViewDescriptorHeap.SetGraphicsDescriptorHandles(RootIndex, Offset, Count, Handles);
+}
+
 void FCommandContext::SetPipelineState(const FPipelineState& PipelineState)
 {
 	ID3D12PipelineState* PipelineStateObj = PipelineState.GetPipelineStateObject();
@@ -222,6 +236,9 @@ void FCommandContext::SetRootSignature(const FRootSignature& RootSignature)
 		return;
 	m_CurGraphicsRootSignature = RootSignature.GetSignature();
 	m_CommandList->SetGraphicsRootSignature(m_CurGraphicsRootSignature);
+
+	m_DynamicViewDescriptorHeap.ParseGraphicsRootSignature(RootSignature);
+	m_DynamicSamplerDescriptorHeap.ParseGraphicsRootSignature(RootSignature);
 }
 
 void FCommandContext::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY Topology)
@@ -314,11 +331,17 @@ void FCommandContext::DrawIndexed(UINT IndexCount, UINT StartIndexLocation /*= 0
 
 void FCommandContext::DrawInstanced(UINT VertexCountPerInstance, UINT InstanceCount, UINT StartVertexLocation /*= 0*/, UINT StartInstanceLocation /*= 0*/)
 {
+	FlushResourceBarriers();
+	m_DynamicViewDescriptorHeap.CommitGraphicsRootDescriptorTables(m_CommandList);
+	m_DynamicSamplerDescriptorHeap.CommitGraphicsRootDescriptorTables(m_CommandList);
 	m_CommandList->DrawInstanced(VertexCountPerInstance, InstanceCount, StartVertexLocation, StartInstanceLocation);
 }
 
 void FCommandContext::DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)
 {
+	FlushResourceBarriers();
+	m_DynamicViewDescriptorHeap.CommitGraphicsRootDescriptorTables(m_CommandList);
+	m_DynamicSamplerDescriptorHeap.CommitGraphicsRootDescriptorTables(m_CommandList);
 	m_CommandList->DrawIndexedInstanced(IndexCountPerInstance, InstanceCount, StartIndexLocation, BaseVertexLocation, StartInstanceLocation);
 }
 

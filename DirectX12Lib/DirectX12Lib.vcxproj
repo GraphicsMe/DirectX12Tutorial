@@ -128,6 +128,7 @@
     <ClInclude Include="d3dx12.h" />
     <ClInclude Include="DepthBuffer.h" />
     <ClInclude Include="DescriptorAllocator.h" />
+    <ClInclude Include="DynamicDescriptorHeap.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GpuBuffer.h" />
     <ClInclude Include="LinearAllocator.h" />
@@ -151,6 +152,7 @@
     <ClCompile Include="D3D12RHI.cpp" />
     <ClCompile Include="DepthBuffer.cpp" />
     <ClCompile Include="DescriptorAllocator.cpp" />
+    <ClCompile Include="DynamicDescriptorHeap.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="ApplicationWin32.cpp" />
     <ClCompile Include="GpuBuffer.cpp" />

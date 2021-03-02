@@ -1,13 +1,14 @@
 ﻿#include "DescriptorAllocator.h"
 #include "D3D12RHI.h"
 
+std::vector<ComPtr<ID3D12DescriptorHeap> > FDescriptorAllocator::sm_DescriptorPool;
 
-DescriptorAllocator::DescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE Type)
+FDescriptorAllocator::FDescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE Type)
 	: m_HeapType(Type)
 {
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocator::Allocate(uint32_t Count)
+D3D12_CPU_DESCRIPTOR_HANDLE FDescriptorAllocator::Allocate(uint32_t Count)
 {
 	if (m_CurrentHeap == nullptr || m_RemainingFreeHandles < Count)
 	{
@@ -27,14 +28,12 @@ D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocator::Allocate(uint32_t Count)
 	return Result;
 }
 
-void DescriptorAllocator::DestroyAll()
+void FDescriptorAllocator::DestroyAll()
 {
 	sm_DescriptorPool.clear();
 }
 
-std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> > DescriptorAllocator::sm_DescriptorPool;
-
-ID3D12DescriptorHeap* DescriptorAllocator::RequestNewHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type)
+ID3D12DescriptorHeap* FDescriptorAllocator::RequestNewHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC Desc = {};
 	Desc.NumDescriptors = sm_NumDescriptorsPerHeap;

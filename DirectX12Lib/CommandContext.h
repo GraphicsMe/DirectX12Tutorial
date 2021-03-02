@@ -6,6 +6,7 @@
 #include <d3d12.h>
 
 #include "LinearAllocator.h"
+#include "DynamicDescriptorHeap.h"
 
 class FColorBuffer;
 class FDepthBuffer;
@@ -54,7 +55,7 @@ public:
 
 	void Initialize();
 	void SetID(const std::wstring& ID) { m_ID = ID; }
-	uint64_t FinishFrame(bool WaitForCompletion = false);
+	uint64_t Finish(bool WaitForCompletion = false);
 
 	FAllocation ReserveUploadMemory(uint32_t SizeInBytes);
 
@@ -65,6 +66,9 @@ public:
 
 	void SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr);
 	void SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_TYPE Type[], ID3D12DescriptorHeap* HeapPtrs[]);
+
+	void SetDynamicDescriptor(UINT RootIndex, UINT Offset, D3D12_CPU_DESCRIPTOR_HANDLE Handle);
+	void SetDynamicDescriptors(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[]);
 
 	void SetPipelineState(const FPipelineState& PipelineState);
 	void SetRootSignature(const FRootSignature& RootSignature);
@@ -114,4 +118,7 @@ protected:
 
 	LinearAllocator m_CpuLinearAllocator;
 	LinearAllocator m_GpuLinearAllocator;
+
+	FDynamicDescriptorHeap m_DynamicViewDescriptorHeap;
+	FDynamicDescriptorHeap m_DynamicSamplerDescriptorHeap;
 };

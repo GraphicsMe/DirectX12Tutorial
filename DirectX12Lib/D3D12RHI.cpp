@@ -25,7 +25,7 @@ using namespace std;
 FContextManager g_ContextManager;
 FCommandListManager g_CommandListManager;
 
-DescriptorAllocator g_DescriptorAllocator[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] =
+FDescriptorAllocator g_DescriptorAllocator[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES] =
 {
 	D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 	D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
@@ -169,7 +169,7 @@ void D3D12RHI::Destroy()
 {
 	g_CommandListManager.Destroy();
 	FPipelineState::DestroyAll();
-
+	FDescriptorAllocator::DestroyAll();
 	RenderWindow::Get().Destroy();
 }
 

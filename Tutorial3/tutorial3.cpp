@@ -43,7 +43,7 @@ public:
 		
 		SetupPiplineState();
 
-		CommandContext.FinishFrame(true);
+		CommandContext.Finish(true);
 	}
 
 	void OnUpdate()
@@ -77,7 +77,7 @@ public:
 
 		FillCommandLists(CommandContext);
 		
-		CommandContext.FinishFrame(true);
+		CommandContext.Finish(true);
 
 		RenderWindow::Get().Present();	
 	}
@@ -208,10 +208,6 @@ private:
 
 	FGpuBuffer m_VertexBuffer;
 	FGpuBuffer m_IndexBuffer;
-
-	ComPtr<ID3D12Resource> m_uniformBuffer;
-	ComPtr<ID3D12DescriptorHeap> m_uniformBufferHeap;
-	UINT8* m_mappedUniformBuffer;
 
 	float m_elapsedTime;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;

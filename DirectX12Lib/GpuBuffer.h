@@ -22,6 +22,7 @@ public:
 		size_t Offset = StartIndex * m_ElementSize;
 		return IndexBufferView(Offset, (uint32_t)(m_BufferSize - Offset), m_ElementSize == 4);
 	}
+	
 	uint32_t GetBufferSize() const { return m_BufferSize; }
 	uint32_t GetElementCount() const { return m_ElementCount; }
 	uint32_t GetElementSize() const { return m_ElementSize; }
@@ -37,4 +38,20 @@ protected:
 	uint32_t m_ElementCount;
 	uint32_t m_ElementSize;
 	D3D12_RESOURCE_FLAGS m_ResourceFlags;
+};
+
+class FConstBuffer : public FGpuBuffer
+{
+public:
+	FConstBuffer() : m_MappedData(nullptr) {}
+	~FConstBuffer() { Unmap(); }
+
+	void CreateUpload(const std::wstring& Name, uint32_t Size);
+	D3D12_CPU_DESCRIPTOR_HANDLE CreateConstantBufferView(uint32_t Offset, uint32_t Size);
+
+	void* Map();
+	void Unmap();
+
+private:
+	void* m_MappedData;
 };

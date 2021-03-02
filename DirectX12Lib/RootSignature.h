@@ -134,6 +134,12 @@ public:
 
 	ID3D12RootSignature* GetSignature() const { return m_D3DRootSignature; }
 
+	UINT GetNumParameters() const { return m_NumParameters; }
+
+	uint32_t GetSamplerTableBitMap() const { return m_SamplerTableBitMap; }
+	uint32_t GetDescriptorTableBitMap() const { return m_DescriptorTableBitMap; }
+	uint32_t GetDescriptorTableSize(uint32_t RootIndex) const { return m_DescriptorTableSize[RootIndex]; }
+
 
 protected:
 	bool m_Finalized;
