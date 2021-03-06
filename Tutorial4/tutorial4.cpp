@@ -31,20 +31,12 @@ public:
 
 	void OnStartup()
 	{
-		m_device = D3D12RHI::Get().GetD3D12Device();
-
-		FSamplerDesc DefaultSamplerDesc;
-
-		m_rootSignature.Reset(2, 1);
-		m_rootSignature[0].InitAsConstants(0, sizeof(m_uboVS) / 4, D3D12_SHADER_VISIBILITY_VERTEX);
-		m_rootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-		m_rootSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
-		m_rootSignature.Finalize(L"Tutorial4", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		SetupRootSignature();
 
 		m_Texture.LoadFromFile(L"../Resources/Textures/Foliage.dds");
 		SetupShaders();
 		SetupMesh();
-		SetupPiplineState();
+		SetupPipelineState();
 	}
 
 	void OnUpdate()
@@ -84,6 +76,17 @@ public:
 	}
 
 private:
+	void SetupRootSignature()
+	{
+		FSamplerDesc DefaultSamplerDesc;
+
+		m_RootSignature.Reset(2, 1);
+		m_RootSignature[0].InitAsConstants(0, sizeof(m_uboVS) / 4, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_RootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature.Finalize(L"Tutorial4", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	}
+
 	void SetupMesh()
 	{
 		struct Vertex
@@ -123,7 +126,7 @@ private:
 		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/triangle.hlsl", "ps_main", "ps_5_1");
 	}
 
-	void SetupPiplineState()
+	void SetupPipelineState()
 	{
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
 		{
@@ -132,7 +135,7 @@ private:
 		  { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 		};
 
-		m_PipelineState.SetRootSignature(m_rootSignature);
+		m_PipelineState.SetRootSignature(m_RootSignature);
 		m_PipelineState.SetRasterizerState(FPipelineState::RasterizerDefault);
 		m_PipelineState.SetBlendState(FPipelineState::BlendTraditional);
 		m_PipelineState.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
@@ -147,7 +150,7 @@ private:
 	void FillCommandLists(FCommandContext& CommandContext)
 	{
 		// Set necessary state.
-		CommandContext.SetRootSignature(m_rootSignature);
+		CommandContext.SetRootSignature(m_RootSignature);
 		CommandContext.SetPipelineState(m_PipelineState);
 		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
@@ -159,8 +162,7 @@ private:
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer2();
 		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
-		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-
+		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
 
@@ -184,9 +186,7 @@ private:
 		FMatrix viewMatrix;
 	} m_uboVS;
 
-	ComPtr<ID3D12Device> m_device;
-
-	FRootSignature m_rootSignature;
+	FRootSignature m_RootSignature;
 	FGraphicsPipelineState m_PipelineState;
 
 	ComPtr<ID3DBlob> m_vertexShader;
@@ -194,10 +194,6 @@ private:
 
 	FGpuBuffer m_VertexBuffer;
 	FGpuBuffer m_IndexBuffer;
-
-	ComPtr<ID3D12Resource> m_uniformBuffer;
-	ComPtr<ID3D12DescriptorHeap> m_uniformBufferHeap;
-	UINT8* m_mappedUniformBuffer;
 
 	FTexture m_Texture;
 

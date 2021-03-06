@@ -1,4 +1,4 @@
-#include "MeshData.h"
+﻿#include "MeshData.h"
 #include "Common.h"
 
 MeshData::MeshData(const std::string& filepath)
@@ -82,7 +82,13 @@ const float* MeshData::GetVertexData(VertexElementType type)
 
 uint32_t MeshData::GetIndexSize() const
 {
-	return (uint32_t)m_indices.size() * sizeof(uint32_t);
+	return (uint32_t)m_indices.size() * GetIndexElementSize();
+}
+
+uint32_t MeshData::GetIndexElementSize() const
+{
+	//TODO: maybe short?
+	return sizeof(uint32_t);
 }
 
 uint32_t MeshData::GetIndexCount() const

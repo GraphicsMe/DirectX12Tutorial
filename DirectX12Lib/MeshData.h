@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "MathLib.h"
 #include <vector>
@@ -68,6 +68,7 @@ public:
 
 	uint32_t GetIndexCount() const;
 	uint32_t GetIndexSize() const;
+	uint32_t GetIndexElementSize() const;
 	const uint32_t* GetIndexData();
 
 	void AddMaterial(const MaterialData& Material);
