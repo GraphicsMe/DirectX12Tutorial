@@ -43,11 +43,11 @@ LinearAllocator::LinearAllocator(ELinearAllocatorType Type)
 	m_PageSize = (Type == ELinearAllocatorType::GpuExclusive ? GpuAllocatorPageSize : CpuAllocatorPageSize);
 }
 
-FAllocation LinearAllocator::Allocate(uint32_t SizeInBytes, uint32_t Alignment /*= DEFAULT_ALIGN*/)
+FAllocation LinearAllocator::Allocate(size_t SizeInBytes, size_t Alignment /*= DEFAULT_ALIGN*/)
 {
-	const uint32_t AlignmentMask = Alignment - 1;
+	const size_t AlignmentMask = Alignment - 1;
 	Assert((AlignmentMask & Alignment) == 0);
-	const uint32_t AlignedSize = AlignUpWithMask(SizeInBytes, AlignmentMask);
+	const size_t AlignedSize = AlignUpWithMask(SizeInBytes, AlignmentMask);
 
 	Assert(AlignedSize <= m_PageSize);
 	//if (AlignedSize > m_PageSize)
@@ -111,7 +111,7 @@ LinearAllocationPage* LinearAllocator::AllocateLargePage(uint32_t SizeInBytes)
 	return nullptr;
 }
 
-LinearAllocationPage* LinearAllocator::RequestPage(uint32_t SizeInBytes)
+LinearAllocationPage* LinearAllocator::RequestPage(size_t SizeInBytes)
 {
 	LinearAllocationPage* Page = nullptr;
 	while (!m_RetiredPages.empty() && g_CommandListManager.IsFenceComplete(m_RetiredPages.front()->GetFenceValue()))
@@ -127,7 +127,7 @@ LinearAllocationPage* LinearAllocator::RequestPage(uint32_t SizeInBytes)
 	return Page;
 }
 
-LinearAllocationPage* LinearAllocator::CreateNewPage(uint32_t PageSize)
+LinearAllocationPage* LinearAllocator::CreateNewPage(size_t PageSize)
 {
 	D3D12_HEAP_PROPERTIES HeapProps;
 	HeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;

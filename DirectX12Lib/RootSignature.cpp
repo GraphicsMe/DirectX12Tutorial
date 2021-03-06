@@ -32,6 +32,7 @@ void FRootSignature::InitStaticSampler(UINT Register, const D3D12_SAMPLER_DESC& 
 	{
 		StaticSamplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
 	}
+	m_StaticSamplerArray.emplace_back(StaticSamplerDesc);
 }
 
 void FRootSignature::Finalize(const std::wstring& name, D3D12_ROOT_SIGNATURE_FLAGS Flags)

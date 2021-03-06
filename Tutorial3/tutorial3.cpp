@@ -35,15 +35,12 @@ public:
 		m_rootSignature[0].InitAsConstants(0, sizeof(m_uboVS) / 4, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_rootSignature.Finalize(L"Tutorial3", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_COPY);
-
 		SetupShaders();
 
-		SetupMesh(CommandContext);
+		SetupMesh();
 		
 		SetupPiplineState();
 
-		CommandContext.Finish(true);
 	}
 
 	void OnUpdate()
@@ -83,7 +80,7 @@ public:
 	}
 
 private:
-	void SetupMesh(FCommandContext& CommandContext)
+	void SetupMesh()
 	{
 		struct Vertex
 		{
@@ -112,8 +109,6 @@ private:
 			{ { -1.f, -1.f,  1.f }, { 0.f, 0.f, 0.f } }  // 7
 		};
 
-		const UINT VertexBufferSize = sizeof(vertexBufferData);
-
 		m_VertexBuffer.Create(L"VertexBuffer", _countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
 		uint32_t indexBufferData[] = { 
 			0, 1, 2,
@@ -130,7 +125,6 @@ private:
 			5, 7, 6
 		};
 
-		const UINT indexBufferSize = sizeof(indexBufferData);
 		m_IndexBuffer.Create(L"IndexBuffer", _countof(indexBufferData), sizeof(uint32_t), indexBufferData);
 	}
 

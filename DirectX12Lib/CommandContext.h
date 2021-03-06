@@ -49,6 +49,7 @@ public:
 	static void DestroyAllContexts();
 	static FCommandContext& Begin(D3D12_COMMAND_LIST_TYPE Type=D3D12_COMMAND_LIST_TYPE_DIRECT, const std::wstring& ID = L"");
 	static void InitializeBuffer(FD3D12Resource& Dest, const void* Data, uint32_t NumBytes, size_t Offset = 0);
+	static void InitializeTexture(FD3D12Resource& Dest, UINT NumSubResources, D3D12_SUBRESOURCE_DATA SubData[]);
 
 public:
 	~FCommandContext();
@@ -57,7 +58,7 @@ public:
 	void SetID(const std::wstring& ID) { m_ID = ID; }
 	uint64_t Finish(bool WaitForCompletion = false);
 
-	FAllocation ReserveUploadMemory(uint32_t SizeInBytes);
+	FAllocation ReserveUploadMemory(size_t SizeInBytes);
 
 	void FlushResourceBarriers();
 	ID3D12GraphicsCommandList* GetCommandList() { return m_CommandList; }

@@ -73,6 +73,17 @@ void FCommandContext::InitializeBuffer(FD3D12Resource& Dest, const void* Data, u
 	CommandContext.Finish(true);
 }
 
+void FCommandContext::InitializeTexture(FD3D12Resource& Dest, UINT NumSubResources, D3D12_SUBRESOURCE_DATA SubData[])
+{
+	UINT64 UploadBufferSize = GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubResources);
+
+	FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	FAllocation Allocation = CommandContext.ReserveUploadMemory(UploadBufferSize);
+	UpdateSubresources(CommandContext.m_CommandList, Dest.GetResource(), Allocation.D3d12Resource, 0, 0, NumSubResources, SubData);
+	CommandContext.TransitionResource(Dest,D3D12_RESOURCE_STATE_GENERIC_READ);
+	CommandContext.Finish(true);
+}
+
 FCommandContext::~FCommandContext()
 {
 	if (m_CommandList)
@@ -145,7 +156,7 @@ uint64_t FCommandContext::Finish(bool WaitForCompletion /*= false*/)
 	return FenceValue;
 }
 
-FAllocation FCommandContext::ReserveUploadMemory(uint32_t SizeInBytes)
+FAllocation FCommandContext::ReserveUploadMemory(size_t SizeInBytes)
 {
 	return m_CpuLinearAllocator.Allocate(SizeInBytes);
 }

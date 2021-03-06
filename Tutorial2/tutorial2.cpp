@@ -18,8 +18,6 @@
 #include <chrono>
 #include <iostream>
 
-extern FCommandListManager g_CommandListManager;
-
 
 class Tutorial2 : public FGame
 {
@@ -36,16 +34,11 @@ public:
 		m_rootSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 0, 1, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_rootSignature.Finalize(L"Tutorial2", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_COPY);
-
 		SetupShaders();
-
-		SetupMesh(CommandContext);
+		SetupMesh();
 
 		SetupUniformBuffer();
 		SetupPiplineState();
-
-		CommandContext.Finish(true);
 	}
 
 	void OnUpdate()
@@ -89,7 +82,7 @@ public:
 	}
 
 private:
-	void SetupMesh(FCommandContext& CommandContext)
+	void SetupMesh()
 	{
 		struct Vertex
 		{
@@ -108,12 +101,9 @@ private:
 		  { { -1.0f, -1.0f, 0.0f },{ 0.0f, 1.0f, 0.0f } },
 		  { { 0.0f,  1.0f,  0.0f },{ 0.0f, 0.0f, 1.0f } }
 		};
-
-		const UINT VertexBufferSize = sizeof(vertexBufferData);
 		m_VertexBuffer.Create(L"VertexBuffer", _countof(vertexBufferData), sizeof(Vertex), vertexBufferData);
 
 		uint32_t indexBufferData[3] = { 0, 1, 2 };
-		const UINT indexBufferSize = sizeof(indexBufferData);
 		m_IndexBuffer.Create(L"IndexBuffer", _countof(indexBufferData), sizeof(uint32_t), indexBufferData);
 	}
 

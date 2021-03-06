@@ -85,6 +85,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>../ThirdParty/DirectXTex/DirectXTex</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -139,6 +140,8 @@
     <ClInclude Include="PixelBuffer.h" />
     <ClInclude Include="RenderWindow.h" />
     <ClInclude Include="RootSignature.h" />
+    <ClInclude Include="SamplerManager.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="WindowWin32.h" />
   </ItemGroup>
@@ -164,6 +167,7 @@
     <ClCompile Include="PixelBuffer.cpp" />
     <ClCompile Include="RenderWindow.cpp" />
     <ClCompile Include="RootSignature.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="WindowWin32.cpp" />
   </ItemGroup>
