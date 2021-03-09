@@ -6,7 +6,7 @@
 
 extern FCommandListManager g_CommandListManager;
 
-LinearAllocationPage::LinearAllocationPage(ID3D12Resource* Resource, D3D12_RESOURCE_STATES State, uint32_t SizeInBytes)
+LinearAllocationPage::LinearAllocationPage(ID3D12Resource* Resource, D3D12_RESOURCE_STATES State, size_t SizeInBytes)
 	: FD3D12Resource(Resource, State)
 	, m_PageSize(SizeInBytes)
 	, m_CpuAddress(nullptr)

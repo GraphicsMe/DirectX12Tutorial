@@ -1,12 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+﻿cmake_minimum_required(VERSION 3.10)
 
 project(DirectX12Tutorial)
 
 if(WIN32)
-	add_compile_definitions(_UNICODE UNICODE _WIN32_WINNT=0x0601)
+	add_compile_definitions(_UNICODE UNICODE)
 endif()
-option(BUILD_DX12 "" OFF)
-option(BUILD_DX11 "" OFF)
 
 add_subdirectory(DirectX12Lib)
 add_subdirectory(ThirdParty/DirectXTex)
