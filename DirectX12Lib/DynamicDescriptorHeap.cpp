@@ -13,6 +13,8 @@ std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> FDynamicDescriptorHeap
 FDynamicDescriptorHeap::FDynamicDescriptorHeap(FCommandContext& OwningContext, D3D12_DESCRIPTOR_HEAP_TYPE HeapType)
 	: m_OwningContext(OwningContext)
 	, m_HeapType(HeapType)
+	, m_CurrentHeap(nullptr)
+	, m_CurrentOffset(0)
 {
 
 }

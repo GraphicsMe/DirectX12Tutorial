@@ -5,6 +5,7 @@
 class FGpuBuffer : public FD3D12Resource
 {
 public:
+	FGpuBuffer();
 	virtual ~FGpuBuffer() { Destroy(); }
 
 	void Create(const std::wstring& Name, uint32_t NumElements, uint32_t ElementSize, const void* InitData = nullptr);

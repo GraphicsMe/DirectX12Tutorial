@@ -107,6 +107,7 @@ FCommandContext::FCommandContext(D3D12_COMMAND_LIST_TYPE Type)
 	, m_DynamicSamplerDescriptorHeap(*this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
 	, m_DynamicViewDescriptorHeap(*this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
 {
+	ZeroMemory(m_CurrentDescriptorHeaps, sizeof(m_CurrentDescriptorHeaps));
 	m_CommandList = nullptr;
 	m_CurrentAllocator = nullptr;
 	

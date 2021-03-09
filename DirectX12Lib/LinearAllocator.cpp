@@ -9,6 +9,7 @@ extern FCommandListManager g_CommandListManager;
 LinearAllocationPage::LinearAllocationPage(ID3D12Resource* Resource, D3D12_RESOURCE_STATES State, uint32_t SizeInBytes)
 	: FD3D12Resource(Resource, State)
 	, m_PageSize(SizeInBytes)
+	, m_CpuAddress(nullptr)
 {
 	this->Map();
 	GpuAddress = Resource->GetGPUVirtualAddress();
@@ -38,6 +39,7 @@ void LinearAllocationPage::Unmap()
 
 LinearAllocator::LinearAllocator(ELinearAllocatorType Type)
 	: m_AllocatorType(Type)
+	, m_CurrentPage(nullptr)
 {
 	Assert(Type > ELinearAllocatorType::InvalidAllocator && Type < ELinearAllocatorType::NumAllocatorTypes);
 	m_PageSize = (Type == ELinearAllocatorType::GpuExclusive ? GpuAllocatorPageSize : CpuAllocatorPageSize);

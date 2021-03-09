@@ -84,6 +84,7 @@ std::map<size_t, ComPtr<ID3D12PipelineState>> FPipelineState::ms_GraphicsPSHashM
 std::map<size_t, ComPtr<ID3D12PipelineState>> FPipelineState::ms_ComputePSHashMap;
 
 FGraphicsPipelineState::FGraphicsPipelineState()
+	: m_InputLayouts(nullptr)
 {
 	ZeroMemory(&m_PSDesc, sizeof(m_PSDesc));
 	m_PSDesc.NodeMask = 1;
