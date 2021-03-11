@@ -65,12 +65,7 @@ UINT RenderWindow::Present()
 	return m_frameIndex;
 }
 
-ComPtr<ID3D12Resource> RenderWindow::GetBackBuffer()
-{
-	return m_BackBuffers[m_frameIndex].GetResource();
-}
-
-FColorBuffer& RenderWindow::GetBackBuffer2()
+FColorBuffer& RenderWindow::GetBackBuffer()
 {
 	return m_BackBuffers[m_frameIndex];
 }

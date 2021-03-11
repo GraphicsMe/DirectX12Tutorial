@@ -21,8 +21,7 @@ public:
 
 	// swap chain & present
 	UINT Present();
-	ComPtr<ID3D12Resource> GetBackBuffer();
-	FColorBuffer& GetBackBuffer2();
+	FColorBuffer& GetBackBuffer();
 	FDepthBuffer& GetDepthBuffer();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();

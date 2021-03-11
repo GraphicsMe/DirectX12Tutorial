@@ -168,7 +168,7 @@ private:
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
-		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer2();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
 		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);

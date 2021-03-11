@@ -147,7 +147,7 @@ private:
 		CommandContext.SetDynamicDescriptor(0, 0, m_ConstBuffer.CreateConstantBufferView(0, sizeof(m_uboVS)));
 
 		RenderWindow& renderWindow = RenderWindow::Get();
-		auto BackBuffer = renderWindow.GetBackBuffer2();
+		auto BackBuffer = renderWindow.GetBackBuffer();
 		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
