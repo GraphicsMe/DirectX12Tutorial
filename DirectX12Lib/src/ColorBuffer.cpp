@@ -34,6 +34,7 @@ void FColorBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Hei
 
 void FColorBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, uint32_t ArraySize, uint32_t NumMips /*= 1*/)
 {
+	(ArraySize);
 	D3D12_RENDER_TARGET_VIEW_DESC RTVDesc = {};
 	D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
 

@@ -162,8 +162,7 @@ void FGraphicsPipelineState::Finalize()
 	HashCode = HashState(m_InputLayouts, m_PSDesc.InputLayout.NumElements, HashCode);
 	m_PSDesc.InputLayout.pInputElementDescs = m_InputLayouts;
 
-	ID3D12PipelineState** PSRef = nullptr;
-	bool FirstCompile = false;
+	//todo: cache pso
 	{
 		auto iter = ms_GraphicsPSHashMap.find(HashCode);
 		if (iter == ms_GraphicsPSHashMap.end())
@@ -191,8 +190,7 @@ void FComputePipelineState::Finalize()
 
 	size_t HashCode = HashState(&m_PSDesc);
 
-	ID3D12PipelineState** PSRef = nullptr;
-	bool FirstCompile = false;
+	//todo: cache pso
 	{
 		auto iter = ms_GraphicsPSHashMap.find(HashCode);
 		if (iter == ms_GraphicsPSHashMap.end())

@@ -27,6 +27,7 @@ D3D12_RESOURCE_DESC FPixelBuffer::DescribeTex2D(uint32_t Width, uint32_t Height,
 
 void FPixelBuffer::AssociateWithResource(ID3D12Device* Device, const std::wstring& Name, ID3D12Resource* Resource, D3D12_RESOURCE_STATES State)
 {
+	(Device);
 	Assert(Resource != nullptr);
 
 	D3D12_RESOURCE_DESC Desc = Resource->GetDesc();

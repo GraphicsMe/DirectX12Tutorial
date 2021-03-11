@@ -73,6 +73,8 @@ void FTexture::LoadFromFile(const std::wstring& FileName)
 	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
 	ThrowIfFailed(DirectX::CreateTextureEx(Device, image.GetMetadata(), D3D12_RESOURCE_FLAG_NONE, true, m_Resource.ReleaseAndGetAddressOf()));
 
+	m_Resource->SetName(FileName.c_str());
+
 	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 	ThrowIfFailed(PrepareUpload(Device, image.GetImages(), image.GetImageCount(), image.GetMetadata(), subresources));
 	

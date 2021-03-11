@@ -20,7 +20,7 @@ public:
 	
 	void Clear()
 	{
-		if (m_RootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+		if (m_RootParam.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
 		{
 			delete [] m_RootParam.DescriptorTable.pDescriptorRanges;
 		}

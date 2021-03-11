@@ -1,4 +1,4 @@
-#include "ObjLoader.h"
+﻿#include "ObjLoader.h"
 #include "MathLib.h"
 #include "Timer.h"
 #include "MeshData.h"
@@ -31,7 +31,6 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath)
 
 	ObjFace face;
 	bool FirstGroup = true;
-	int CurrentIndex = 0;
 	ObjGroup CurrentGroup;
 	std::vector<ObjGroup> Groups;
 
@@ -193,14 +192,14 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath)
 	}
 
 	uint32_t group_size = (uint32_t)Groups.size();
-	for (uint32_t g = 0; g < (uint32_t)Groups.size(); ++g)
+	for (uint32_t g = 0; g < group_size; ++g)
 	{
 		ObjGroup& Group = Groups[g];
 		Group.HasNormal = has_normal;
 
 		Group.StartIndex = (uint32_t)final_indices.size();
 		uint32_t face_size = (uint32_t)Group.Faces.size();
-		for (uint32_t f = 0; f < Group.Faces.size(); ++f)
+		for (uint32_t f = 0; f < face_size; ++f)
 		{
 			//printf("group %s %d/%d, face %d/%d\n", Group.Name.c_str(), g, group_size, f, face_size);
 			const ObjFace& Face = Group.Faces[f];
