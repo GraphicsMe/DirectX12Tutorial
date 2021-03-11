@@ -43,13 +43,12 @@ void FContextManager::DestroyAllContexts()
 	for (uint32_t i = 0; i < 4; ++i)
 	{
 		m_ContextPool[i].clear();
-		Assert(m_AvailableContexts[i].empty());
 	}
 }
 
 void FCommandContext::DestroyAllContexts()
 {
-
+	g_ContextManager.DestroyAllContexts();
 }
 
 FCommandContext& FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE Type, const std::wstring& ID /*= L""*/)
@@ -128,7 +127,7 @@ void FCommandContext::Reset(void)
 	m_CurComputeRootSignature = nullptr;
 	m_NumBarriersToFlush = 0;
 
-	//todo: bind descriptor heaps
+	BindDescriptorHeaps();
 }
 
 uint64_t FCommandContext::Finish(bool WaitForCompletion /*= false*/)
@@ -153,7 +152,7 @@ uint64_t FCommandContext::Finish(bool WaitForCompletion /*= false*/)
 		g_CommandListManager.WaitForFence(FenceValue);
 	}
 	
-	// todo: free context
+	g_ContextManager.FreeContext(this);
 	return FenceValue;
 }
 

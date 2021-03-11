@@ -16,7 +16,7 @@ FDynamicDescriptorHeap::FDynamicDescriptorHeap(FCommandContext& OwningContext, D
 	, m_CurrentHeap(nullptr)
 	, m_CurrentOffset(0)
 {
-
+	m_DescriptorSize = D3D12RHI::Get().GetD3D12Device()->GetDescriptorHandleIncrementSize(HeapType);
 }
 
 void FDynamicDescriptorHeap::CleanupUsedHeaps(uint64_t FenceValue)
@@ -59,6 +59,7 @@ ID3D12DescriptorHeap* FDynamicDescriptorHeap::GetHeapPointer()
 {
 	if (m_CurrentHeap == nullptr)
 	{
+		Assert(m_CurrentOffset == 0);
 		m_CurrentHeap = RequestDescriptorHeap(m_HeapType);
 		m_FirstDescriptor = FDescriptorHandle(m_CurrentHeap);
 	}
@@ -73,7 +74,7 @@ ID3D12DescriptorHeap* FDynamicDescriptorHeap::RequestDescriptorHeap(D3D12_DESCRI
 		ms_ReadyDescriptorHeaps[idx].push(ms_RetiredDescriptorHeaps[idx].front().second);
 		ms_RetiredDescriptorHeaps[idx].pop();
 	}
-	if (!m_RetiredHeaps.empty())
+	if (!ms_ReadyDescriptorHeaps[idx].empty())
 	{
 		ID3D12DescriptorHeap* Heap = ms_ReadyDescriptorHeaps[idx].front();
 		ms_ReadyDescriptorHeaps[idx].pop();
@@ -207,6 +208,7 @@ void FDynamicDescriptorHeap::FDescriptorHandleCache::CopyAndBindStaleTables(
 		DWORD TableSize = 0;
 		BOOL Result = _BitScanReverse(&TableSize, m_RootDescriptorTable[RootIndex].AssignedHandlesBitMap);
 		Assert(Result);
+		TableSize += 1;
 
 		(CmdList->*SetFunc)(RootIndex, DestHandleStart.GetGpuHandle());
 

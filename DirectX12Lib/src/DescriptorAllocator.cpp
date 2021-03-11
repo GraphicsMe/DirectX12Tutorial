@@ -5,7 +5,11 @@ std::vector<ComPtr<ID3D12DescriptorHeap> > FDescriptorAllocator::sm_DescriptorPo
 
 FDescriptorAllocator::FDescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE Type)
 	: m_HeapType(Type)
+	, m_DescriptorSize(0)
+	, m_CurrentHeap(nullptr)
+	, m_RemainingFreeHandles(0)
 {
+	m_CurrentCpuAddress.ptr = 0;
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE FDescriptorAllocator::Allocate(uint32_t Count)

@@ -36,10 +36,8 @@ public:
 	LinearAllocationPage(ID3D12Resource* pResource, D3D12_RESOURCE_STATES State, size_t SizeInBytes);
 	~LinearAllocationPage();
 
-	bool HasSpace(uint32_t SizeInBytes, uint32_t Alignment);
-	FAllocation Allocate(uint32_t SizeInBytes, uint32_t Alignment);
-	void Reset();
 	uint64_t GetFenceValue() const { return m_FenceValue; }
+	void SetFenceValue(uint64_t FenceValue) { m_FenceValue = FenceValue; }
 
 private:
 	void Map();
@@ -48,7 +46,6 @@ private:
 private:
 	uint64_t m_FenceValue;
 	size_t m_PageSize;
-	ComPtr<ID3D12Resource> m_d3d12Resource;
 	void* m_CpuAddress;
 	D3D12_GPU_VIRTUAL_ADDRESS GpuAddress;
 	
@@ -73,7 +70,7 @@ private:
 
 	ELinearAllocatorType m_AllocatorType;
 	size_t m_PageSize;
-	size_t m_CurrentOffset = 0;
+	size_t m_CurrentOffset;
 
 	PagePool m_UsingPages;
 	PagePool m_RetiredPages;

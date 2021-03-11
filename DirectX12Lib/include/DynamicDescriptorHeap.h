@@ -118,7 +118,10 @@ private:
 
 	struct FDescriptorTableCache
 	{
-		FDescriptorTableCache(): AssignedHandlesBitMap(0) {}
+		FDescriptorTableCache() 
+			: AssignedHandlesBitMap(0)
+			, TableSize(0)
+			, TableStart(nullptr) {}
 
 		uint32_t AssignedHandlesBitMap;
 		uint32_t TableSize;
@@ -134,8 +137,10 @@ private:
 
 		void ClearCache()
 		{
+			m_StaleRootParamsBitMap = 0;
 			m_RootDescriptorTablesBitMap = 0;
 			m_MaxCachedDescriptors = 0;
+			ZeroMemory(m_HandleCache, sizeof(m_HandleCache));
 		}
 
 		void UnbindAllInvalid();
@@ -146,20 +151,21 @@ private:
 		void CopyAndBindStaleTables(D3D12_DESCRIPTOR_HEAP_TYPE Type, uint32_t DescriptorSize, FDescriptorHandle DestHandleStart, ID3D12GraphicsCommandList* CmdList,
 			void (STDMETHODCALLTYPE ID3D12GraphicsCommandList::*SetFunc)(UINT, D3D12_GPU_DESCRIPTOR_HANDLE));
 
-		uint32_t m_RootDescriptorTablesBitMap;
-		uint32_t m_StaleRootParamsBitMap;
-		uint32_t m_MaxCachedDescriptors;
+		uint32_t m_RootDescriptorTablesBitMap = 0;
+		uint32_t m_StaleRootParamsBitMap = 0;
+		uint32_t m_MaxCachedDescriptors = 0;
 
 		static const uint32_t MaxNumDescriptors = 256;
 		static const uint32_t MaxNumDescriptorTables = 16;
-		FDescriptorTableCache m_RootDescriptorTable[MaxNumDescriptorTables];
-		D3D12_CPU_DESCRIPTOR_HANDLE m_HandleCache[MaxNumDescriptors];
+		FDescriptorTableCache m_RootDescriptorTable[MaxNumDescriptorTables] = {};
+		D3D12_CPU_DESCRIPTOR_HANDLE m_HandleCache[MaxNumDescriptors] = {};
 	};
 	FDescriptorHandleCache m_GraphicsHandleCache;
 	FDescriptorHandleCache m_ComputeHandleCache;
 
 	FDescriptorHandle AllocateDescriptor(UINT Count)
 	{
+		Assert (m_CurrentHeap != nullptr);
 		FDescriptorHandle Result = m_FirstDescriptor + m_CurrentOffset * m_DescriptorSize;
 		m_CurrentOffset += Count;
 		return Result;

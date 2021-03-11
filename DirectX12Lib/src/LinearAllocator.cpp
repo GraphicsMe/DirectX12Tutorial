@@ -10,6 +10,7 @@ LinearAllocationPage::LinearAllocationPage(ID3D12Resource* Resource, D3D12_RESOU
 	: FD3D12Resource(Resource, State)
 	, m_PageSize(SizeInBytes)
 	, m_CpuAddress(nullptr)
+	, m_FenceValue(0)
 {
 	this->Map();
 	GpuAddress = Resource->GetGPUVirtualAddress();
@@ -25,6 +26,7 @@ void LinearAllocationPage::Map()
 	if (m_CpuAddress == nullptr)
 	{
 		m_Resource->Map(0, nullptr, &m_CpuAddress);
+		Assert(m_CpuAddress != nullptr);
 	}
 }
 
@@ -40,6 +42,7 @@ void LinearAllocationPage::Unmap()
 LinearAllocator::LinearAllocator(ELinearAllocatorType Type)
 	: m_AllocatorType(Type)
 	, m_CurrentPage(nullptr)
+	, m_CurrentOffset(0)
 {
 	Assert(Type > ELinearAllocatorType::InvalidAllocator && Type < ELinearAllocatorType::NumAllocatorTypes);
 	m_PageSize = (Type == ELinearAllocatorType::GpuExclusive ? GpuAllocatorPageSize : CpuAllocatorPageSize);
@@ -67,6 +70,7 @@ FAllocation LinearAllocator::Allocate(size_t SizeInBytes, size_t Alignment /*= D
 	if (m_CurrentPage == nullptr)
 	{
 		m_CurrentPage = RequestPage(m_PageSize);
+		Assert(m_CurrentPage != nullptr);
 		m_CurrentOffset = 0;
 	}
 
@@ -82,7 +86,22 @@ FAllocation LinearAllocator::Allocate(size_t SizeInBytes, size_t Alignment /*= D
 
 void LinearAllocator::CleanupUsedPages(uint64_t FenceID)
 {
+	while (!m_UsingPages.empty())
+	{
+		LinearAllocationPage* Page = m_UsingPages.front();
+		m_UsingPages.pop_back();
+		Page->SetFenceValue(FenceID);
+		m_RetiredPages.push_back(Page);
+	}
 
+	if (m_CurrentPage != nullptr)
+	{
+		m_CurrentPage->SetFenceValue(FenceID);
+		m_RetiredPages.push_back(m_CurrentPage);
+	}
+	
+	m_CurrentPage = nullptr;
+	m_CurrentOffset = 0;
 }
 
 void LinearAllocator::Destroy()

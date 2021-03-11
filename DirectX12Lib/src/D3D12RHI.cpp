@@ -167,6 +167,7 @@ bool D3D12RHI::Initialize()
 
 void D3D12RHI::Destroy()
 {
+	FCommandContext::DestroyAllContexts();
 	g_CommandListManager.Destroy();
 	FPipelineState::DestroyAll();
 	FDescriptorAllocator::DestroyAll();

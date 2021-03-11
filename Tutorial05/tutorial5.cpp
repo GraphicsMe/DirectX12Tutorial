@@ -222,7 +222,7 @@ private:
 
 	FTexture m_Texture;
 
-	float m_elapsedTime;
+	float m_elapsedTime = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 

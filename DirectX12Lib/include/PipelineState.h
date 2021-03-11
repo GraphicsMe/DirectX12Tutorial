@@ -10,7 +10,7 @@ class FRootSignature;
 class FPipelineState
 {
 public:
-	FPipelineState() : m_RootSignature(nullptr) {}
+	FPipelineState() : m_RootSignature(nullptr), m_PipelineState(nullptr) {}
 	
 	static void Initialize();
 	static void DestroyAll();

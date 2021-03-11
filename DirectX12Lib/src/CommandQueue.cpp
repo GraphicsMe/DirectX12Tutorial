@@ -7,6 +7,7 @@ FCommandQueue::FCommandQueue(D3D12_COMMAND_LIST_TYPE type)
 	, m_CommandListType(type)
 	, m_NextFenceValue(SET_FENCE(1))
 	, m_LastCompletedFenceValue(SET_FENCE(0))
+	, m_FenceEvent(nullptr)
 {
 
 }

@@ -93,7 +93,6 @@ class FRootSignature
 {
 public:
 	FRootSignature(UINT NumRootParams = 0, UINT NumStaticSamplers = 0)
-		: m_Finalized(false)
 	{
 		Reset(NumRootParams, NumStaticSamplers);
 	}
@@ -142,15 +141,15 @@ public:
 
 
 protected:
-	bool m_Finalized;
-	UINT m_NumParameters;
-	UINT m_NumStaticSamplers;
+	bool m_Finalized = false;
+	UINT m_NumParameters = 0;
+	UINT m_NumStaticSamplers = 0;
 
-	uint32_t m_DescriptorTableBitMap;
-	uint32_t m_SamplerTableBitMap;
-	uint32_t m_DescriptorTableSize[16];
+	uint32_t m_DescriptorTableBitMap = 0;
+	uint32_t m_SamplerTableBitMap = 0;
+	uint32_t m_DescriptorTableSize[16] = {};
 
 	std::vector<FRootParameter> m_ParamArray;
 	std::vector< D3D12_STATIC_SAMPLER_DESC> m_StaticSamplerArray;
-	ID3D12RootSignature* m_D3DRootSignature;
+	ID3D12RootSignature* m_D3DRootSignature = nullptr;
 };

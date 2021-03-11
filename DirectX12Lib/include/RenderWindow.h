@@ -36,7 +36,7 @@ private:
 	//ComPtr<ID3D12Device> m_d3d12Device;
 	
 	static const UINT BUFFER_COUNT = 2;
-	UINT m_frameIndex;
+	UINT m_frameIndex = 0;
 
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	FColorBuffer m_BackBuffers[BUFFER_COUNT];
