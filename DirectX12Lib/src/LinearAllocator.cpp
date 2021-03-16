@@ -6,6 +6,10 @@
 
 extern FCommandListManager g_CommandListManager;
 
+ELinearAllocatorType LinearAllocationPagePageManager::ms_TypeCounter = GpuExclusive;
+
+LinearAllocationPagePageManager LinearAllocator::ms_PageManager[2];
+
 LinearAllocationPage::LinearAllocationPage(ID3D12Resource* Resource, D3D12_RESOURCE_STATES State, size_t SizeInBytes)
 	: FD3D12Resource(Resource, State)
 	, m_PageSize(SizeInBytes)
@@ -54,22 +58,21 @@ FAllocation LinearAllocator::Allocate(size_t SizeInBytes, size_t Alignment /*= D
 	Assert((AlignmentMask & Alignment) == 0);
 	const size_t AlignedSize = AlignUpWithMask(SizeInBytes, AlignmentMask);
 
-	Assert(AlignedSize <= m_PageSize);
-	//if (AlignedSize > m_PageSize)
-	//	return AllocateLargepage(AlignedSize);
+	if (AlignedSize > m_PageSize)
+		return AllocateLargePage(AlignedSize);
 
 	m_CurrentOffset = AlignUp(m_CurrentOffset, Alignment);
 	if (m_CurrentOffset + AlignedSize > m_PageSize)
 	{
 		Assert(m_CurrentPage != nullptr);
 		// make sure current page is in UsingPages
-		m_UsingPages.push_back(m_CurrentPage);
+		m_StandardPages.push_back(m_CurrentPage);
 		m_CurrentPage = nullptr;
 	}
 
 	if (m_CurrentPage == nullptr)
 	{
-		m_CurrentPage = RequestPage(m_PageSize);
+		m_CurrentPage = ms_PageManager[m_AllocatorType].RequestPage();
 		Assert(m_CurrentPage != nullptr);
 		m_CurrentOffset = 0;
 	}
@@ -86,69 +89,90 @@ FAllocation LinearAllocator::Allocate(size_t SizeInBytes, size_t Alignment /*= D
 
 void LinearAllocator::CleanupUsedPages(uint64_t FenceID)
 {
-	while (!m_UsingPages.empty())
-	{
-		LinearAllocationPage* Page = m_UsingPages.front();
-		m_UsingPages.pop_back();
-		Page->SetFenceValue(FenceID);
-		m_RetiredPages.push_back(Page);
-	}
-
 	if (m_CurrentPage != nullptr)
 	{
-		m_CurrentPage->SetFenceValue(FenceID);
-		m_RetiredPages.push_back(m_CurrentPage);
-	}
-	
-	m_CurrentPage = nullptr;
-	m_CurrentOffset = 0;
-}
-
-void LinearAllocator::Destroy()
-{
-	while (!m_RetiredPages.empty())
-	{
-		LinearAllocationPage* Page = m_RetiredPages.front();
-		m_RetiredPages.pop_front();
-		delete Page;
-	}
-
-	while (!m_UsingPages.empty())
-	{
-		LinearAllocationPage* Page = m_UsingPages.front();
-		m_UsingPages.pop_front();
-		delete Page;
-	}
-
-	if (m_CurrentPage)
-	{
-		delete m_CurrentPage;
+		m_StandardPages.push_back(m_CurrentPage);
 		m_CurrentPage = nullptr;
+		m_CurrentOffset = 0;
 	}
+	for (auto Iter = m_StandardPages.begin(); Iter != m_StandardPages.end(); ++Iter)
+	{
+		(*Iter)->SetFenceValue(FenceID);
+	}
+
+	ms_PageManager[m_AllocatorType].DiscardStandardPages(FenceID, m_StandardPages);
+	m_StandardPages.clear();
+
+	ms_PageManager[m_AllocatorType].DiscardLargePages(FenceID, m_LargePages);
+	m_LargePages.clear();
 }
 
-LinearAllocationPage* LinearAllocator::AllocateLargePage(uint32_t SizeInBytes)
+void LinearAllocator::DestroyAll()
 {
-	return nullptr;
+	ms_PageManager[0].Destroy();
+	ms_PageManager[1].Destroy();
 }
 
-LinearAllocationPage* LinearAllocator::RequestPage(size_t SizeInBytes)
+FAllocation LinearAllocator::AllocateLargePage(size_t SizeInBytes)
+{
+	LinearAllocationPage* Page = ms_PageManager[m_AllocatorType].CreateNewPage(SizeInBytes);
+	m_LargePages.push_back(Page);
+
+	FAllocation allocation;
+	allocation.D3d12Resource = Page->GetResource();
+	allocation.Offset = 0;
+	allocation.CPU = (uint8_t*)Page->m_CpuAddress;
+	allocation.GpuAddress = Page->GpuAddress;
+	return allocation;
+}
+
+LinearAllocationPagePageManager::LinearAllocationPagePageManager()
+{
+	m_AllocatorType = ms_TypeCounter;
+	ms_TypeCounter = (ELinearAllocatorType)(ms_TypeCounter + 1);
+	Assert(ms_TypeCounter <= NumAllocatorTypes);
+}
+
+LinearAllocationPage* LinearAllocationPagePageManager::RequestPage()
 {
 	LinearAllocationPage* Page = nullptr;
-	while (!m_RetiredPages.empty() && g_CommandListManager.IsFenceComplete(m_RetiredPages.front()->GetFenceValue()))
+	if (!m_RetiredPages.empty() && g_CommandListManager.IsFenceComplete(m_RetiredPages.front()->GetFenceValue()))
 	{
 		Page = m_RetiredPages.front();
-		m_RetiredPages.pop_front();
+		m_RetiredPages.pop();
 	}
-	if (!Page)
+	else
 	{
-		Page = CreateNewPage(SizeInBytes);
+		Page = CreateNewPage();
+		m_StandardPagePool.push(Page);
 	}
-
 	return Page;
 }
 
-LinearAllocationPage* LinearAllocator::CreateNewPage(size_t PageSize)
+void LinearAllocationPagePageManager::DiscardStandardPages(uint64_t FenceID, const std::vector<LinearAllocationPage*>& Pages)
+{
+	for (auto Iter = Pages.begin(); Iter != Pages.end(); ++Iter)
+	{
+		(*Iter)->SetFenceValue(FenceID);
+		m_RetiredPages.push(*Iter);
+	}
+}
+
+void LinearAllocationPagePageManager::DiscardLargePages(uint64_t FenceID, const std::vector<LinearAllocationPage*>& Pages)
+{
+	while (!m_LargePagePool.empty() && g_CommandListManager.IsFenceComplete(m_LargePagePool.front()->GetFenceValue()))
+	{
+		delete m_LargePagePool.front();
+		m_LargePagePool.pop();
+	}
+	for (auto Iter = Pages.begin(); Iter != Pages.end(); ++Iter)
+	{
+		(*Iter)->SetFenceValue(FenceID);
+		m_LargePagePool.push(*Iter);
+	}
+}
+
+LinearAllocationPage* LinearAllocationPagePageManager::CreateNewPage(size_t PageSize)
 {
 	D3D12_HEAP_PROPERTIES HeapProps;
 	HeapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -198,3 +222,18 @@ LinearAllocationPage* LinearAllocator::CreateNewPage(size_t PageSize)
 
 	return new LinearAllocationPage(pBuffer, DefaultUsage, PageSize);
 }
+
+void LinearAllocationPagePageManager::Destroy()
+{
+	while (!m_LargePagePool.empty())
+	{
+		delete m_LargePagePool.front();
+		m_LargePagePool.pop();
+	}
+	while (!m_StandardPagePool.empty())
+	{
+		delete m_StandardPagePool.front();
+		m_StandardPagePool.pop();
+	}
+}
+

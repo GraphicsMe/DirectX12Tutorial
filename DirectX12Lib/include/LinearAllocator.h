@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <deque>
+#include <queue>
 #include <memory>
 #include <d3d12.h>
 #include "Common.h"
@@ -51,6 +51,27 @@ private:
 	
 };
 
+class LinearAllocationPagePageManager
+{
+public:
+	LinearAllocationPagePageManager();
+	LinearAllocationPage* RequestPage();
+	void DiscardStandardPages(uint64_t FenceID, const std::vector<LinearAllocationPage*>& Pages);
+	void DiscardLargePages(uint64_t FenceID, const std::vector<LinearAllocationPage*>& Pages);
+	LinearAllocationPage* CreateNewPage(size_t SizeInBytes = 0);
+	void Destroy();
+
+private:
+	using PagePool = std::queue<LinearAllocationPage* >;
+
+	PagePool m_RetiredPages;
+	PagePool m_LargePagePool;
+	PagePool m_StandardPagePool;
+
+	static ELinearAllocatorType ms_TypeCounter;
+	ELinearAllocatorType m_AllocatorType;
+};
+
 class LinearAllocator
 {
 public:
@@ -59,21 +80,19 @@ public:
 	FAllocation Allocate(size_t SizeInBytes, size_t Alignment = DEFAULT_ALIGN);
 
 	void CleanupUsedPages(uint64_t FenceID);
-	void Destroy();
+	static void DestroyAll();
 
 private:
-	LinearAllocationPage* AllocateLargePage(uint32_t SizeInBytes);
-	LinearAllocationPage* RequestPage(size_t SizeInBytes);
-	LinearAllocationPage* CreateNewPage(size_t PageSize);
-
-	using PagePool = std::deque<LinearAllocationPage* >;
+	FAllocation AllocateLargePage(size_t SizeInBytes);
 
 	ELinearAllocatorType m_AllocatorType;
 	size_t m_PageSize;
 	size_t m_CurrentOffset;
 
-	PagePool m_UsingPages;
-	PagePool m_RetiredPages;
+	std::vector<LinearAllocationPage*> m_StandardPages;
+	std::vector<LinearAllocationPage*> m_LargePages;
 
 	LinearAllocationPage* m_CurrentPage;
+
+	static LinearAllocationPagePageManager ms_PageManager[2];
 };

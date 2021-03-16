@@ -48,6 +48,7 @@ void FContextManager::DestroyAllContexts()
 
 void FCommandContext::DestroyAllContexts()
 {
+	LinearAllocator::DestroyAll();
 	g_ContextManager.DestroyAllContexts();
 }
 
@@ -90,8 +91,6 @@ FCommandContext::~FCommandContext()
 		m_CommandList->Release();
 		m_CommandList = nullptr;
 	}
-	m_CpuLinearAllocator.Destroy();
-	m_GpuLinearAllocator.Destroy();
 }
 
 void FCommandContext::Initialize()
