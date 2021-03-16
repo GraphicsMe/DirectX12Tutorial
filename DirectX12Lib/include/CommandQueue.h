@@ -13,8 +13,6 @@ public:
 	void Create(ID3D12Device* Device);
 	void Destroy();
 	
-	ComPtr<ID3D12GraphicsCommandList> GetCommandList();
-
 	// Execute a command list.
     // Returns the fence value to wait for for this command list.
 	uint64_t ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList);
@@ -30,7 +28,6 @@ public:
 
 protected:
 	ID3D12CommandAllocator* CreateCommandAllocator();
-	ComPtr<ID3D12GraphicsCommandList> CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator);
 
 private:
     // Keep track of command allocators that are "in-flight"

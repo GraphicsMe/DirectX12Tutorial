@@ -44,10 +44,6 @@ public:
 	
 	void OnRender()
 	{
-		static int count = 0;
-		++count;
-		FCommandContext& CommandContext = FCommandContext::Begin();
-
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
@@ -70,6 +66,7 @@ public:
 
 		memcpy(m_ConstBuffer.Map(), &m_uboVS, sizeof(m_uboVS));
 
+		FCommandContext& CommandContext = FCommandContext::Begin();
 		FillCommandLists(CommandContext);
 		
 		CommandContext.Finish(true);

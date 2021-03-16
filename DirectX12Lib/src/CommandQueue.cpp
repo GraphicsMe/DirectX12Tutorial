@@ -55,34 +55,9 @@ void FCommandQueue::Destroy()
 	m_FenceEvent = nullptr;
 }
 
-ComPtr<ID3D12GraphicsCommandList> FCommandQueue::GetCommandList()
-{
-	ComPtr<ID3D12GraphicsCommandList> commandList;
-
-	ID3D12CommandAllocator* Allocator = RequestAllocator();
-	if (!m_CommandListQueue.empty())
-	{
-		commandList = m_CommandListQueue.front();
-		m_CommandListQueue.pop();
-
-		ThrowIfFailed(commandList->Reset(Allocator, nullptr));
-	}
-	else
-	{
-		commandList = CreateCommandList(Allocator);
-	}
-	ThrowIfFailed(commandList->SetPrivateDataInterface(__uuidof(ID3D12CommandAllocator), Allocator));
-
-	return commandList;
-}
-
 uint64_t FCommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> commandList)
 {
 	commandList->Close();  // finish recording command, should be called before ExecuteCommandLists
-
-	//ID3D12CommandAllocator* commandAllocator;
-	//UINT dataSize = sizeof(commandAllocator);
-	//ThrowIfFailed(commandList->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator));
 
 	ID3D12CommandList* const ppCommandLists[] = {
 		commandList.Get()
@@ -91,12 +66,8 @@ uint64_t FCommandQueue::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList> com
 	m_d3d12CommandQueue->ExecuteCommandLists(1, ppCommandLists);
 	uint64_t fenceValue = Signal();
 
-	//m_ReadyAllocators.emplace(CommandAllocatorEntry{ fenceValue, commandAllocator });
-
 	//can be reused the next time the GetCommandList method is called.
 	m_CommandListQueue.push(commandList);
-
-	//commandAllocator->Release();
 
 	return fenceValue;
 }
@@ -161,11 +132,4 @@ ID3D12CommandAllocator* FCommandQueue::CreateCommandAllocator()
 	ID3D12CommandAllocator* CommandAllocator;
 	ThrowIfFailed(m_d3d12Device->CreateCommandAllocator(m_CommandListType, IID_PPV_ARGS(&CommandAllocator)));
 	return CommandAllocator;
-}
-
-ComPtr<ID3D12GraphicsCommandList> FCommandQueue::CreateCommandList(ComPtr<ID3D12CommandAllocator> allocator)
-{
-	ComPtr<ID3D12GraphicsCommandList> commandList;
-	ThrowIfFailed(m_d3d12Device->CreateCommandList(0, m_CommandListType, allocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
-	return commandList;
 }

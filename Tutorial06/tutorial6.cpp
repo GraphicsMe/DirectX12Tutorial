@@ -61,8 +61,6 @@ public:
 	
 	void OnRender()
 	{
-		FCommandContext& CommandContext = FCommandContext::Begin();
-
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
@@ -84,6 +82,7 @@ public:
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 
+		FCommandContext& CommandContext = FCommandContext::Begin();
 		FillCommandLists(CommandContext);
 		
 		CommandContext.Finish(true);

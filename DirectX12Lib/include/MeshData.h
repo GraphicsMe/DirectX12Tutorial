@@ -35,8 +35,8 @@ struct MaterialData
 	std::string OpacityPath;
 	std::string EmissivePath;
 	Vector3f Albedo;
-	float Metallic;
-	float Roughness;
+	float Metallic = 0.f;
+	float Roughness = 0.f;
 };
 
 struct SubMeshData
@@ -71,9 +71,16 @@ public:
 	uint32_t GetIndexElementSize() const;
 	const uint32_t* GetIndexData();
 
+	size_t GetMaterialCount() const { return m_materials.size(); }
+	size_t GetMeshCount() const { return m_submeshes.size(); }
+	uint32_t GetSubIndexStart(size_t Index) const;
+	size_t GetSubIndexCount(size_t Index) const;
+	size_t GetSubMaterialIndex(size_t Index) const;
+
 	void AddMaterial(const MaterialData& Material);
 	void AddSubMesh(uint32_t StartIndex, uint32_t IndexCount, uint32_t MaterialIndex);
 	std::string GetBaseColorPath(uint32_t Index);
+	const MaterialData& GetMaterialData(size_t Index);
 
 	friend FObjLoader;
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <map>
 #include <vector>
@@ -43,8 +43,8 @@ struct ObjMaterial
 	std::string OpacityPath;
 	std::string EmissivePath;
 	Vector3f Albedo;
-	float Metallic;
-	float Roughness;
+	float Metallic = 0.f;
+	float Roughness = 0.f;
 	ObjMaterial()
 	{
 		Reset();
@@ -69,11 +69,11 @@ struct ObjMaterial
 struct ObjGroup
 {
 	std::string Name;
-	uint32_t StartIndex;
-	uint32_t IndexCount;
+	uint32_t StartIndex = 0;
+	uint32_t IndexCount = 0;
 	std::vector<ObjFace> Faces;
 
-	bool HasNormal;
+	bool HasNormal = false;
 
 	//ObjMaterial MaterialParam;
 	std::string MaterialName;
