@@ -1,6 +1,7 @@
 ﻿#include "MeshData.h"
 #include "GpuBuffer.h"
 #include "Texture.h"
+#include "MathLib.h"
 
 #include <string>
 
@@ -17,10 +18,22 @@ public:
 
 	void GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout);
 
+	void SetScale(float Scale);
+	void SetRotation(const FMatrix& Rotation);
+	void SetPosition(const Vector3f& Position);
+	void SetPosition(float x, float y, float z);
+	const FMatrix GetModelMatrix() { return m_ModelMatrix;}
+
 private:
 	void InitializeResource();
+	void UpdateModelMatrix();
 
 protected:
+	float m_Scale;
+	FMatrix m_RotationMatrix;
+	Vector3f m_Position;
+	FMatrix m_ModelMatrix;
+
 	MeshData* m_MeshData;
 	std::string m_FileName;
 

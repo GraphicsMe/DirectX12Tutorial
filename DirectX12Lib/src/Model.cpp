@@ -5,6 +5,7 @@
 
 FModel::FModel(const std::string& FileName)
 	: m_FileName(FileName)
+	, m_Scale(1.f)
 {
 	m_MeshData = FObjLoader::LoadObj(FileName);
 	InitializeResource();
@@ -57,6 +58,35 @@ void FModel::GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout)
 	{
 		MeshLayout.push_back({ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
 	}
+}
+
+void FModel::SetScale(float Scale)
+{
+	m_Scale = Scale;
+	UpdateModelMatrix();
+}
+
+void FModel::SetRotation(const FMatrix& Rotation)
+{
+	m_RotationMatrix = Rotation;
+	UpdateModelMatrix();
+}
+
+void FModel::SetPosition(const Vector3f& Position)
+{
+	m_Position = Position;
+	UpdateModelMatrix();
+}
+
+void FModel::SetPosition(float x, float y, float z)
+{
+	m_Position = Vector3f(x, y, z);
+	UpdateModelMatrix();
+}
+
+void FModel::UpdateModelMatrix()
+{
+	m_ModelMatrix = FMatrix::ScaleMatrix(m_Scale) * m_RotationMatrix * FMatrix::TranslateMatrix(m_Position);
 }
 
 void FModel::InitializeResource()

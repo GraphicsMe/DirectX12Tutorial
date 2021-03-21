@@ -40,7 +40,7 @@ Vector4f FMatrix::Column(int i) const
 	return Vector4f(r0[i], r1[i], r2[i], r3[i]);
 }
 
-FMatrix FMatrix::operator*(const FMatrix& rhs)
+FMatrix FMatrix::operator*(const FMatrix& rhs) const
 {
 	Vector4f c0 = rhs.Column(0);
 	Vector4f c1 = rhs.Column(1);

@@ -164,7 +164,7 @@ struct FMatrix
 
 	Vector4f Column(int i) const;
 
-	FMatrix operator * (const FMatrix& rhs);
+	FMatrix operator * (const FMatrix& rhs) const;
 	FMatrix& operator *= (const FMatrix& rhs);
 
 	Vector3f TranslateVector(const Vector3f& vector);

@@ -36,6 +36,8 @@ public:
 		SetupMesh();
 		SetupShaders();
 		SetupPipelineState();
+
+		tStart = std::chrono::high_resolution_clock::now();
 	}
 
 	void OnShutdown()
@@ -44,31 +46,26 @@ public:
 
 	void OnUpdate()
 	{
-	}
-	
-	void OnRender()
-	{
 		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
-		float time = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
-		if (time < (1000.0f / 60.0f))
-		{
-			return;
-		}
+		float delta = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
 		tStart = std::chrono::high_resolution_clock::now();
 
 		// Update Uniforms
-		m_elapsedTime += 0.001f * time;
-		m_elapsedTime = fmodf(m_elapsedTime, 6.283185307179586f);
-		//m_elapsedTime = MATH_PI / 4.f;
-		m_uboVS.modelMatrix = FMatrix::RotateY(m_elapsedTime);
+		m_rotateRadians += 0.0004f * delta;
+		m_rotateRadians = fmodf(m_rotateRadians, 2.f * MATH_PI);
+
+		m_Box->SetRotation(FMatrix::RotateY(m_rotateRadians));
 
 		FCamera camera(Vector3f(0.f, 1.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_uboVS.viewMatrix = camera.GetViewMatrix();
 
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
-
+	}
+	
+	void OnRender()
+	{
 		FCommandContext& CommandContext = FCommandContext::Begin();
 		FillCommandLists(CommandContext);
 		
@@ -92,7 +89,11 @@ private:
 	void SetupMesh()
 	{
 		m_Box = std::make_unique<FModel>("../Resources/Models/primitive/cube.obj");
+
 		m_Floor = std::make_unique<FModel>("../Resources/Models/primitive/quad.obj");
+		m_Floor->SetScale(5.f);
+		m_Floor->SetRotation(FMatrix::RotateX(MATH_PI * 0.5));
+		m_Floor->SetPosition(0.f, -0.5f, 0.f);
 	}
 
 	void SetupShaders()
@@ -133,8 +134,6 @@ private:
 		CommandContext.SetPipelineState(m_PipelineState);
 		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
-		
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
 		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
@@ -148,9 +147,12 @@ private:
 		CommandContext.ClearDepth(DepthBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+		FMatrix m = FMatrix::RotateY(m_rotateRadians);
+		m_uboVS.modelMatrix = m_Box->GetModelMatrix();
+		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 		m_Box->Draw(CommandContext);
 
-		m_uboVS.modelMatrix = FMatrix::ScaleMatrix(5.f) * FMatrix::RotateX(MATH_PI * 0.5) * m_uboVS.modelMatrix;
+		m_uboVS.modelMatrix = m_Floor->GetModelMatrix();
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 		m_Floor->Draw(CommandContext);
 
@@ -171,7 +173,7 @@ private:
 	ComPtr<ID3DBlob> m_vertexShader;
 	ComPtr<ID3DBlob> m_pixelShader;
 
-	float m_elapsedTime = 0;
+	float m_rotateRadians = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 
 	std::unique_ptr<FModel> m_Box;
