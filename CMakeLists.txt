@@ -39,3 +39,8 @@ add_executable(Tutorial06 Tutorial06/tutorial6.cpp)
 target_link_libraries(Tutorial06 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial06 PROPERTIES
 	PROJECT_LABEL "Tutorial06 - Mesh Loader")
+
+add_executable(Tutorial07 Tutorial07/tutorial7.cpp)
+target_link_libraries(Tutorial07 LINK_PUBLIC DirectX12Lib)
+set_target_properties(Tutorial07 PROPERTIES
+	PROJECT_LABEL "Tutorial07 - Shadow Mapping")

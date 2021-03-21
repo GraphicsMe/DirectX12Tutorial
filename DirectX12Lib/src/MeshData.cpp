@@ -101,6 +101,24 @@ const uint32_t* MeshData::GetIndexData()
 	return &m_indices[0];
 }
 
+uint32_t MeshData::GetSubIndexStart(size_t Index) const
+{
+	Assert(Index < m_submeshes.size());
+	return m_submeshes[Index].StartIndex;
+}
+
+size_t MeshData::GetSubIndexCount(size_t Index) const
+{
+	Assert(Index < m_submeshes.size());
+	return m_submeshes[Index].IndexCount;
+}
+
+size_t MeshData::GetSubMaterialIndex(size_t Index) const
+{
+	Assert(Index < m_submeshes.size());
+	return m_submeshes[Index].MaterialIndex;
+}
+
 void MeshData::AddMaterial(const MaterialData& Material)
 {
 	m_materials.push_back(Material);
@@ -124,6 +142,12 @@ std::string MeshData::GetBaseColorPath(uint32_t Index)
 		}
 	}
 	return result;
+}
+
+const MaterialData& MeshData::GetMaterialData(size_t Index)
+{
+	Assert(Index < m_materials.size());
+	return m_materials[Index];
 }
 
 MeshPlane::MeshPlane()

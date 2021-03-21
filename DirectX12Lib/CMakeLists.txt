@@ -1,4 +1,4 @@
-set(HEADER_FILES
+﻿set(HEADER_FILES
 	include/ApplicationWin32.h
 	include/Camera.h
 	include/ColorBuffer.h
@@ -26,6 +26,7 @@ set(HEADER_FILES
 	include/Texture.h
 	include/Timer.h
 	include/WindowWin32.h
+	include/Model.h
 	 )
 
 set(SOURCES
@@ -53,6 +54,7 @@ set(SOURCES
 	src/Texture.cpp
 	src/Timer.cpp
 	src/WindowWin32.cpp
+	src/Model.cpp
 )
 
 add_library(DirectX12Lib
