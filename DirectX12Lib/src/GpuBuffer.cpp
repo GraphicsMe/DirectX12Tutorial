@@ -8,8 +8,8 @@ FGpuBuffer::FGpuBuffer()
 	, m_ElementCount(0)
 {
 	m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;//D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	m_UAV.ptr = D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN;
-	m_SRV.ptr = D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN;
+	m_UAV.ptr = D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN;
+	m_SRV.ptr = D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN;
 }
 
 void FGpuBuffer::Create(const std::wstring& Name, uint32_t NumElements, uint32_t ElementSize, const void* InitData /*= nullptr*/)

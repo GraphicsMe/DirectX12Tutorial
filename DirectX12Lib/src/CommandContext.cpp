@@ -75,7 +75,7 @@ void FCommandContext::InitializeBuffer(FD3D12Resource& Dest, const void* Data, u
 
 void FCommandContext::InitializeTexture(FD3D12Resource& Dest, UINT NumSubResources, D3D12_SUBRESOURCE_DATA SubData[])
 {
-	UINT64 UploadBufferSize = GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubResources);
+	size_t UploadBufferSize = (size_t)GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubResources);
 
 	FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	FAllocation Allocation = CommandContext.ReserveUploadMemory(UploadBufferSize);

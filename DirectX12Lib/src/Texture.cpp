@@ -42,7 +42,7 @@ void FTexture::Create(uint32_t Width, uint32_t Height, DXGI_FORMAT Format, const
 
 	FCommandContext::InitializeTexture(*this, 1, &TexData);
 
-	if (m_CpuDescriptorHandle.ptr == D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN)
+	if (m_CpuDescriptorHandle.ptr == D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN)
 		m_CpuDescriptorHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	D3D12RHI::Get().GetD3D12Device()->CreateShaderResourceView(m_Resource.Get(), nullptr, m_CpuDescriptorHandle);
 }
@@ -81,7 +81,7 @@ void FTexture::LoadFromFile(const std::wstring& FileName)
 	Assert(subresources.size() > 0);
 	FCommandContext::InitializeTexture(*this, (UINT)subresources.size(), &subresources[0]);
 
-	if (m_CpuDescriptorHandle.ptr == D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN)
+	if (m_CpuDescriptorHandle.ptr == D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN)
 		m_CpuDescriptorHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	D3D12RHI::Get().GetD3D12Device()->CreateShaderResourceView(m_Resource.Get(), nullptr, m_CpuDescriptorHandle);
 

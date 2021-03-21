@@ -12,7 +12,7 @@ class FDescriptorHandle
 public:
 	FDescriptorHandle()
 	{
-		m_CpuHandle.ptr = D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN;
+		m_CpuHandle.ptr = D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN;
 		m_GpuHandle.ptr = D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN;
 	}
 
@@ -42,7 +42,7 @@ public:
 
 	void operator += (INT Offset)
 	{
-		if (m_CpuHandle.ptr != D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN)
+		if (m_CpuHandle.ptr != D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN)
 			m_CpuHandle.ptr += Offset;
 		if (m_GpuHandle.ptr != D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN)
 			m_GpuHandle.ptr += Offset;
@@ -51,7 +51,7 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCpuHandle() const { return m_CpuHandle; }
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGpuHandle() const { return m_GpuHandle; }
 
-	bool IsCpuNull() const { return m_CpuHandle.ptr == D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN; }
+	bool IsCpuNull() const { return m_CpuHandle.ptr == D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN; }
 	bool IsShaderVisible() const { return m_GpuHandle.ptr != D3D12_GPU_VIRTUAL_ADDRESS_UNKNOWN; }
 
 private:
