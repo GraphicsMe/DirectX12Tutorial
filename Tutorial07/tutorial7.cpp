@@ -16,6 +16,7 @@
 #include "Texture.h"
 #include "SamplerManager.h"
 #include "Model.h"
+#include "ShadowBuffer.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -120,11 +121,33 @@ private:
 		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
 		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_pixelShader.Get()));
 		m_PipelineState.Finalize();
+
+		m_ShadowPSO.SetRootSignature(m_RootSignature);
+		m_ShadowPSO.SetRasterizerState(FPipelineState::RasterizerShadow);
+		m_ShadowPSO.SetBlendState(FPipelineState::BlendNoColorWrite);
+		m_ShadowPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		m_ShadowPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_ShadowPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_ShadowPSO.SetRenderTargetFormats(0, nullptr, m_ShadowBuffer.GetFormat());
+		m_ShadowPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
+		m_ShadowPSO.Finalize();
 	}
 
-	void DepthPass(FCommandContext& CommandContext)
+	void ShadowPass(FCommandContext& CommandContext)
 	{
+		CommandContext.SetRootSignature(m_RootSignature);
+		CommandContext.SetPipelineState(m_ShadowPSO);
+	}
 
+	void RenderObjects(FCommandContext& CommandContext)
+	{
+		m_uboVS.modelMatrix = m_Box->GetModelMatrix();
+		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_Box->Draw(CommandContext);
+
+		m_uboVS.modelMatrix = m_Floor->GetModelMatrix();
+		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_Floor->Draw(CommandContext);
 	}
 
 	void FillCommandLists(FCommandContext& CommandContext)
@@ -147,14 +170,7 @@ private:
 		CommandContext.ClearDepth(DepthBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		FMatrix m = FMatrix::RotateY(m_rotateRadians);
-		m_uboVS.modelMatrix = m_Box->GetModelMatrix();
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
-		m_Box->Draw(CommandContext);
-
-		m_uboVS.modelMatrix = m_Floor->GetModelMatrix();
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
-		m_Floor->Draw(CommandContext);
+		RenderObjects(CommandContext);
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}
@@ -169,9 +185,13 @@ private:
 
 	FRootSignature m_RootSignature;
 	FGraphicsPipelineState m_PipelineState;
+	FGraphicsPipelineState m_ShadowPSO;
+
+	FShadowBuffer m_ShadowBuffer;
 
 	ComPtr<ID3DBlob> m_vertexShader;
 	ComPtr<ID3DBlob> m_pixelShader;
+	ComPtr<ID3DBlob> m_ShadowVertexShader;
 
 	float m_rotateRadians = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;

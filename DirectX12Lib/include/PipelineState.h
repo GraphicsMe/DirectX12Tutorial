@@ -27,6 +27,7 @@ public:
 public:
 	static D3D12_RASTERIZER_DESC RasterizerDefault;
 	static D3D12_RASTERIZER_DESC RasterizerTwoSided;
+	static D3D12_RASTERIZER_DESC RasterizerShadow;
 
 	static D3D12_BLEND_DESC BlendNoColorWrite;
 	static D3D12_BLEND_DESC BlendDisable;

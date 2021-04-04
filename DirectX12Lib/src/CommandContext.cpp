@@ -304,6 +304,12 @@ void FCommandContext::SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h)
 	SetScissor(x, y, x+w, h+h);
 }
 
+void FCommandContext::SetViewportAndScissor(const D3D12_VIEWPORT& Viewport, const D3D12_RECT& Scissor)
+{
+	m_CommandList->RSSetViewports(1, &Viewport);
+	m_CommandList->RSSetScissorRects(1, &Scissor);
+}
+
 void FCommandContext::ClearColor(FColorBuffer& Target)
 {
 	m_CommandList->ClearRenderTargetView(Target.GetRTV(), Target.GetClearColor().data, 0, nullptr);
@@ -322,6 +328,11 @@ void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_
 void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[])
 {
 	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, true, nullptr);
+}
+
+void FCommandContext::SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV)
+{
+	SetRenderTargets(0, nullptr, DSV);
 }
 
 void FCommandContext::SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents)

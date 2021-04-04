@@ -83,11 +83,13 @@ public:
 	void SetScissor(UINT left, UINT top, UINT right, UINT bottom);
 	void SetViewport(FLOAT x, FLOAT y, FLOAT w, FLOAT h, FLOAT minDepth = 0.0f, FLOAT maxDepth = 1.0f);
 	void SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h);
+	void SetViewportAndScissor(const D3D12_VIEWPORT& Viewport, const D3D12_RECT& Scissor);
 
 	void ClearColor(FColorBuffer& Target);
 	void ClearDepth(FDepthBuffer& Target);
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[]);
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV);
+	void SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV);
 
 	void SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents);
 
