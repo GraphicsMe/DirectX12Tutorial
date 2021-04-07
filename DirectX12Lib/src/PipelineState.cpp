@@ -130,7 +130,7 @@ void FGraphicsPipelineState::SetRenderTargetFormat(DXGI_FORMAT RTVFormat, DXGI_F
 
 void FGraphicsPipelineState::SetRenderTargetFormats(UINT NumRTVs, const DXGI_FORMAT* RTVFormats, DXGI_FORMAT DSVFormat, UINT MsaaCount /*= 1*/, UINT MsaaQuality /*= 0*/)
 {
-	Assert(NumRTVs != 0 || RTVFormats != nullptr);
+	Assert(NumRTVs == 0 || RTVFormats != nullptr);
 
 	for (UINT i = 0; i < NumRTVs; ++i)
 		m_PSDesc.RTVFormats[i] = RTVFormats[i];

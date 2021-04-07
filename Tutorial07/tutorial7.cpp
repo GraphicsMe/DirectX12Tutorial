@@ -128,6 +128,7 @@ private:
 		m_ShadowPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		m_ShadowPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_ShadowPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_ShadowBuffer.Create(L"Shadow Map", 2048, 2048);
 		m_ShadowPSO.SetRenderTargetFormats(0, nullptr, m_ShadowBuffer.GetFormat());
 		m_ShadowPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
 		m_ShadowPSO.Finalize();
