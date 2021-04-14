@@ -27,8 +27,9 @@
 	include/Timer.h
 	include/WindowWin32.h
 	include/Model.h
-	include/ShadowBuffer
-	 )
+	include/ShadowBuffer.h
+	include/Light.h
+)
 
 set(SOURCES
 	src/ApplicationWin32.cpp
@@ -56,7 +57,8 @@ set(SOURCES
 	src/Timer.cpp
 	src/WindowWin32.cpp
 	src/Model.cpp
-	src/ShadowBuffer
+	src/ShadowBuffer.cpp
+	src/Light.cpp
 )
 
 add_library(DirectX12Lib

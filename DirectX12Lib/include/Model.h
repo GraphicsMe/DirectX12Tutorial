@@ -8,6 +8,8 @@
 
 class MeshData;
 class FCommandContext;
+
+
 class FModel
 {
 public:
@@ -24,9 +26,12 @@ public:
 	void SetPosition(float x, float y, float z);
 	const FMatrix GetModelMatrix() { return m_ModelMatrix;}
 
+	const FBoundingBox& GetBoundingBox() const { return m_BoundingBox; }
+
 private:
 	void InitializeResource();
 	void UpdateModelMatrix();
+	void UpdateBoundingBox();
 
 protected:
 	float m_Scale;
@@ -41,4 +46,6 @@ protected:
 	FGpuBuffer m_IndexBuffer;
 
 	std::vector<FTexture> m_Textures;
+
+	FBoundingBox m_BoundingBox;
 };

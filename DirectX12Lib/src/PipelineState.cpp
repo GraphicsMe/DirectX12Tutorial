@@ -23,8 +23,9 @@ void FPipelineState::Initialize()
 	RasterizerTwoSided.CullMode = D3D12_CULL_MODE_NONE;
 
 	RasterizerShadow = RasterizerDefault;
-	RasterizerShadow.DepthBias = -100;
-	RasterizerShadow.SlopeScaledDepthBias = -1.5f;
+	RasterizerShadow.DepthBias = 100;
+	RasterizerShadow.DepthBiasClamp = 0.f;
+	RasterizerShadow.SlopeScaledDepthBias = 1.5f;
 
 	// blend state
 	D3D12_BLEND_DESC alphaBlend = {};

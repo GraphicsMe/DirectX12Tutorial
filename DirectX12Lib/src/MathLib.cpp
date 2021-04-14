@@ -1,4 +1,4 @@
-#include "MathLib.h"
+﻿#include "MathLib.h"
 
 FMatrix::FMatrix()
 	: r0(1.f, 0.f, 0.f, 0.f)
@@ -61,19 +61,41 @@ FMatrix& FMatrix::operator*=(const FMatrix& rhs)
 	return *this;
 }
 
-Vector3f FMatrix::TranslateVector(const Vector3f& vector)
+Vector3f FMatrix::TranslateVector(const Vector3f& vector) const
 {
 	Vector4f Res = Vector4f(vector, 0.f) * (*this);
 	return Vector3f(Res.x, Res.y, Res.z);
 }
 
-Vector3f FMatrix::TransformPosition(const Vector3f& position)
+Vector3f FMatrix::TransformPosition(const Vector3f& position) const
 {
 	Vector4f Res = Vector4f(position, 1.f) * (*this);
 	return Vector3f(Res.x, Res.y, Res.z);
 }
 
-FMatrix FMatrix::Transpose()
+FBoundingBox FMatrix::TransformBoundingBox(const FBoundingBox& BoundBox) const
+{
+	Vector3f BoundMin = TransformPosition(BoundBox.BoundMin);
+	Vector3f BoundMax = TransformPosition(BoundBox.BoundMax);
+
+	FBoundingBox Result;
+	Result.BoundMin = Min(BoundMin, BoundMax);
+	Result.BoundMax = Max(BoundMin, BoundMax);
+	return Result;
+}
+
+FBoundingBox FMatrix::TransformBoundingBox(const Vector3f& BoundMin, const Vector3f& BoundMax) const
+{
+	Vector3f BMin = TransformPosition(BoundMin);
+	Vector3f BMax = TransformPosition(BoundMax);
+
+	FBoundingBox Result;
+	Result.BoundMin = Min(BMin, BMax);
+	Result.BoundMax = Max(BMin, BMax);
+	return Result;
+}
+
+FMatrix FMatrix::Transpose() const
 {
 	return FMatrix(
 		r0.x, r1.x, r2.x, r3.x,
@@ -157,8 +179,6 @@ FMatrix FMatrix::MatrixLookAtLH(const Vector3f& EyePosition, const Vector3f& Foc
 	return Result.Transpose();
 }
 
-
-
 FMatrix FMatrix::MatrixPerspectiveFovLH(float FovAngleY, float AspectHByW, float NearZ, float FarZ)
 {
 	float h = 1.f / (float)tan(FovAngleY/2);
@@ -196,3 +216,8 @@ Vector4f operator*(const Vector4f& vec, const FMatrix& mat)
 	return Vector4f(d0, d1, d2, d3);
 }
 
+void FBoundingBox::Include(const FBoundingBox& Other)
+{
+	BoundMin = Min(BoundMin, Other.BoundMin);
+	BoundMax = Max(BoundMax, Other.BoundMin);
+}

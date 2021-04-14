@@ -1,0 +1,13 @@
+#comment
+
+mtllib mtllib.mtl
+
+v 0.0 1.0 0.0
+vt 0.5 0
+v -1.0 -1.0 0.0
+vt 0 1
+v 1.0 -1.0 0.0
+vt 1.0 1.0
+
+usemtl cloth_r
+f 1/1 2/2 3/3

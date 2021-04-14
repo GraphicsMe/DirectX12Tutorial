@@ -1,6 +1,8 @@
 ﻿#include "MeshData.h"
 #include "Common.h"
 
+#include <limits>
+
 MeshData::MeshData(const std::string& filepath)
 	: m_filepath(filepath)
 {
@@ -148,6 +150,23 @@ const MaterialData& MeshData::GetMaterialData(size_t Index)
 {
 	Assert(Index < m_materials.size());
 	return m_materials[Index];
+}
+
+void MeshData::ComputeBoundingBox()
+{
+	m_BoundMin = Vector3f(std::numeric_limits<float>::max());
+	m_BoundMax = Vector3f(-std::numeric_limits<float>::max());
+	for (size_t i = 0; i < m_positions.size(); ++i)
+	{
+		m_BoundMin = Min(m_BoundMin, m_positions[i]);
+		m_BoundMax = Max(m_BoundMax, m_positions[i]);
+	}
+}
+
+void MeshData::GetBoundingBox(Vector3f& BoundMin, Vector3f& BoundMax)
+{
+	BoundMin = m_BoundMin;
+	BoundMax = m_BoundMax;
 }
 
 MeshPlane::MeshPlane()

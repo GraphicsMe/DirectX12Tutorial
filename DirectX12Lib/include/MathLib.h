@@ -4,8 +4,11 @@
 #include <stdint.h>
 #include <intrin.h>
 #include <functional>
+#include <algorithm>
 
 const float MATH_PI = 3.141592654f;
+
+struct FBoundingBox;
 
 template<typename T>
 struct Vector4;
@@ -111,6 +114,18 @@ Vector3<T> Cross(const Vector3<T>& lhs, const Vector3<T>& rhs)
 }
 
 template<typename T>
+Vector3<T> Min(const Vector3<T>& lhs, const Vector3<T>& rhs)
+{
+	return Vector3<T>(std::min(lhs.x, rhs.x), std::min(lhs.y, rhs.y), std::min(lhs.z, rhs.z));
+}
+
+template<typename T>
+Vector3<T> Max(const Vector3<T>& lhs, const Vector3<T>& rhs)
+{
+	return Vector3<T>(std::max(lhs.x, rhs.x), std::max(lhs.y, rhs.y), std::max(lhs.z, rhs.z));
+}
+
+template<typename T>
 struct Vector4
 {
 	union 
@@ -144,6 +159,14 @@ typedef Vector3<float> Vector3f;
 typedef Vector4<float> Vector4f;
 
 
+struct FBoundingBox
+{
+	Vector3f BoundMin;
+	Vector3f BoundMax;
+
+	void Include(const FBoundingBox& Other);
+};
+
 
 struct FMatrix
 {
@@ -167,9 +190,11 @@ struct FMatrix
 	FMatrix operator * (const FMatrix& rhs) const;
 	FMatrix& operator *= (const FMatrix& rhs);
 
-	Vector3f TranslateVector(const Vector3f& vector);
-	Vector3f TransformPosition(const Vector3f& position);
-	FMatrix Transpose();
+	Vector3f TranslateVector(const Vector3f& vector) const;
+	Vector3f TransformPosition(const Vector3f& position) const;
+	FBoundingBox TransformBoundingBox(const FBoundingBox& BoundBox) const;
+	FBoundingBox TransformBoundingBox(const Vector3f& BoundMin, const Vector3f& BoundMax) const;
+	FMatrix Transpose() const;
 
 	static FMatrix TranslateMatrix(const Vector3f& T);
 	static FMatrix ScaleMatrix(float s);

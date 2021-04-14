@@ -229,9 +229,11 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath)
 	MeshData* meshdata = new MeshData(FilePath);
 	meshdata->m_positions.swap(final_positions);
 	meshdata->m_texcoords.swap(final_texcoords);
+	meshdata->m_normals.swap(final_normals);
 	meshdata->m_indices.swap(final_indices);
 	//Model->SetVertices(&final_vertices[0], final_vertices.size() / VertexFloatCount, sizeof(float) * VertexFloatCount);
 	//Model->SetIndices(&final_indices[0], final_indices.size());
+	meshdata->ComputeBoundingBox();
 
 	std::vector<MaterialData> UsedMaterials;
 

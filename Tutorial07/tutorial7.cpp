@@ -17,6 +17,7 @@
 #include "SamplerManager.h"
 #include "Model.h"
 #include "ShadowBuffer.h"
+#include "Light.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -33,6 +34,7 @@ public:
 
 	void OnStartup()
 	{
+		SetupCameraLight();
 		SetupRootSignature();
 		SetupMesh();
 		SetupShaders();
@@ -47,28 +49,24 @@ public:
 
 	void OnUpdate()
 	{
-		// Frame limit set to 60 fps
 		tEnd = std::chrono::high_resolution_clock::now();
 		float delta = std::chrono::duration<float, std::milli>(tEnd - tStart).count();
 		tStart = std::chrono::high_resolution_clock::now();
 
 		// Update Uniforms
 		m_rotateRadians += 0.0004f * delta;
+		m_rotateRadians = 0.9f;
 		m_rotateRadians = fmodf(m_rotateRadians, 2.f * MATH_PI);
 
 		m_Box->SetRotation(FMatrix::RotateY(m_rotateRadians));
-
-		FCamera camera(Vector3f(0.f, 1.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
-		m_uboVS.viewMatrix = camera.GetViewMatrix();
-
-		const float FovVertical = MATH_PI / 4.f;
-		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 	}
 	
 	void OnRender()
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin();
-		FillCommandLists(CommandContext);
+
+		ShadowPass(CommandContext);
+		ColorPass(CommandContext);
 		
 		CommandContext.Finish(true);
 
@@ -76,14 +74,27 @@ public:
 	}
 
 private:
+	void SetupCameraLight()
+	{
+		m_Camera = FCamera(Vector3f(0.f, 1.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		
+		const float FovVertical = MATH_PI / 4.f;
+		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
+
+		m_DirectionLight.SetDirection(Vector3f(-1.f, -1.f, 0.f));
+	}
+
 	void SetupRootSignature()
 	{
 		FSamplerDesc DefaultSamplerDesc;
+		FSamplerDesc ShadowSamplerDesc;
+		ShadowSamplerDesc.SetShadowMapDesc();
 
-		m_RootSignature.Reset(2, 1);
+		m_RootSignature.Reset(2, 2);
 		m_RootSignature[0].InitAsConstants(0, sizeof(m_uboVS) / 4, D3D12_SHADER_VISIBILITY_VERTEX);
-		m_RootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature.InitStaticSampler(1, ShadowSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.Finalize(L"RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
 
@@ -99,9 +110,8 @@ private:
 
 	void SetupShaders()
 	{
-		m_vertexShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/triangle.hlsl", "vs_main", "vs_5_1");
-
-		m_pixelShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/triangle.hlsl", "ps_main", "ps_5_1");
+		m_VertexShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/simple.hlsl", "vs_main", "vs_5_1");
+		m_PixelShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/simple.hlsl", "ps_main", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -118,8 +128,8 @@ private:
 
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
-		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
-		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_pixelShader.Get()));
+		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
+		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PixelShader.Get()));
 		m_PipelineState.Finalize();
 
 		m_ShadowPSO.SetRootSignature(m_RootSignature);
@@ -130,7 +140,7 @@ private:
 		m_ShadowPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_ShadowBuffer.Create(L"Shadow Map", 2048, 2048);
 		m_ShadowPSO.SetRenderTargetFormats(0, nullptr, m_ShadowBuffer.GetFormat());
-		m_ShadowPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
+		m_ShadowPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
 		m_ShadowPSO.Finalize();
 	}
 
@@ -138,25 +148,46 @@ private:
 	{
 		CommandContext.SetRootSignature(m_RootSignature);
 		CommandContext.SetPipelineState(m_ShadowPSO);
+		CommandContext.SetViewportAndScissor(0, 0, m_ShadowBuffer.GetWidth(), m_ShadowBuffer.GetHeight());
+		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		m_ShadowBuffer.BeginRendering(CommandContext);
+
+		FBoundingBox WorldBound = m_Box->GetBoundingBox();
+		//WorldBound.Include(m_Floor->GetBoundingBox());
+		m_DirectionLight.UpdateShadowBound(WorldBound);
+
+		m_uboVS.LightMatrix = FMatrix();
+		RenderObjects(CommandContext, m_DirectionLight.GetViewMatrix(), m_DirectionLight.GetProjectMatrix());
+
+		//m_uboVS.LightMatrix = m_DirectionLight.GetViewMatrix() * m_DirectionLight.GetProjectMatrix();
+		m_uboVS.LightMatrix = m_uboVS.ViewProjection;
+		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_ShadowBuffer.EndRendering(CommandContext);
 	}
 
-	void RenderObjects(FCommandContext& CommandContext)
+	void RenderObjects(FCommandContext& CommandContext, const FMatrix& ViewMatrix, const FMatrix& ProjectMatrix)
 	{
-		m_uboVS.modelMatrix = m_Box->GetModelMatrix();
+		m_uboVS.ViewProjection = ViewMatrix * ProjectMatrix;
+
+		m_uboVS.ModelMatrix = m_Box->GetModelMatrix();
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 		m_Box->Draw(CommandContext);
 
-		m_uboVS.modelMatrix = m_Floor->GetModelMatrix();
+		m_uboVS.ModelMatrix = m_Floor->GetModelMatrix();
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 		m_Floor->Draw(CommandContext);
 	}
 
-	void FillCommandLists(FCommandContext& CommandContext)
+	void ColorPass(FCommandContext& CommandContext)
 	{
+		CommandContext.SetDynamicDescriptor(1, 1, m_ShadowBuffer.GetDepthSRV());
+
 		// Set necessary state.
 		CommandContext.SetRootSignature(m_RootSignature);
 		CommandContext.SetPipelineState(m_PipelineState);
 		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
+		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
@@ -169,9 +200,8 @@ private:
 		// Record commands.
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.ClearDepth(DepthBuffer);
-		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		RenderObjects(CommandContext);
+		RenderObjects(CommandContext, m_Camera.GetViewMatrix(), m_Camera.GetProjectionMatrix());
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}
@@ -179,9 +209,9 @@ private:
 private:
 	struct
 	{
-		FMatrix projectionMatrix;
-		FMatrix modelMatrix;
-		FMatrix viewMatrix;
+		FMatrix ModelMatrix;
+		FMatrix ViewProjection;
+		FMatrix LightMatrix;
 	} m_uboVS;
 
 	FRootSignature m_RootSignature;
@@ -190,15 +220,18 @@ private:
 
 	FShadowBuffer m_ShadowBuffer;
 
-	ComPtr<ID3DBlob> m_vertexShader;
-	ComPtr<ID3DBlob> m_pixelShader;
-	ComPtr<ID3DBlob> m_ShadowVertexShader;
+	ComPtr<ID3DBlob> m_VertexShader;
+	ComPtr<ID3DBlob> m_PixelShader;
 
 	float m_rotateRadians = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 
 	std::unique_ptr<FModel> m_Box;
 	std::unique_ptr<FModel> m_Floor;
+
+	FCamera m_Camera;
+	FMatrix m_ProjectionMatrix;
+	FDirectionalLight m_DirectionLight;
 };
 
 int main()

@@ -87,6 +87,15 @@ void FModel::SetPosition(float x, float y, float z)
 void FModel::UpdateModelMatrix()
 {
 	m_ModelMatrix = FMatrix::ScaleMatrix(m_Scale) * m_RotationMatrix * FMatrix::TranslateMatrix(m_Position);
+	UpdateBoundingBox();
+}
+
+void FModel::UpdateBoundingBox()
+{
+	Vector3f BoundMin, BoundMax;
+	m_MeshData->GetBoundingBox(BoundMin, BoundMax);
+	
+	m_BoundingBox = m_ModelMatrix.TransformBoundingBox(BoundMin, BoundMax);
 }
 
 void FModel::InitializeResource()

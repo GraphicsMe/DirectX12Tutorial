@@ -82,6 +82,9 @@ public:
 	std::string GetBaseColorPath(uint32_t Index);
 	const MaterialData& GetMaterialData(size_t Index);
 
+	void ComputeBoundingBox();
+	void GetBoundingBox(Vector3f& BoundMin, Vector3f& BoundMax);
+
 	friend FObjLoader;
 
 protected:
@@ -94,6 +97,8 @@ protected:
 
 	std::vector<MaterialData> m_materials;
 	std::vector<SubMeshData> m_submeshes;
+
+	Vector3f m_BoundMin, m_BoundMax;
 };
 
 

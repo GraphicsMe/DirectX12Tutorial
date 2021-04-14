@@ -1,5 +1,10 @@
-#include "Camera.h"
+﻿#include "Camera.h"
 #include <stdio.h>
+
+FCamera::FCamera()
+{
+	SetPerspectiveParams(MATH_PI / 4.f, 1.f, 0.01f, 1000.f);
+}
 
 FCamera::FCamera(const Vector3f& CamPosition, const Vector3f& LookAtPosition, const Vector3f& UpDirection)
 {
@@ -23,12 +28,12 @@ Vector4f FCamera::GetPosition() const
 void FCamera::UpdateViewMatrix()
 {
 	Vector3f Focus = Position + Forward * CameraLength;
-	ViewMat = FMatrix::MatrixLookAtLH(Position, Focus, Up);
+	m_ViewMat = FMatrix::MatrixLookAtLH(Position, Focus, Up);
 }
 
-FMatrix FCamera::GetViewMatrix() const
+const FMatrix FCamera::GetViewMatrix() const
 {
-	return ViewMat;
+	return m_ViewMat;
 }
 
 void FCamera::MoveForward(float Value)
@@ -95,4 +100,42 @@ void FCamera::Rotate(float Yaw, float Pitch)
 	Up = Result.r1;
 	Forward = Result.r2;
 	UpdateViewMatrix();
+}
+
+void FCamera::SetVerticalFov(float VerticalFov)
+{
+	m_VerticalFov = VerticalFov;
+	UpdateProjMatrix();
+}
+
+void FCamera::SetAspectRatio(float AspectHByW)
+{
+	m_AspectHByW = AspectHByW;
+	UpdateProjMatrix();
+}
+
+void FCamera::SetNearFar(float NearZ, float FarZ)
+{
+	m_NearZ = NearZ;
+	m_FarZ = FarZ;
+	UpdateProjMatrix();
+}
+
+void FCamera::SetPerspectiveParams(float VerticalFov, float AspectHByW, float NearZ, float FarZ)
+{
+	m_VerticalFov = VerticalFov;
+	m_AspectHByW = AspectHByW;
+	m_NearZ = NearZ;
+	m_FarZ = FarZ;
+	UpdateProjMatrix();
+}
+
+void FCamera::UpdateProjMatrix()
+{
+	m_ProjMat = FMatrix::MatrixPerspectiveFovLH(m_VerticalFov, m_AspectHByW, m_NearZ, m_FarZ);
+}
+
+const FMatrix FCamera::GetProjectionMatrix() const
+{
+	return m_ProjMat;
 }
