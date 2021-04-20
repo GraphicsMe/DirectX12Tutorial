@@ -21,6 +21,7 @@ public:
 	void GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout);
 
 	void SetScale(float Scale);
+	void SetScale(float x, float y, float z);
 	void SetRotation(const FMatrix& Rotation);
 	void SetPosition(const Vector3f& Position);
 	void SetPosition(float x, float y, float z);
@@ -34,7 +35,7 @@ private:
 	void UpdateBoundingBox();
 
 protected:
-	float m_Scale;
+	Vector3f m_Scale;
 	FMatrix m_RotationMatrix;
 	Vector3f m_Position;
 	FMatrix m_ModelMatrix;

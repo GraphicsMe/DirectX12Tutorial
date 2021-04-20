@@ -14,7 +14,7 @@ FLight::FLight()
 FDirectionalLight::FDirectionalLight()
 {
 	SetDirection(Vector3f(1.f));
-	UpdateShadowBound(FBoundingBox{Vector3f(-1000.f), Vector3f(1000.f)});
+	UpdateShadowBound(FBoundingBox(Vector3f(-1000.f), Vector3f(1000.f)));
 }
 
 void FDirectionalLight::SetDirection(const Vector3f& Direction)

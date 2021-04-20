@@ -123,6 +123,15 @@ FMatrix FMatrix::ScaleMatrix(float s)
 		0.f, 0.f, 0.f, 1.f);
 }
 
+FMatrix FMatrix::ScaleMatrix(const Vector3f& s)
+{
+	return FMatrix(
+		s.x, 0.f, 0.f, 0.f,
+		0.f, s.y, 0.f, 0.f,
+		0.f, 0.f, s.z, 0.f,
+		0.f, 0.f, 0.f, 1.f);
+}
+
 FMatrix FMatrix::RotateX(float v)
 {
 	float c = (float)cos(v);
@@ -219,5 +228,5 @@ Vector4f operator*(const Vector4f& vec, const FMatrix& mat)
 void FBoundingBox::Include(const FBoundingBox& Other)
 {
 	BoundMin = Min(BoundMin, Other.BoundMin);
-	BoundMax = Max(BoundMax, Other.BoundMin);
+	BoundMax = Max(BoundMax, Other.BoundMax);
 }

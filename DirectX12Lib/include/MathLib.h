@@ -5,6 +5,7 @@
 #include <intrin.h>
 #include <functional>
 #include <algorithm>
+#include <limits>
 
 const float MATH_PI = 3.141592654f;
 
@@ -163,6 +164,10 @@ struct FBoundingBox
 {
 	Vector3f BoundMin;
 	Vector3f BoundMax;
+	FBoundingBox(const Vector3f& BMin = (std::numeric_limits<float>::max)(), const Vector3f& BMax = -(std::numeric_limits<float>::max)())
+		: BoundMin(BMin)
+		, BoundMax(BMax)
+	{}
 
 	void Include(const FBoundingBox& Other);
 };
@@ -198,6 +203,7 @@ struct FMatrix
 
 	static FMatrix TranslateMatrix(const Vector3f& T);
 	static FMatrix ScaleMatrix(float s);
+	static FMatrix ScaleMatrix(const Vector3f& s);
 	static FMatrix RotateX(float v);
 	static FMatrix RotateY(float v);
 	static FMatrix RotateZ(float v);

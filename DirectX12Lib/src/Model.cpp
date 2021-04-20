@@ -62,7 +62,13 @@ void FModel::GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout)
 
 void FModel::SetScale(float Scale)
 {
-	m_Scale = Scale;
+	m_Scale = Vector3f(Scale);
+	UpdateModelMatrix();
+}
+
+void FModel::SetScale(float x, float y, float z)
+{
+	m_Scale = Vector3f(x, y, z);
 	UpdateModelMatrix();
 }
 

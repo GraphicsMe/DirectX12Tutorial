@@ -58,6 +58,7 @@ public:
 		m_rotateRadians = fmodf(m_rotateRadians, 2.f * MATH_PI);
 
 		m_Box->SetRotation(FMatrix::RotateY(m_rotateRadians));
+		m_Pillar->SetRotation(FMatrix::RotateY(1.f));
 	}
 	
 	void OnRender()
@@ -100,6 +101,11 @@ private:
 	void SetupMesh()
 	{
 		m_Box = std::make_unique<FModel>("../Resources/Models/primitive/cube.obj");
+		m_Box->SetPosition(1.f, 0.f, 0.f);
+
+		m_Pillar = std::make_unique<FModel>("../Resources/Models/primitive/cube.obj");
+		m_Pillar->SetScale(0.4f, 3.f, 0.4f);
+		m_Pillar->SetPosition(0.f, 1.f, 1.f);
 
 		m_Floor = std::make_unique<FModel>("../Resources/Models/primitive/quad.obj");
 		m_Floor->SetScale(5.f);
@@ -117,7 +123,7 @@ private:
 	{
 		m_PipelineState.SetRootSignature(m_RootSignature);
 		m_PipelineState.SetRasterizerState(FPipelineState::RasterizerDefault);
-		m_PipelineState.SetBlendState(FPipelineState::BlendTraditional);
+		m_PipelineState.SetBlendState(FPipelineState::BlendDisable);
 		m_PipelineState.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		
 		std::vector<D3D12_INPUT_ELEMENT_DESC> MeshLayout;
@@ -137,7 +143,7 @@ private:
 		m_ShadowPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		m_ShadowPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_ShadowPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_ShadowBuffer.Create(L"Shadow Map", 512, 512);
+		m_ShadowBuffer.Create(L"Shadow Map", 1024, 1024);
 		m_ShadowPSO.SetRenderTargetFormats(0, nullptr, m_ShadowBuffer.GetFormat());
 		m_ShadowPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
 		m_ShadowPSO.Finalize();
@@ -153,7 +159,7 @@ private:
 		m_ShadowBuffer.BeginRendering(CommandContext);
 
 		FBoundingBox WorldBound = m_Box->GetBoundingBox();
-		//WorldBound.Include(m_Floor->GetBoundingBox());
+		WorldBound.Include(m_Pillar->GetBoundingBox());
 		m_DirectionLight.UpdateShadowBound(WorldBound);
 
 		m_uboVS.ShadowMatrix = FMatrix();
@@ -171,6 +177,10 @@ private:
 		m_uboVS.ModelMatrix = m_Box->GetModelMatrix();
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 		m_Box->Draw(CommandContext);
+
+		m_uboVS.ModelMatrix = m_Pillar->GetModelMatrix();
+		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_Pillar->Draw(CommandContext);
 
 		m_uboVS.ModelMatrix = m_Floor->GetModelMatrix();
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
@@ -225,6 +235,7 @@ private:
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 
 	std::unique_ptr<FModel> m_Box;
+	std::unique_ptr<FModel> m_Pillar;
 	std::unique_ptr<FModel> m_Floor;
 
 	FCamera m_Camera;
