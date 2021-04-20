@@ -21,11 +21,15 @@ public:
 	const Vector3f& GetDirection() const { return m_Direction; }
 	const FMatrix& GetViewMatrix() const;
 	const FMatrix& GetProjectMatrix();
+	const FMatrix& GetLightToShadowMatrix();
 	
 	void UpdateShadowBound(const FBoundingBox& WorldBound);
+
+private:
+	void UpdateShadowMatrix();
 
 
 protected:
 	Vector3f m_Direction;
-	FMatrix m_ViewMat, m_ProjMat;
+	FMatrix m_ViewMat, m_ProjMat, m_ShadowMatrix;
 };

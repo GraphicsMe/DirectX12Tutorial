@@ -13,7 +13,6 @@
 #include "GpuBuffer.h"
 #include "PipelineState.h"
 #include "DirectXTex.h"
-#include "Texture.h"
 #include "SamplerManager.h"
 #include "Model.h"
 #include "ShadowBuffer.h"
@@ -54,7 +53,7 @@ public:
 		tStart = std::chrono::high_resolution_clock::now();
 
 		// Update Uniforms
-		m_rotateRadians += 0.0004f * delta;
+		//m_rotateRadians += 0.0004f * delta;
 		m_rotateRadians = 0.9f;
 		m_rotateRadians = fmodf(m_rotateRadians, 2.f * MATH_PI);
 
@@ -88,7 +87,7 @@ private:
 	{
 		FSamplerDesc DefaultSamplerDesc;
 		FSamplerDesc ShadowSamplerDesc;
-		ShadowSamplerDesc.SetShadowMapDesc();
+		ShadowSamplerDesc.SetShadowMapPCFDesc(); //SetShadowMapPCFDesc
 
 		m_RootSignature.Reset(2, 2);
 		m_RootSignature[0].InitAsConstants(0, sizeof(m_uboVS) / 4, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -138,7 +137,7 @@ private:
 		m_ShadowPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		m_ShadowPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_ShadowPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_ShadowBuffer.Create(L"Shadow Map", 2048, 2048);
+		m_ShadowBuffer.Create(L"Shadow Map", 512, 512);
 		m_ShadowPSO.SetRenderTargetFormats(0, nullptr, m_ShadowBuffer.GetFormat());
 		m_ShadowPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
 		m_ShadowPSO.Finalize();
@@ -157,11 +156,10 @@ private:
 		//WorldBound.Include(m_Floor->GetBoundingBox());
 		m_DirectionLight.UpdateShadowBound(WorldBound);
 
-		m_uboVS.LightMatrix = FMatrix();
+		m_uboVS.ShadowMatrix = FMatrix();
 		RenderObjects(CommandContext, m_DirectionLight.GetViewMatrix(), m_DirectionLight.GetProjectMatrix());
 
-		//m_uboVS.LightMatrix = m_DirectionLight.GetViewMatrix() * m_DirectionLight.GetProjectMatrix();
-		m_uboVS.LightMatrix = m_uboVS.ViewProjection;
+		m_uboVS.ShadowMatrix = m_DirectionLight.GetLightToShadowMatrix();
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 		m_ShadowBuffer.EndRendering(CommandContext);
 	}
@@ -211,7 +209,7 @@ private:
 	{
 		FMatrix ModelMatrix;
 		FMatrix ViewProjection;
-		FMatrix LightMatrix;
+		FMatrix ShadowMatrix;
 	} m_uboVS;
 
 	FRootSignature m_RootSignature;
