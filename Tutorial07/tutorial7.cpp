@@ -90,9 +90,10 @@ private:
 		FSamplerDesc ShadowSamplerDesc;
 		ShadowSamplerDesc.SetShadowMapPCFDesc(); //SetShadowMapPCFDesc
 
-		m_RootSignature.Reset(2, 2);
-		m_RootSignature[0].InitAsConstants(0, sizeof(m_uboVS) / 4, D3D12_SHADER_VISIBILITY_VERTEX);
-		m_RootSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature.Reset(3, 2);
+		m_RootSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_RootSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.InitStaticSampler(1, ShadowSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.Finalize(L"RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -162,34 +163,34 @@ private:
 		WorldBound.Include(m_Pillar->GetBoundingBox());
 		m_DirectionLight.UpdateShadowBound(WorldBound);
 
-		m_uboVS.ShadowMatrix = FMatrix();
+		m_VSConstant.ShadowMatrix = FMatrix();
 		RenderObjects(CommandContext, m_DirectionLight.GetViewMatrix(), m_DirectionLight.GetProjectMatrix());
 
-		m_uboVS.ShadowMatrix = m_DirectionLight.GetLightToShadowMatrix();
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_VSConstant.ShadowMatrix = m_DirectionLight.GetLightToShadowMatrix();
+		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
 		m_ShadowBuffer.EndRendering(CommandContext);
 	}
 
 	void RenderObjects(FCommandContext& CommandContext, const FMatrix& ViewMatrix, const FMatrix& ProjectMatrix)
 	{
-		m_uboVS.ViewProjection = ViewMatrix * ProjectMatrix;
+		m_VSConstant.ViewProjection = ViewMatrix * ProjectMatrix;
 
-		m_uboVS.ModelMatrix = m_Box->GetModelMatrix();
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_VSConstant.ModelMatrix = m_Box->GetModelMatrix();
+		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
 		m_Box->Draw(CommandContext);
 
-		m_uboVS.ModelMatrix = m_Pillar->GetModelMatrix();
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_VSConstant.ModelMatrix = m_Pillar->GetModelMatrix();
+		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
 		m_Pillar->Draw(CommandContext);
 
-		m_uboVS.ModelMatrix = m_Floor->GetModelMatrix();
-		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
+		m_VSConstant.ModelMatrix = m_Floor->GetModelMatrix();
+		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
 		m_Floor->Draw(CommandContext);
 	}
 
 	void ColorPass(FCommandContext& CommandContext)
 	{
-		CommandContext.SetDynamicDescriptor(1, 1, m_ShadowBuffer.GetDepthSRV());
+		CommandContext.SetDynamicDescriptor(2, 1, m_ShadowBuffer.GetDepthSRV());
 
 		// Set necessary state.
 		CommandContext.SetRootSignature(m_RootSignature);
@@ -209,6 +210,9 @@ private:
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.ClearDepth(DepthBuffer);
 
+		m_PSConstant.LightDirection = m_DirectionLight.GetDirection();
+		CommandContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstant), &m_PSConstant);
+
 		RenderObjects(CommandContext, m_Camera.GetViewMatrix(), m_Camera.GetProjectionMatrix());
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
@@ -220,7 +224,11 @@ private:
 		FMatrix ModelMatrix;
 		FMatrix ViewProjection;
 		FMatrix ShadowMatrix;
-	} m_uboVS;
+	} m_VSConstant;
+
+	__declspec(align(16)) struct {
+		Vector3f LightDirection;
+	} m_PSConstant;
 
 	FRootSignature m_RootSignature;
 	FGraphicsPipelineState m_PipelineState;

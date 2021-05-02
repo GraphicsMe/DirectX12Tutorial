@@ -92,6 +92,7 @@ public:
 	void SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV);
 
 	void SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents);
+	void SetDynamicConstantBufferView(UINT RootIndex, size_t BufferSize, const void* BufferData);
 
 	void Draw(UINT VertexCount, UINT VertexStartOffset = 0);
 	void DrawIndexed(UINT IndexCount, UINT StartIndexLocation = 0, INT BaseVertexLocation = 0);

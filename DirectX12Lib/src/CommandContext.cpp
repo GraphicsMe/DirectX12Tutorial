@@ -340,6 +340,14 @@ void FCommandContext::SetConstantArray(UINT RootIndex, UINT NumConstants, const 
 	m_CommandList->SetGraphicsRoot32BitConstants(RootIndex, NumConstants, Contents, 0);
 }
 
+void FCommandContext::SetDynamicConstantBufferView(UINT RootIndex, size_t BufferSize, const void* BufferData)
+{
+	Assert(BufferData != nullptr && IsAligned(BufferSize, 16));
+	FAllocation Alloc = m_CpuLinearAllocator.Allocate(BufferSize);
+	memcpy(Alloc.CPU, BufferData, BufferSize);
+	m_CommandList->SetGraphicsRootConstantBufferView(RootIndex, Alloc.GpuAddress);
+}
+
 void FCommandContext::Draw(UINT VertexCount, UINT VertexStartOffset /*= 0*/)
 {
 	DrawInstanced(VertexCount, 1, VertexStartOffset, 0);

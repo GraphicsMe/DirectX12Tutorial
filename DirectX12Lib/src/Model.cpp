@@ -34,7 +34,7 @@ void FModel::Draw(FCommandContext& CommandContext)
 	for (size_t i = 0; i < m_MeshData->GetMeshCount(); ++i)
 	{
 		size_t MtlIndex = m_MeshData->GetSubMaterialIndex(i);
-		CommandContext.SetDynamicDescriptor(1, 0, m_Textures[MtlIndex].GetSRV());
+		CommandContext.SetDynamicDescriptor(2, 0, m_Textures[MtlIndex].GetSRV());
 		CommandContext.DrawIndexed((UINT)m_MeshData->GetSubIndexCount(i), (UINT)m_MeshData->GetSubIndexStart(i));
 	}
 }

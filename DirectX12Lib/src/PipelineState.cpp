@@ -23,7 +23,7 @@ void FPipelineState::Initialize()
 	RasterizerTwoSided.CullMode = D3D12_CULL_MODE_NONE;
 
 	RasterizerShadow = RasterizerDefault;
-	RasterizerShadow.DepthBias = 100;
+	RasterizerShadow.DepthBias = 10;
 	RasterizerShadow.DepthBiasClamp = 0.f;
 	RasterizerShadow.SlopeScaledDepthBias = 1.5f;
 
@@ -198,8 +198,8 @@ void FComputePipelineState::Finalize()
 
 	//todo: cache pso
 	{
-		auto iter = ms_GraphicsPSHashMap.find(HashCode);
-		if (iter == ms_GraphicsPSHashMap.end())
+		auto iter = ms_ComputePSHashMap.find(HashCode);
+		if (iter == ms_ComputePSHashMap.end())
 		{
 			ThrowIfFailed(D3D12RHI::Get().GetD3D12Device()->CreateComputePipelineState(&m_PSDesc, IID_PPV_ARGS(&m_PipelineState)));
 			ms_ComputePSHashMap[HashCode].Attach(m_PipelineState);

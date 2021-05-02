@@ -1,19 +1,24 @@
 #pragma pack_matrix(row_major)
 
 
-struct MatrixParam
+cbuffer VSContant : register(b0)
 {
 	float4x4 ModelMatrix;
 	float4x4 ViewProjection;
 	float4x4 ShadowMatrix;
 };
 
+cbuffer PSConstant : register(b0)
+{
+	float3 LightDirection;
+}
+
 #define FILTER_SIZE 8
 #define GS2 ((FILTER_SIZE-1)/2)
 #define PCF_SAMPLE_COUNT ((FILTER_SIZE-1)*(FILTER_SIZE-1))
 #define USE_RECEIVER_PLANE_DEPTH_BIAS 1
 
-ConstantBuffer<MatrixParam> Matrix		: register(b0);
+//ConstantBuffer<MatrixParam> Matrix	: register(b0);
 Texture2D DiffuseTexture				: register(t0);
 Texture2D ShadowMap						: register(t1);
 SamplerState LinearSampler				: register(s0);
@@ -44,12 +49,11 @@ struct PixelOutput
 VertexOutput vs_main(VertexIN IN)
 {
 	VertexOutput OUT;
-	float4 WorldPos = mul(float4(IN.inPos, 1.0f), Matrix.ModelMatrix);
-	OUT.gl_Position = mul(WorldPos, Matrix.ViewProjection);
-	//OUT.color = IN.color;
+	float4 WorldPos = mul(float4(IN.inPos, 1.0f), ModelMatrix);
+	OUT.gl_Position = mul(WorldPos, ViewProjection);
 	OUT.tex = IN.tex;
-	OUT.normal = IN.normal;
-	OUT.ShadowCoord = mul(WorldPos, Matrix.ShadowMatrix);
+	OUT.normal = mul(float4(IN.normal, 1.0), ModelMatrix).xyz;
+	OUT.ShadowCoord = mul(WorldPos, ShadowMatrix);
 	return OUT;
 }
 
@@ -70,7 +74,7 @@ float DoSampleCmp(float2 ReceiverPlaneDepthBias, float2 TexelSize, float2 SubTex
 	return ShadowMap.SampleCmpLevelZero(ShadowSampler, SubTexelCoord, CurrentDepth, TexelOffset);
 }
 
-float SampleFixedSizePCF(float3 ShadowPos)
+float SampleFixedSizePCF(float3 ShadowPos, float3 LightDirection, float3 Normal)
 {
 	float NumSlices;
 	float2 ShadowMapSize;
@@ -102,8 +106,12 @@ float SampleFixedSizePCF(float3 ShadowPos)
 	CurrentDepth -= min(FractionalSamplingError, 0.006f);
 #endif
 
+	float bias = clamp(0.002 + (saturate(dot(LightDirection, Normal))) * 0.01, 0.0, 0.003);
+	bias = (1 - saturate(dot(LightDirection, Normal))) * 0.02;
+	//CurrentDepth -= bias;
+
 	float s = 0.0;
-	s += pwAB.x * pwAB.y * DoSampleCmp(ReceiverPlaneDepthBias, TexelSize, tc + tcAB,					CurrentDepth, int2(-GS2, -GS2));	//top left
+	s += pwAB.x * pwAB.y * DoSampleCmp(ReceiverPlaneDepthBias, TexelSize, tc + tcAB,					CurrentDepth, int2(-GS2, -GS2));//top left
 	s += pwGH.x * pwAB.y * DoSampleCmp(ReceiverPlaneDepthBias, TexelSize, tc + float2(tcGH.x, tcAB.y),	CurrentDepth, int2(GS2, -GS2));	//top right
 	s += pwAB.x * pwGH.y * DoSampleCmp(ReceiverPlaneDepthBias, TexelSize, tc + float2(tcAB.x, tcGH.y),	CurrentDepth, int2(-GS2, GS2));	//bottom left
 	s += pwGH.x * pwGH.y * DoSampleCmp(ReceiverPlaneDepthBias, TexelSize, tc + tcGH,					CurrentDepth, int2(GS2, GS2));	//bottom right
@@ -128,24 +136,22 @@ float SampleFixedSizePCF(float3 ShadowPos)
 	return s / PCF_SAMPLE_COUNT;
 }
 
-float ComputeShadow(float4 ShadowCoord)
+float ComputeShadow(float4 ShadowCoord, float3 Normal)
 {
 	//float3 ShadowPos = ShadowCoord.xyz / ShadowCoord.w;
 	float3 ShadowPos = ShadowCoord.xyz;
 #if FILTER_SIZE == 2
 	return ShadowMap.SampleCmpLevelZero(ShadowSampler, ShadowPos.xy, ShadowPos.z);
 #else
-	return SampleFixedSizePCF(ShadowPos);
+	return SampleFixedSizePCF(ShadowPos, -LightDirection, Normal);
 #endif
 }
 
 PixelOutput ps_main(VertexOutput IN)
 {
 	PixelOutput output;
-	//output.outFragColor = float4(IN.color, 1.0f);
 	float4 texColor = DiffuseTexture.Sample( LinearSampler, IN.tex );
-	float Shadow = ComputeShadow(IN.ShadowCoord);
-	//output.outFragColor = float4(Shadow, Shadow, Shadow, 1.0);	
+	float Shadow = ComputeShadow(IN.ShadowCoord, IN.normal);	
 	output.outFragColor = texColor * saturate(0.2 + Shadow);
 	return output;
 }

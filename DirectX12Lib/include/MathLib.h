@@ -241,6 +241,12 @@ T AlignDown(T value, size_t alignment)
 	return AlignDownWithMask(value, alignment - 1);
 }
 
+template <typename T>
+bool IsAligned(T value, size_t alignment)
+{
+	return 0 == ((size_t)value & (alignment - 1));
+}
+
 
 #ifdef _M_X64
 #define ENABLE_SSE_CRC32 1
