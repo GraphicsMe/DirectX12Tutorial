@@ -37,6 +37,8 @@ struct NonCopyable
 	NonCopyable& operator=(const NonCopyable) = delete;
 };
 
+class FComputeContext;
+
 class FCommandContext : NonCopyable
 {
 	friend FContextManager;
@@ -55,8 +57,13 @@ public:
 	~FCommandContext();
 
 	void Initialize();
-	void SetID(const std::wstring& ID) { m_ID = ID; }
+	void SetID(const std::wstring& ID);
+	uint64_t Flush(bool WaitForCompletion = false);
 	uint64_t Finish(bool WaitForCompletion = false);
+
+	FComputeContext& GetComputeContext() {
+		return reinterpret_cast<FComputeContext&>(*this);
+	}
 
 	FAllocation ReserveUploadMemory(size_t SizeInBytes);
 
@@ -125,4 +132,17 @@ protected:
 
 	FDynamicDescriptorHeap m_DynamicViewDescriptorHeap;
 	FDynamicDescriptorHeap m_DynamicSamplerDescriptorHeap;
+};
+
+class FComputeContext : public FCommandContext
+{
+public:
+	static FComputeContext& Begin(const std::wstring& ID = L"");
+
+	void SetRootSignature(const FRootSignature& RootSignature);
+
+	void SetDynamicDescriptor(UINT RootIndex, UINT Offset, D3D12_CPU_DESCRIPTOR_HANDLE Handle);
+	void SetDynamicDescriptors(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[]);
+
+	void Dispatch(size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ);
 };

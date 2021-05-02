@@ -20,6 +20,8 @@ public:
 	uint64_t Signal();
 	bool IsFenceComplete(uint64_t FenceValue);
 	void WaitForFenceValue(uint64_t FenceValue);
+	void StallForFence(uint64_t FenceValue);
+	void StallForProducer(FCommandQueue& Producer);
 	void Flush();
  
 	ID3D12CommandQueue* GetD3D12CommandQueue() const { return m_d3d12CommandQueue.Get(); }

@@ -14,6 +14,7 @@ public:
 	{
 		m_RTVHandle.ptr = 0;
 		m_SRVHandle.ptr = 0;
+		m_UAVHandle.ptr = 0;
 	}
 
 	void CreateFromSwapChain(const std::wstring& Name, ID3D12Resource* BaseResource);
@@ -22,6 +23,7 @@ public:
 
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetSRV(void) const { return m_SRVHandle; }
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetRTV(void) const { return m_RTVHandle; }
+	const D3D12_CPU_DESCRIPTOR_HANDLE& GetUAV(void) const { return m_UAVHandle; }
 
 	void SetClearColor(const Vector3f& Color) { m_ClearColor = Color; }
 	const Vector3f& GetClearColor() const { return m_ClearColor; }
@@ -54,4 +56,5 @@ protected:
 
 	D3D12_CPU_DESCRIPTOR_HANDLE m_RTVHandle;
 	D3D12_CPU_DESCRIPTOR_HANDLE m_SRVHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_UAVHandle;
 };

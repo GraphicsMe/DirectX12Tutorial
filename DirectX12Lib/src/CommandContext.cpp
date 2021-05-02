@@ -98,6 +98,12 @@ void FCommandContext::Initialize()
 	g_CommandListManager.CreateNewCommandList(m_Type, &m_CommandList, &m_CurrentAllocator);
 }
 
+void FCommandContext::SetID(const std::wstring& ID)
+{
+	m_ID = ID;
+	m_CommandList->SetName(m_ID.c_str());
+}
+
 FCommandContext::FCommandContext(D3D12_COMMAND_LIST_TYPE Type)
 	: m_Type(Type)
 	, m_CpuLinearAllocator(ELinearAllocatorType::CpuWritable)
@@ -127,6 +133,35 @@ void FCommandContext::Reset(void)
 	m_NumBarriersToFlush = 0;
 
 	BindDescriptorHeaps();
+}
+
+uint64_t FCommandContext::Flush(bool WaitForCompletion /*= false*/)
+{
+	FlushResourceBarriers();
+	
+	Assert(m_CurrentAllocator != nullptr);
+
+	uint64_t FenceValue = g_CommandListManager.GetQueue(m_Type).ExecuteCommandList(m_CommandList);
+	if (WaitForCompletion)
+	{
+		g_CommandListManager.WaitForFence(FenceValue);
+	}
+
+	m_CommandList->Reset(m_CurrentAllocator, nullptr);
+	if (m_CurGraphicsRootSignature)
+	{
+		m_CommandList->SetGraphicsRootSignature(m_CurGraphicsRootSignature);
+	}
+	if (m_CurComputeRootSignature)
+	{
+		m_CommandList->SetComputeRootSignature(m_CurComputeRootSignature);
+	}
+	if (m_CurPipelineState)
+	{
+		m_CommandList->SetPipelineState(m_CurPipelineState);
+	}
+	BindDescriptorHeaps();
+	return FenceValue;
 }
 
 uint64_t FCommandContext::Finish(bool WaitForCompletion /*= false*/)
@@ -389,4 +424,42 @@ void FCommandContext::BindDescriptorHeaps()
 	{
 		m_CommandList->SetDescriptorHeaps(NonNullHeaps, HeapsToBind);
 	}
+}
+
+FComputeContext& FComputeContext::Begin(const std::wstring& ID /*= L""*/)
+{
+	FComputeContext& NewContext = g_ContextManager.AllocateContext(D3D12_COMMAND_LIST_TYPE_COMPUTE)->GetComputeContext();
+	NewContext.SetID(ID);
+	return NewContext;
+}
+
+void FComputeContext::SetRootSignature(const FRootSignature& RootSignature)
+{
+	if (RootSignature.GetSignature() == m_CurComputeRootSignature)
+		return;
+	m_CurComputeRootSignature = RootSignature.GetSignature();
+	m_CommandList->SetComputeRootSignature(m_CurComputeRootSignature);
+
+	m_DynamicViewDescriptorHeap.ParseComputeRootSignature(RootSignature);
+	m_DynamicSamplerDescriptorHeap.ParseComputeRootSignature(RootSignature);
+}
+
+void FComputeContext::SetDynamicDescriptor(UINT RootIndex, UINT Offset, D3D12_CPU_DESCRIPTOR_HANDLE Handle)
+{
+	SetDynamicDescriptors(RootIndex, Offset, 1, &Handle);
+}
+
+void FComputeContext::SetDynamicDescriptors(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[])
+{
+	m_DynamicViewDescriptorHeap.SetComputeDescriptorHandles(RootIndex, Offset, Count, Handles);
+}
+
+void FComputeContext::Dispatch(size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ)
+{
+	//Assert(m_Type == D3D12_COMMAND_LIST_TYPE_COMPUTE);
+
+	FlushResourceBarriers();
+	m_DynamicViewDescriptorHeap.CommitComputeRootDescriptorTables(m_CommandList);
+	m_DynamicSamplerDescriptorHeap.CommitComputeRootDescriptorTables(m_CommandList);
+	m_CommandList->Dispatch((UINT)GroupCountX, (UINT)GroupCountY, (UINT)GroupCountZ);
 }

@@ -1,4 +1,7 @@
 ﻿#include "CommandQueue.h"
+#include "CommandListManager.h"
+
+extern FCommandListManager g_CommandListManager;
 
 #define SET_FENCE(f) ((uint64_t)m_CommandListType << 56 | f)
 
@@ -96,6 +99,18 @@ void FCommandQueue::WaitForFenceValue(uint64_t FenceValue)
 	ThrowIfFailed(m_d3d12Fence->SetEventOnCompletion(FenceValue, m_FenceEvent));
 	::WaitForSingleObject(m_FenceEvent, INFINITE);
 	m_LastCompletedFenceValue = FenceValue;
+}
+
+void FCommandQueue::StallForFence(uint64_t FenceValue)
+{
+	FCommandQueue& Producer = g_CommandListManager.GetQueue((D3D12_COMMAND_LIST_TYPE)(FenceValue >> 56));
+	m_d3d12CommandQueue->Wait(Producer.m_d3d12Fence.Get(), Producer.m_NextFenceValue-1);
+}
+
+void FCommandQueue::StallForProducer(FCommandQueue& Producer)
+{
+	Assert(Producer.m_NextFenceValue > 0);
+	m_d3d12CommandQueue->Wait(Producer.m_d3d12Fence.Get(), Producer.m_NextFenceValue-1);
 }
 
 void FCommandQueue::Flush()

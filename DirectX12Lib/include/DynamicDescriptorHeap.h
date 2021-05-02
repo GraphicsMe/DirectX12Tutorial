@@ -75,9 +75,20 @@ public:
 	{
 		m_GraphicsHandleCache.ParseRootSignature(m_HeapType, RootSignature);
 	}
+
+	void ParseComputeRootSignature(const FRootSignature& RootSignature)
+	{
+		m_ComputeHandleCache.ParseRootSignature(m_HeapType, RootSignature);
+	}
+
 	void SetGraphicsDescriptorHandles(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[])
 	{
 		m_GraphicsHandleCache.StageDescriptorHandles(RootIndex, Offset, Count, Handles);
+	}
+
+	void SetComputeDescriptorHandles(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[])
+	{
+		m_ComputeHandleCache.StageDescriptorHandles(RootIndex, Offset, Count, Handles);
 	}
 
 	void CommitGraphicsRootDescriptorTables(ID3D12GraphicsCommandList* CommandList)
@@ -85,6 +96,14 @@ public:
 		if (m_GraphicsHandleCache.m_StaleRootParamsBitMap)
 		{
 			CopyAndBindStagedTables(m_GraphicsHandleCache, CommandList, &ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable);
+		}
+	}
+
+	void CommitComputeRootDescriptorTables(ID3D12GraphicsCommandList* CommandList)
+	{
+		if (m_ComputeHandleCache.m_StaleRootParamsBitMap)
+		{
+			CopyAndBindStagedTables(m_ComputeHandleCache, CommandList, &ID3D12GraphicsCommandList::SetComputeRootDescriptorTable);
 		}
 	}
 

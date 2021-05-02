@@ -28,5 +28,5 @@ void FShadowBuffer::BeginRendering(FCommandContext& CommandContext)
 
 void FShadowBuffer::EndRendering(FCommandContext& CommandContext)
 {
-	CommandContext.TransitionResource(*this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	CommandContext.TransitionResource(*this, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, true);
 }

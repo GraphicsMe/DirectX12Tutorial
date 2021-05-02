@@ -37,9 +37,11 @@ void FColorBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, 
 	(ArraySize);
 	D3D12_RENDER_TARGET_VIEW_DESC RTVDesc = {};
 	D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
+	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
 
 	RTVDesc.Format = Format;
 	SRVDesc.Format = Format;
+	UAVDesc.Format = Format;
 	SRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 	RTVDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
@@ -49,13 +51,21 @@ void FColorBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, 
 	SRVDesc.Texture2D.MipLevels = NumMips;
 	SRVDesc.Texture2D.MostDetailedMip = 0;
 
+	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	UAVDesc.Texture2D.MipSlice = 0;
+
 	if (m_SRVHandle.ptr == 0)
 	{
 		m_RTVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		m_SRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
+	if (m_UAVHandle.ptr == 0)
+	{
+		m_UAVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+
 	Device->CreateRenderTargetView(m_Resource.Get(), &RTVDesc, m_RTVHandle);
 	Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, m_SRVHandle);
+	Device->CreateUnorderedAccessView(m_Resource.Get(), nullptr, &UAVDesc, m_UAVHandle);
 }
-
