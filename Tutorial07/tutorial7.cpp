@@ -26,7 +26,12 @@
 
 extern FCommandListManager g_CommandListManager;
 
-#define USE_VSM 1
+enum EShadowMode
+{
+	SM_Raw,
+	SM_PCF,
+	SM_VSM
+};
 
 const int SHADOW_BUFFER_SIZE = 1024;
 
@@ -72,7 +77,10 @@ public:
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
 		ShadowPass(CommandContext);
-		ComputePass(CommandContext);
+		if (m_ShadowMode == SM_VSM)
+		{
+			ComputePass(CommandContext);
+		}
 		ColorPass(CommandContext);
 		
 		CommandContext.Finish(true);
@@ -113,10 +121,27 @@ private:
 
 	void SetupShaders()
 	{
-		m_VertexShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/simple.hlsl", "vs_main", "vs_5_1");
-		m_PixelShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/simple.hlsl", "ps_main", "ps_5_1");
+		m_VertexShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/Shadow.hlsl", "vs_main", "vs_5_1");
+		m_PixelShaderRaw = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/Shadow.hlsl", "ps_main", "ps_5_1");
+		m_PixelShaderPCF = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/ShadowPCF.hlsl", "ps_main", "ps_5_1");
+		m_PixelShaderVSM = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/ShadowVSM.hlsl", "ps_main", "ps_5_1");
 
 		m_VSMConvertShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/vsmConvertCS.hlsl", "cs_main", "cs_5_1");
+	}
+
+	ID3DBlob* GetPixelShaderByMode(EShadowMode ShadowMode)
+	{
+		switch (ShadowMode)
+		{
+		case SM_Raw:
+			return m_PixelShaderRaw.Get();
+		case SM_PCF:
+			return m_PixelShaderPCF.Get();
+		case SM_VSM:
+			return m_PixelShaderVSM.Get();
+		default:
+			return nullptr;
+		}
 	}
 
 	void SetupPipelineState()
@@ -147,7 +172,7 @@ private:
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
 		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
-		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PixelShader.Get()));
+		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(GetPixelShaderByMode(m_ShadowMode)));
 		m_PipelineState.Finalize();
 
 		m_ShadowPSO.SetRootSignature(m_RootSignature);
@@ -213,7 +238,6 @@ private:
 	
 	void ComputePass(FCommandContext& GfxContext)
 	{
-	#if USE_VSM
 		GfxContext.TransitionResource(m_ShadowBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		g_CommandListManager.GetComputeQueue().WaitForFenceValue(GfxContext.Flush());
 
@@ -231,14 +255,14 @@ private:
 		CommandContext.Dispatch(GroupCount, GroupCount, 1);
 
 		CommandContext.Finish(false);
-	#endif
 	}
 
 	void ColorPass(FCommandContext& CommandContext)
 	{
-	#if USE_VSM
-		g_CommandListManager.GetGraphicsQueue().StallForProducer(g_CommandListManager.GetComputeQueue());
-	#endif
+		if (m_ShadowMode == SM_VSM)
+		{
+			g_CommandListManager.GetGraphicsQueue().StallForProducer(g_CommandListManager.GetComputeQueue());
+		}
 		// Set necessary state.
 		CommandContext.SetRootSignature(m_RootSignature);
 		CommandContext.SetPipelineState(m_PipelineState);
@@ -251,11 +275,14 @@ private:
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
-	#if USE_VSM
-		CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	#else
-		CommandContext.TransitionResource(m_ShadowBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	#endif
+		if (m_ShadowMode == SM_VSM)
+		{
+			CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
+		else
+		{
+			CommandContext.TransitionResource(m_ShadowBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		}
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
 
 		// Record commands.
@@ -264,11 +291,15 @@ private:
 
 		m_PSConstant.LightDirection = m_DirectionLight.GetDirection();
 		CommandContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstant), &m_PSConstant);
-	#if USE_VSM
-		CommandContext.SetDynamicDescriptor(2, 1, m_VSMBuffer.GetSRV());
-	#else
-		CommandContext.SetDynamicDescriptor(2, 1, m_ShadowBuffer.GetDepthSRV());
-	#endif
+	
+		if (m_ShadowMode == SM_VSM)
+		{
+			CommandContext.SetDynamicDescriptor(2, 1, m_VSMBuffer.GetSRV());
+		}
+		else
+		{
+			CommandContext.SetDynamicDescriptor(2, 1, m_ShadowBuffer.GetDepthSRV());
+		}
 
 		RenderObjects(CommandContext, m_Camera.GetViewMatrix(), m_Camera.GetProjectionMatrix());
 
@@ -300,7 +331,9 @@ private:
 	FColorBuffer m_VSMBuffer;
 
 	ComPtr<ID3DBlob> m_VertexShader;
-	ComPtr<ID3DBlob> m_PixelShader;
+	ComPtr<ID3DBlob> m_PixelShaderRaw;
+	ComPtr<ID3DBlob> m_PixelShaderPCF;
+	ComPtr<ID3DBlob> m_PixelShaderVSM;
 	ComPtr<ID3DBlob> m_VSMConvertShader;
 	ComPtr<ID3DBlob> m_BlurShader;
 
@@ -314,6 +347,8 @@ private:
 	FCamera m_Camera;
 	FMatrix m_ProjectionMatrix;
 	FDirectionalLight m_DirectionLight;
+
+	EShadowMode m_ShadowMode = SM_Raw;
 };
 
 int main()
