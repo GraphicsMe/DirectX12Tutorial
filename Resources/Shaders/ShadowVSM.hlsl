@@ -3,7 +3,7 @@
 cbuffer PSConstant : register(b0)
 {
 	float3 LightDirection;
-	float MinVariance;
+	//float MinVariance;
 }
 
 Texture2D DiffuseTexture				: register(t0);
@@ -25,14 +25,31 @@ struct PixelOutput
 	float4 outFragColor : SV_Target0;
 };
 
+float Linstep(float a, float b, float v)
+{
+	return saturate((v - a) / (b - a));
+}
+
+// Reduces VSM light bleedning
+float ReduceLightBleeding(float pMax, float amount)
+{
+	// Remove the [0, amount] tail and linearly rescale (amount, 1].
+	return Linstep(amount, 1.0f, pMax);
+}
+
 float ChebyshevUpperBound(float2 Moments, float t) 
 {
 	float Variance = Moments.y - Moments.x * Moments.x;
+	float MinVariance = 0.0000001;
 	Variance = max(Variance, MinVariance);
 
 	// Compute probabilistic upper bound.
 	float d = t - Moments.x;
 	float pMax = Variance / (Variance + d * d);
+
+	float lightBleedingReduction = 0.0;
+	pMax = ReduceLightBleeding(pMax, lightBleedingReduction);
+
 	return (t <= Moments.x ? 1.0 : pMax);
 }
 

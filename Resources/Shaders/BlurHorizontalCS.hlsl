@@ -9,7 +9,7 @@ static const float Weights[9] = { 1.f / 256.f, 8.f / 256.f, 28.f / 256.f, 56.f /
 
 groupshared float2 CacheRG[256];
 
-void BlurHorizontally(uint Index, uint LeftMostIndex)
+void BlurHorizontally(uint2 PixelCoord, uint LeftMostIndex)
 {
 	float2 Result = 0;
 	[unroll]
@@ -17,35 +17,13 @@ void BlurHorizontally(uint Index, uint LeftMostIndex)
 	{
 		Result += Weights[i] * CacheRG[LeftMostIndex + i];
 	}
-	CacheRG[Index] = Result;
-}
-
-void BlurVertically(uint2 PixelCoord, uint2 TopMost)
-{
-	float2 Result = 0;
-	[unroll]
-	for (uint i = 0; i < 9; ++i)
-	{
-		Result += Weights[i] * CacheRG[TopMost.x + (TopMost.y << 4)];
-		TopMost.y += 1;
-	}
 	Output[PixelCoord] = Result;
 }
+
 
 [numthreads(8, 8, 1)]
 void cs_main(uint3 GroupID: SV_GroupID, uint3 GroupThreadID: SV_GroupThreadID, uint3 DispatchThreadID: SV_DispatchThreadID)
 {
-/*
- _______16x16_______
-|--4--|             |
-|     ___8x8___     |
-|    |         |    |
-|    |         |    |
-|    |         |    |
-|    |_________|    |
-|                   |
-|___________________|
-*/
 	// 1. load 16x16 shared data, each thread load 4 pixels
 	uint2 Dimension;
 	Input.GetDimensions(Dimension.x, Dimension.y);
@@ -64,10 +42,5 @@ void cs_main(uint3 GroupID: SV_GroupID, uint3 GroupThreadID: SV_GroupThreadID, u
 	// 2. blur horizontally, each thread blur one pixel
 	uint2 CenterCoord = GroupThreadID.xy + uint2(4,4);
 	uint CenterIndex = CenterCoord.x + (CenterCoord.y << 4);
-	BlurHorizontally(CenterIndex, CenterIndex - 4);
-
-	GroupMemoryBarrierWithGroupSync();
-
-	// 3. blur vertically, each thread blur one pixel
-	BlurVertically(DispatchThreadID.xy, CenterCoord - uint2(0, 4));
+	BlurHorizontally(DispatchThreadID.xy, CenterIndex - 4);
 }

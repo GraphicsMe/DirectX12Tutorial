@@ -12,10 +12,10 @@ void FShadowBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t He
 	m_Viewport.MinDepth = 0.f;
 	m_Viewport.MaxDepth = 1.f;
 
-	m_Scissor.left = 1;
-	m_Scissor.top = 1;
-	m_Scissor.right = (LONG)Width - 2;
-	m_Scissor.bottom = (LONG)Height - 2;
+	m_Scissor.left = 0;
+	m_Scissor.top = 0;
+	m_Scissor.right = (LONG)Width;
+	m_Scissor.bottom = (LONG)Height;
 }
 
 void FShadowBuffer::BeginRendering(FCommandContext& CommandContext)

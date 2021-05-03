@@ -128,6 +128,8 @@ private:
 
 		m_VSMConvertShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/VSMConvertCS.hlsl", "cs_main", "cs_5_1");
 		m_BlurShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/BlurCS.hlsl", "cs_main", "cs_5_1");
+		m_BlurHorizontalShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/BlurHorizontalCS.hlsl", "cs_main", "cs_5_1");
+		m_BlurVerticalShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/BlurVerticalCS.hlsl", "cs_main", "cs_5_1");
 	}
 
 	ID3DBlob* GetPixelShaderByMode(EShadowMode ShadowMode)
@@ -200,6 +202,15 @@ private:
 		m_BlurPSO.SetRootSignature(m_CSSignature);
 		m_BlurPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_BlurShader.Get()));
 		m_BlurPSO.Finalize();
+
+		m_BlurHorizontalPSO.SetRootSignature(m_CSSignature);
+		m_BlurHorizontalPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_BlurHorizontalShader.Get()));
+		m_BlurHorizontalPSO.Finalize();
+
+		m_BlurVerticalPSO.SetRootSignature(m_CSSignature);
+		m_BlurVerticalPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_BlurVerticalShader.Get()));
+		m_BlurVerticalPSO.Finalize();
+
 		m_BlurredVSMBuffer.Create(L"Blurred VSM Buffer", SHADOW_BUFFER_SIZE, SHADOW_BUFFER_SIZE, 1, DXGI_FORMAT_R16G16_UNORM);
 	}
 
@@ -261,15 +272,39 @@ private:
 		CommandContext.Dispatch(GroupCount, GroupCount, 1);
 
 		// 2. blur vsm map
-		CommandContext.SetPipelineState(m_BlurPSO);
-		CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		const static bool USE_TWO_PASS = false;
+		if (USE_TWO_PASS)
+		{
+			CommandContext.SetPipelineState(m_BlurHorizontalPSO);
+			CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		CommandContext.SetDynamicDescriptor(0, 0, m_VSMBuffer.GetSRV());
-		CommandContext.SetDynamicDescriptor(1, 0, m_BlurredVSMBuffer.GetUAV());
-		GroupCount = (SHADOW_BUFFER_SIZE + 7) / 8;
-		CommandContext.Dispatch(GroupCount, GroupCount, 1);
+			CommandContext.SetDynamicDescriptor(0, 0, m_VSMBuffer.GetSRV());
+			CommandContext.SetDynamicDescriptor(1, 0, m_BlurredVSMBuffer.GetUAV());
+			GroupCount = (SHADOW_BUFFER_SIZE + 7) / 8;
+			CommandContext.Dispatch(GroupCount, GroupCount, 1);
 
+			CommandContext.SetPipelineState(m_BlurVerticalPSO);
+			CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			CommandContext.SetDynamicDescriptor(0, 0, m_VSMBuffer.GetSRV());
+			CommandContext.SetDynamicDescriptor(1, 0, m_BlurredVSMBuffer.GetUAV());
+			GroupCount = (SHADOW_BUFFER_SIZE + 7) / 8;
+			CommandContext.Dispatch(GroupCount, GroupCount, 1);
+		}
+		else
+		{
+			CommandContext.SetPipelineState(m_BlurPSO);
+			CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+			CommandContext.SetDynamicDescriptor(0, 0, m_VSMBuffer.GetSRV());
+			CommandContext.SetDynamicDescriptor(1, 0, m_BlurredVSMBuffer.GetUAV());
+			GroupCount = (SHADOW_BUFFER_SIZE + 7) / 8;
+			CommandContext.Dispatch(GroupCount, GroupCount, 1);
+		}
+		
 		CommandContext.Finish(false);
 	}
 
@@ -342,6 +377,8 @@ private:
 	FGraphicsPipelineState m_ShadowPSO;
 	FComputePipelineState m_VSMConvertPSO;
 	FComputePipelineState m_BlurPSO;
+	FComputePipelineState m_BlurHorizontalPSO;
+	FComputePipelineState m_BlurVerticalPSO;
 
 	FShadowBuffer m_ShadowBuffer;
 	FColorBuffer m_VSMBuffer;
@@ -353,6 +390,8 @@ private:
 	ComPtr<ID3DBlob> m_PixelShaderVSM;
 	ComPtr<ID3DBlob> m_VSMConvertShader;
 	ComPtr<ID3DBlob> m_BlurShader;
+	ComPtr<ID3DBlob> m_BlurHorizontalShader;
+	ComPtr<ID3DBlob> m_BlurVerticalShader;
 
 	float m_rotateRadians = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
