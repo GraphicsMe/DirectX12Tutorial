@@ -3,6 +3,7 @@
 cbuffer PSConstant : register(b0)
 {
 	float3 LightDirection;
+	float MinVariance;
 }
 
 Texture2D DiffuseTexture				: register(t0);
@@ -24,13 +25,21 @@ struct PixelOutput
 	float4 outFragColor : SV_Target0;
 };
 
+float ChebyshevUpperBound(float2 Moments, float t) 
+{
+	float Variance = Moments.y - Moments.x * Moments.x;
+	Variance = max(Variance, MinVariance);
+
+	// Compute probabilistic upper bound.
+	float d = t - Moments.x;
+	float pMax = Variance / (Variance + d * d);
+	return (t <= Moments.x ? 1.0 : pMax);
+}
 
 float ComputeShadow(float4 ShadowCoord, float3 Normal)
 {
-	float SampleDepth = ShadowMap.Sample(ShadowSampler, ShadowCoord.xy).x;
-	float CurentDepth = saturate(ShadowCoord.z);
-	float Bias = 0.0001 + (1.0 - dot(Normal, -LightDirection)) * 0.0001;
-	return CurentDepth - Bias < SampleDepth;
+	float2 Moments = ShadowMap.Sample(ShadowSampler, ShadowCoord.xy).xy;
+	return ChebyshevUpperBound(Moments, saturate(ShadowCoord.z));
 }
 
 PixelOutput ps_main(VertexOutput Input)

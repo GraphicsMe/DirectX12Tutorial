@@ -126,7 +126,8 @@ private:
 		m_PixelShaderPCF = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/ShadowPCF.hlsl", "ps_main", "ps_5_1");
 		m_PixelShaderVSM = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/ShadowVSM.hlsl", "ps_main", "ps_5_1");
 
-		m_VSMConvertShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/vsmConvertCS.hlsl", "cs_main", "cs_5_1");
+		m_VSMConvertShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/VSMConvertCS.hlsl", "cs_main", "cs_5_1");
+		m_BlurShader = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/BlurCS.hlsl", "cs_main", "cs_5_1");
 	}
 
 	ID3DBlob* GetPixelShaderByMode(EShadowMode ShadowMode)
@@ -194,8 +195,12 @@ private:
 		m_VSMConvertPSO.SetRootSignature(m_CSSignature);
 		m_VSMConvertPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_VSMConvertShader.Get()));
 		m_VSMConvertPSO.Finalize();
-
 		m_VSMBuffer.Create(L"VSM Buffer", SHADOW_BUFFER_SIZE, SHADOW_BUFFER_SIZE, 1, DXGI_FORMAT_R16G16_UNORM);
+
+		m_BlurPSO.SetRootSignature(m_CSSignature);
+		m_BlurPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_BlurShader.Get()));
+		m_BlurPSO.Finalize();
+		m_BlurredVSMBuffer.Create(L"Blurred VSM Buffer", SHADOW_BUFFER_SIZE, SHADOW_BUFFER_SIZE, 1, DXGI_FORMAT_R16G16_UNORM);
 	}
 
 	void ShadowPass(FCommandContext& CommandContext)
@@ -238,6 +243,7 @@ private:
 	
 	void ComputePass(FCommandContext& GfxContext)
 	{
+		// 1. convert shadow map to vsm map
 		GfxContext.TransitionResource(m_ShadowBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		g_CommandListManager.GetComputeQueue().WaitForFenceValue(GfxContext.Flush());
 
@@ -252,6 +258,16 @@ private:
 		CommandContext.SetDynamicDescriptor(1, 0, m_VSMBuffer.GetUAV());
 
 		uint32_t GroupCount = (SHADOW_BUFFER_SIZE + 15) / 16;
+		CommandContext.Dispatch(GroupCount, GroupCount, 1);
+
+		// 2. blur vsm map
+		CommandContext.SetPipelineState(m_BlurPSO);
+		CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		CommandContext.SetDynamicDescriptor(0, 0, m_VSMBuffer.GetSRV());
+		CommandContext.SetDynamicDescriptor(1, 0, m_BlurredVSMBuffer.GetUAV());
+		GroupCount = (SHADOW_BUFFER_SIZE + 7) / 8;
 		CommandContext.Dispatch(GroupCount, GroupCount, 1);
 
 		CommandContext.Finish(false);
@@ -277,7 +293,7 @@ private:
 		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 		if (m_ShadowMode == SM_VSM)
 		{
-			CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		}
 		else
 		{
@@ -294,7 +310,7 @@ private:
 	
 		if (m_ShadowMode == SM_VSM)
 		{
-			CommandContext.SetDynamicDescriptor(2, 1, m_VSMBuffer.GetSRV());
+			CommandContext.SetDynamicDescriptor(2, 1, m_BlurredVSMBuffer.GetSRV());
 		}
 		else
 		{
@@ -303,7 +319,7 @@ private:
 
 		RenderObjects(CommandContext, m_Camera.GetViewMatrix(), m_Camera.GetProjectionMatrix());
 
-		CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
 
@@ -329,6 +345,7 @@ private:
 
 	FShadowBuffer m_ShadowBuffer;
 	FColorBuffer m_VSMBuffer;
+	FColorBuffer m_BlurredVSMBuffer;
 
 	ComPtr<ID3DBlob> m_VertexShader;
 	ComPtr<ID3DBlob> m_PixelShaderRaw;
@@ -348,7 +365,7 @@ private:
 	FMatrix m_ProjectionMatrix;
 	FDirectionalLight m_DirectionLight;
 
-	EShadowMode m_ShadowMode = SM_Raw;
+	EShadowMode m_ShadowMode = SM_VSM;
 };
 
 int main()
