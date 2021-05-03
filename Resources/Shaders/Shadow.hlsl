@@ -52,16 +52,16 @@ VertexOutput vs_main(VertexInput Input)
 float ComputeShadow(float4 ShadowCoord, float3 Normal)
 {
 	float SampleDepth = ShadowMap.Sample(ShadowSampler, ShadowCoord.xy).x;
-	return ShadowCoord.z < SampleDepth;
+	float CurentDepth = saturate(ShadowCoord.z);
+	float Bias = 0.0001 + (1.0 - dot(Normal, -LightDirection)) * 0.0001;
+	return CurentDepth-Bias < SampleDepth;
 }
 
 PixelOutput ps_main(VertexOutput Input)
 {
 	PixelOutput output;
 	float4 texColor = DiffuseTexture.Sample( LinearSampler, Input.tex );
-	//float Shadow = ComputeShadow(Input.ShadowCoord, Input.normal);
-	float SampleDepth = ShadowMap.Sample(ShadowSampler, Input.ShadowCoord.xy).x;
-	float Shadow = Input.ShadowCoord.z < SampleDepth;
+	float Shadow = ComputeShadow(Input.ShadowCoord, Input.normal);
 	output.outFragColor = texColor * saturate(0.2 + Shadow);
 	return output;
 }

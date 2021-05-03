@@ -28,7 +28,9 @@ struct PixelOutput
 float ComputeShadow(float4 ShadowCoord, float3 Normal)
 {
 	float SampleDepth = ShadowMap.Sample(ShadowSampler, ShadowCoord.xy).x;
-	return ShadowCoord.z < SampleDepth;
+	float CurentDepth = saturate(ShadowCoord.z);
+	float Bias = 0.0001 + (1.0 - dot(Normal, -LightDirection)) * 0.0001;
+	return CurentDepth - Bias < SampleDepth;
 }
 
 PixelOutput ps_main(VertexOutput Input)
