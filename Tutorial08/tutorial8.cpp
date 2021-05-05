@@ -110,7 +110,7 @@ private:
 		m_PostPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 		m_PostPSO.SetBlendState(FPipelineState::BlendDisable);
 		m_PostPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		//m_PostPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		// no need to set input layout
 		m_PostPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_PostPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), DXGI_FORMAT_UNKNOWN);
 		m_PostPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PostVS.Get()));
@@ -164,7 +164,7 @@ private:
 		//GfxContext.SetDynamicDescriptor(1, 0, BackBuffer.Get());
 
 		// no need to set vertex buffer and index buffer
-		GfxContext.DrawIndexed(3);
+		GfxContext.Draw(3);
 		
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
