@@ -44,3 +44,8 @@ add_executable(Tutorial07 Tutorial07/tutorial7.cpp)
 target_link_libraries(Tutorial07 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial07 PROPERTIES
 	PROJECT_LABEL "Tutorial07 - Shadow Mapping")
+
+add_executable(Tutorial08 Tutorial08/tutorial8.cpp)
+target_link_libraries(Tutorial08 LINK_PUBLIC DirectX12Lib)
+set_target_properties(Tutorial08 PROPERTIES
+	PROJECT_LABEL "Tutorial08 - Atmospheric Scattering")
