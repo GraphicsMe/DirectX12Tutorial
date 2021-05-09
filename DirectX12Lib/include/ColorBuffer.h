@@ -7,7 +7,7 @@
 class FColorBuffer : public FPixelBuffer
 {
 public:
-	FColorBuffer(const Vector3f& Color = Vector3f(0.2f))
+	FColorBuffer(const Vector4f& Color = Vector4f(0.2f))
 		: m_ClearColor(Color)
 		, m_NumMipMaps(0)
 		, m_SampleCount(1)
@@ -25,8 +25,8 @@ public:
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetRTV(void) const { return m_RTVHandle; }
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetUAV(void) const { return m_UAVHandle; }
 
-	void SetClearColor(const Vector3f& Color) { m_ClearColor = Color; }
-	const Vector3f& GetClearColor() const { return m_ClearColor; }
+	void SetClearColor(const Vector4f& Color) { m_ClearColor = Color; }
+	const Vector4f& GetClearColor() const { return m_ClearColor; }
 
 protected:
 	D3D12_RESOURCE_FLAGS CombineResourceFlags(void) const
@@ -50,7 +50,7 @@ protected:
 	
 
 protected:
-	Vector3f m_ClearColor;
+	Vector4f m_ClearColor;
 	uint32_t m_NumMipMaps;
 	uint32_t m_SampleCount;
 

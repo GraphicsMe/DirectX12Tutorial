@@ -144,5 +144,8 @@ public:
 	void SetDynamicDescriptor(UINT RootIndex, UINT Offset, D3D12_CPU_DESCRIPTOR_HANDLE Handle);
 	void SetDynamicDescriptors(UINT RootIndex, UINT Offset, UINT Count, const D3D12_CPU_DESCRIPTOR_HANDLE Handles[]);
 
+	void SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents);
+	void SetDynamicConstantBufferView(UINT RootIndex, size_t BufferSize, const void* BufferData);
+
 	void Dispatch(size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ);
 };

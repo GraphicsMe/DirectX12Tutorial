@@ -61,6 +61,17 @@ FMatrix& FMatrix::operator*=(const FMatrix& rhs)
 	return *this;
 }
 
+FMatrix FMatrix::operator * (float rhs) const
+{
+	return FMatrix(r0 * rhs, r1 * rhs, r2 * rhs, r3 * rhs);
+}
+
+FMatrix& FMatrix::operator*=(float rhs)
+{
+	*this = (*this) * rhs;
+	return *this;
+}
+
 Vector3f FMatrix::TranslateVector(const Vector3f& vector) const
 {
 	Vector4f Res = Vector4f(vector, 0.f) * (*this);
@@ -103,6 +114,41 @@ FMatrix FMatrix::Transpose() const
 		r0.z, r1.z, r2.z, r3.z,
 		r0.w, r1.w, r2.w, r3.w
 	);
+}
+
+FMatrix FMatrix::Inverse() const
+{
+	// https://semath.info/src/inverse-cofactor-ex4.html
+	float det =  r0.x*r1.y*r2.z*r3.w + r0.x*r1.z*r2.w*r3.y + r0.x*r1.w*r2.y*r3.z
+				-r0.x*r1.w*r2.z*r3.y - r0.x*r1.z*r2.y*r3.w - r0.x*r1.y*r2.w*r3.z
+				-r0.y*r1.x*r2.z*r3.w - r0.z*r1.x*r2.w*r3.y - r0.w*r1.x*r2.y*r3.z
+				+r0.w*r1.x*r2.z*r3.y + r0.z*r1.x*r2.y*r3.w + r0.y*r1.x*r2.w*r3.z
+				+r0.y*r1.z*r2.x*r3.w + r0.z*r1.w*r2.x*r3.y + r0.w*r1.y*r2.x*r3.z
+				-r0.w*r1.z*r2.x*r3.y - r0.z*r1.y*r2.x*r3.w - r0.y*r1.w*r2.x*r3.z
+				-r0.y*r1.z*r2.w*r3.x - r0.z*r1.w*r2.y*r3.x - r0.w*r1.y*r2.z*r3.x
+				+r0.w*r1.z*r2.y*r3.x + r0.z*r1.y*r2.w*r3.x + r0.y*r1.w*r2.z*r3.x;
+
+	float A11 =  r1.y*r2.z*r3.w + r1.z*r2.w*r3.y + r1.w*r2.y*r3.z - r1.w*r2.z*r3.y - r1.z*r2.y*r3.w - r1.y*r2.w*r3.z;
+	float A12 = -r0.y*r2.z*r3.w - r0.z*r2.w*r3.y - r0.w*r2.y*r3.z + r0.w*r2.z*r3.y + r0.z*r2.y*r3.w + r0.y*r2.w*r3.z;
+	float A13 =  r0.y*r1.z*r3.w + r0.z*r1.w*r3.y + r0.w*r1.y*r3.z - r0.w*r1.z*r3.y - r0.z*r1.y*r3.w - r0.y*r1.w*r3.z;
+	float A14 = -r0.y*r1.z*r2.w - r0.z*r1.w*r2.y - r0.w*r1.y*r2.z + r0.w*r1.z*r2.y + r0.z*r1.y*r2.w + r0.y*r1.w*r2.z;
+
+	float A21 = -r1.x*r2.z*r3.w - r1.z*r2.w*r3.x - r1.w*r2.x*r3.z + r1.w*r2.z*r3.x + r1.z*r2.x*r3.w + r1.x*r2.w*r3.z;
+	float A22 =  r0.x*r2.z*r3.w + r0.z*r2.w*r3.x + r0.w*r2.x*r3.z - r0.w*r2.z*r3.x - r0.z*r2.x*r3.w - r0.x*r2.w*r3.z;
+	float A23 = -r0.x*r1.z*r3.w - r0.z*r1.w*r3.x - r0.w*r1.x*r3.z + r0.w*r1.z*r3.x + r0.z*r1.x*r3.w + r0.x*r1.w*r3.z;
+	float A24 =  r0.x*r1.z*r2.w + r0.z*r1.w*r2.x + r0.w*r1.x*r2.z - r0.w*r1.z*r2.x - r0.z*r1.x*r2.w - r0.x*r1.w*r2.z;
+
+	float A31 =  r1.x*r2.y*r3.w + r1.y*r2.w*r3.x + r1.w*r2.x*r3.y - r1.w*r2.y*r3.x - r1.y*r2.x*r3.w - r1.x*r2.w*r3.y;
+	float A32 = -r0.x*r2.y*r3.w - r0.y*r2.w*r3.x - r0.w*r2.x*r3.y + r0.w*r2.y*r3.x + r0.y*r2.x*r3.w + r0.x*r2.w*r3.y;
+	float A33 =  r0.x*r1.y*r3.w + r0.y*r1.w*r3.x + r0.w*r1.x*r3.y - r0.w*r1.y*r3.x - r0.y*r1.x*r3.w - r0.x*r1.w*r3.y;
+	float A34 = -r0.x*r1.y*r2.w - r0.y*r1.w*r2.x - r0.w*r1.x*r2.y + r0.w*r1.y*r2.x + r0.y*r1.x*r2.w + r0.x*r1.w*r2.y;
+
+	float A41 = -r1.x*r2.y*r3.z - r1.y*r2.z*r3.x - r1.z*r2.x*r3.y + r1.z*r2.y*r3.x + r1.y*r2.x*r3.z + r1.x*r2.z*r3.y;
+	float A42 =  r0.x*r2.y*r3.z + r0.y*r2.z*r3.x + r0.z*r2.x*r3.y - r0.z*r2.y*r3.x - r0.y*r2.x*r3.z - r0.x*r2.z*r3.y;
+	float A43 = -r0.x*r1.y*r3.z - r0.y*r1.z*r3.x - r0.z*r1.x*r3.y + r0.z*r1.y*r3.x + r0.y*r1.x*r3.z + r0.x*r1.z*r3.y;
+	float A44 =  r0.x*r1.y*r2.z + r0.y*r1.z*r2.x + r0.z*r1.x*r2.y - r0.z*r1.y*r2.x - r0.y*r1.x*r2.z - r0.x*r1.z*r2.y;
+
+	return FMatrix(A11, A12, A13, A14, A21, A22, A23, A24, A31, A32, A33, A34, A41, A42, A43, A44) * (1.f / det);
 }
 
 FMatrix FMatrix::TranslateMatrix(const Vector3f& T)

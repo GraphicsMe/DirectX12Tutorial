@@ -50,14 +50,24 @@ public:
 
 	void OnUpdate()
 	{
+		FMatrix Projection = m_Camera.GetProjectionMatrix();
+		FMatrix InvProjection = Projection.Inverse();
+		FMatrix Mul = Projection * InvProjection;
+		Vector3f NDC = InvProjection.TransformPosition(Vector3f(-1, 1, 1));
+		Vector3f WorldPos = m_Camera.GetViewMatrix().Inverse().TransformPosition(Vector3f(-55.2f, 41.4f, 100.f));
+		Vector3f NDC2 = InvProjection.TransformPosition(Vector3f(1, 0, 1));
+		Vector3f NDC3 = Projection.TransformPosition(Vector3f(-1, 0, 0));
 	}
 	
 	void OnRender()
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		//ComputePass(CommandContext);
-
+		const static bool USE_CS = false;
+		if (USE_CS)
+			ScatteringPassCS(CommandContext);
+		else
+			ScatteringPassPS(CommandContext);
 		PostProcess(CommandContext);
 		
 		CommandContext.Finish(true);
@@ -65,10 +75,42 @@ public:
 		RenderWindow::Get().Present();
 	}
 
+	void OnKeyDown(uint8_t Key)
+	{
+		const static float MOUSE_SENSITIVITY = 0.01f;
+		switch (Key)
+		{
+		case 'E':
+			m_Camera.MoveUp(1.f);
+			break;
+		case 'Q':
+			m_Camera.MoveUp(-1.f);
+			break;
+		case 'D':
+			m_Camera.MoveRight(1.f);
+			break;
+		case 'A':
+			m_Camera.MoveRight(-1.f);
+			break;
+		case 'W':
+			m_Camera.MoveForward(1.f);
+			break;
+		case 'S':
+			m_Camera.MoveForward(-1.f);
+			break;
+		case 'C':
+			m_Camera.Rotate(1.f * MOUSE_SENSITIVITY, 0.f);
+			break;
+		case 'Z':
+			m_Camera.Rotate(-1.f * MOUSE_SENSITIVITY, 0.f);
+			break;
+		}
+	}
+
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.f, 1.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(0.f, 0.f, 0.f), Vector3f(0.f, 0.f, 1.f), Vector3f(0.f, 1.f, 0.f));
 		
 		const float FovVertical = MATH_PI / 4.f;
 		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
@@ -83,20 +125,22 @@ private:
 	void SetupShaders()
 	{
 		m_ScatteringCS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/AtmosphericScatteringCS.hlsl", "cs_main", "cs_5_1");
-		m_PostVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "vs_main", "vs_5_1");
+		m_ScatteringPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/AtmosphericScatteringPS.hlsl", "ps_main", "ps_5_1");
+		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "vs_main", "vs_5_1");
 		m_PostPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "ps_main", "ps_5_1");
 	}
 
 	void SetupPipelineState()
 	{
-		m_ScatteringSignature.Reset(2, 0);
-		m_ScatteringSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-		m_ScatteringSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+		m_ScatteringSignature.Reset(3, 0);
+		m_ScatteringSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_ALL); // compute shader need 'all'
+		m_ScatteringSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+		m_ScatteringSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
 		m_ScatteringSignature.Finalize(L"Atmospheric Scattering RootSignature");
 
-		m_ScatteringPSO.SetRootSignature(m_ScatteringSignature);
-		m_ScatteringPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_ScatteringCS.Get()));
-		m_ScatteringPSO.Finalize();
+		m_ScatteringCSPSO.SetRootSignature(m_ScatteringSignature);
+		m_ScatteringCSPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_ScatteringCS.Get()));
+		m_ScatteringCSPSO.Finalize();
 		m_ScatteringBuffer.Create(L"Scattering Buffer", m_GameDesc.Width, m_GameDesc.Height, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
 
 		FSamplerDesc DefaultSamplerDesc;
@@ -113,22 +157,37 @@ private:
 		// no need to set input layout
 		m_PostPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_PostPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), DXGI_FORMAT_UNKNOWN);
-		m_PostPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PostVS.Get()));
+		m_PostPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 		m_PostPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PostPS.Get()));
 		m_PostPSO.Finalize();
-	}
 
+		m_ScatteringPSPSO.SetRootSignature(m_ScatteringSignature);
+		m_ScatteringPSPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_ScatteringPSPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_ScatteringPSPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		// no need to set input layout
+		m_ScatteringPSPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_ScatteringPSPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), DXGI_FORMAT_UNKNOWN);
+		m_ScatteringPSPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
+		m_ScatteringPSPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_ScatteringPS.Get()));
+		m_ScatteringPSPSO.Finalize();
+	}
 	
-	void ComputePass(FCommandContext& GfxContext)
+	void ScatteringPassCS(FCommandContext& GfxContext)
 	{
+		GfxContext.TransitionResource(m_ScatteringBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+		g_CommandListManager.GetComputeQueue().WaitForFenceValue(GfxContext.Flush());
+
 		FComputeContext& CommandContext = FComputeContext::Begin(L"Compute Queue");
 
 		CommandContext.SetRootSignature(m_ScatteringSignature);
-		CommandContext.SetPipelineState(m_ScatteringPSO);
-		
-		CommandContext.TransitionResource(m_ScatteringBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		CommandContext.SetPipelineState(m_ScatteringCSPSO);
 
-		CommandContext.SetDynamicDescriptor(0, 0, m_ScatteringBuffer.GetUAV());
+		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
+		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
+		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
+		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_CSConstant), &m_CSConstant);
+		CommandContext.SetDynamicDescriptor(2, 0, m_ScatteringBuffer.GetUAV());
 
 		uint32_t GroupCountX = (m_GameDesc.Width  + 7) / 8;
 		uint32_t GroupCountY = (m_GameDesc.Height + 7) / 8;
@@ -138,30 +197,50 @@ private:
 		CommandContext.Finish(false);
 	}
 
+	void ScatteringPassPS(FCommandContext& GfxContext)
+	{
+		GfxContext.SetRootSignature(m_ScatteringSignature);
+		GfxContext.SetPipelineState(m_ScatteringPSPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		GfxContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
+
+		GfxContext.TransitionResource(m_ScatteringBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetRenderTargets(1, &m_ScatteringBuffer.GetRTV());
+		GfxContext.ClearColor(m_ScatteringBuffer);
+
+		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
+		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
+		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_CSConstant), &m_CSConstant);
+
+		GfxContext.Draw(3);
+	}
+
 	void PostProcess(FCommandContext& GfxContext)
 	{
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_PostSignature);
 		GfxContext.SetPipelineState(m_PostPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		GfxContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
 		
 		// Indicate that the back buffer will be used as a render target.
-		//CommandContext.TransitionResource(m_ScatteringBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_ScatteringBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 		
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		GfxContext.ClearColor(BackBuffer);
-		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		
 
 		//m_PSConstant.LightDirection = m_DirectionLight.GetDirection();
 		//GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstant), &m_PSConstant);
 	
-		//GfxContext.SetDynamicDescriptor(0, 0, m_ScatteringBuffer.GetSRV());
-		//GfxContext.SetDynamicDescriptor(1, 0, BackBuffer.Get());
+		GfxContext.SetDynamicDescriptor(0, 0, m_ScatteringBuffer.GetSRV());
 
 		// no need to set vertex buffer and index buffer
 		GfxContext.Draw(3);
@@ -172,10 +251,10 @@ private:
 private:
 	struct
 	{
-		FMatrix ModelMatrix;
-		FMatrix ViewProjection;
-		FMatrix ShadowMatrix;
-	} m_VSConstant;
+		Vector4f ScreenParams;
+		FMatrix InvProjectionMatrix;
+		FMatrix InvViewMatrix;
+	} m_CSConstant;
 
 	__declspec(align(16)) struct {
 		Vector3f LightDirection;
@@ -184,17 +263,18 @@ private:
 	FRootSignature m_ScatteringSignature;
 	FRootSignature m_PostSignature;
 
-	FComputePipelineState m_ScatteringPSO;
+	FComputePipelineState m_ScatteringCSPSO;
+	FGraphicsPipelineState m_ScatteringPSPSO;
 	FGraphicsPipelineState m_PostPSO;
 
 	FColorBuffer m_ScatteringBuffer;
 
 	ComPtr<ID3DBlob> m_ScatteringCS;
-	ComPtr<ID3DBlob> m_PostVS;
+	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_PostPS;
+	ComPtr<ID3DBlob> m_ScatteringPS;
 
 	FCamera m_Camera;
-	FMatrix m_ProjectionMatrix;
 	FDirectionalLight m_DirectionLight;
 };
 

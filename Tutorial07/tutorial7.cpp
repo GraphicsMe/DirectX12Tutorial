@@ -88,6 +88,38 @@ public:
 		RenderWindow::Get().Present();
 	}
 
+	void OnKeyDown(uint8_t Key)
+	{
+		const static float MOUSE_SENSITIVITY = 0.01f;
+		switch(Key)
+		{
+		case 'E':
+			m_Camera.MoveUp(1.f);
+			break;
+		case 'Q':
+			m_Camera.MoveUp(-1.f);
+			break;
+		case 'D':
+			m_Camera.MoveRight(1.f);
+			break;
+		case 'A':
+			m_Camera.MoveRight(-1.f);
+			break;
+		case 'W':
+			m_Camera.MoveForward(1.f);
+			break;
+		case 'S':
+			m_Camera.MoveForward(-1.f);
+			break;
+		case 'C':
+			m_Camera.Rotate(1.f * MOUSE_SENSITIVITY, 0.f);
+			break;
+		case 'Z':
+			m_Camera.Rotate(-1.f * MOUSE_SENSITIVITY, 0.f);
+			break;
+		}
+	}
+
 private:
 	void SetupCameraLight()
 	{
@@ -401,7 +433,6 @@ private:
 	std::unique_ptr<FModel> m_Floor;
 
 	FCamera m_Camera;
-	FMatrix m_ProjectionMatrix;
 	FDirectionalLight m_DirectionLight;
 
 	EShadowMode m_ShadowMode = SM_VSM;

@@ -5,6 +5,9 @@ struct VertexOutput
 	float4 Pos	: SV_Position;
 };
 
+Texture2D ScatteringTexture	: register(t0);
+SamplerState LinearSampler	: register(s0);
+
 VertexOutput vs_main(in uint VertID : SV_VertexID)
 {
 	VertexOutput Output;
@@ -17,5 +20,5 @@ VertexOutput vs_main(in uint VertID : SV_VertexID)
 
 float4 ps_main(in VertexOutput Input) : SV_Target0
 {
-	return float4(Input.Tex, 0.f, 1.f);
+	return ScatteringTexture.Sample(LinearSampler, Input.Tex);
 }

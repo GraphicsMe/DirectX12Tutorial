@@ -454,6 +454,19 @@ void FComputeContext::SetDynamicDescriptors(UINT RootIndex, UINT Offset, UINT Co
 	m_DynamicViewDescriptorHeap.SetComputeDescriptorHandles(RootIndex, Offset, Count, Handles);
 }
 
+void FComputeContext::SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents)
+{
+	m_CommandList->SetComputeRoot32BitConstants(RootIndex, NumConstants, Contents, 0);
+}
+
+void FComputeContext::SetDynamicConstantBufferView(UINT RootIndex, size_t BufferSize, const void* BufferData)
+{
+	Assert(BufferData != nullptr && IsAligned(BufferSize, 16));
+	FAllocation Alloc = m_CpuLinearAllocator.Allocate(BufferSize);
+	memcpy(Alloc.CPU, BufferData, BufferSize);
+	m_CommandList->SetComputeRootConstantBufferView(RootIndex, Alloc.GpuAddress);
+}
+
 void FComputeContext::Dispatch(size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ)
 {
 	//Assert(m_Type == D3D12_COMMAND_LIST_TYPE_COMPUTE);

@@ -153,6 +153,18 @@ struct Vector4
 };
 
 
+template<typename T, typename scalar>
+Vector4<T> operator * (const Vector4<T>& lhs, scalar s)
+{
+	return Vector4<T>(lhs.x * s, lhs.y * s, lhs.z * s, lhs.w * s);
+}
+
+template<typename T, typename scalar>
+Vector4<T> operator * (scalar s, const Vector4<T>& lhs)
+{
+	return Vector4<T>(lhs.x * s, lhs.y * s, lhs.z * s, lhs.w * s);
+}
+
 
 typedef Vector2<int> Vector2i;
 typedef Vector2<float> Vector2f;
@@ -194,12 +206,15 @@ struct FMatrix
 
 	FMatrix operator * (const FMatrix& rhs) const;
 	FMatrix& operator *= (const FMatrix& rhs);
+	FMatrix operator * (float rhs) const;
+	FMatrix& operator *= (float rhs);
 
 	Vector3f TranslateVector(const Vector3f& vector) const;
 	Vector3f TransformPosition(const Vector3f& position) const;
 	FBoundingBox TransformBoundingBox(const FBoundingBox& BoundBox) const;
 	FBoundingBox TransformBoundingBox(const Vector3f& BoundMin, const Vector3f& BoundMax) const;
 	FMatrix Transpose() const;
+	FMatrix Inverse() const;
 
 	static FMatrix TranslateMatrix(const Vector3f& T);
 	static FMatrix ScaleMatrix(float s);
