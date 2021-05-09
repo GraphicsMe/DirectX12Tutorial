@@ -50,13 +50,10 @@ public:
 
 	void OnUpdate()
 	{
-		FMatrix Projection = m_Camera.GetProjectionMatrix();
-		FMatrix InvProjection = Projection.Inverse();
-		FMatrix Mul = Projection * InvProjection;
-		Vector3f NDC = InvProjection.TransformPosition(Vector3f(-1, 1, 1));
-		Vector3f WorldPos = m_Camera.GetViewMatrix().Inverse().TransformPosition(Vector3f(-55.2f, 41.4f, 100.f));
-		Vector3f NDC2 = InvProjection.TransformPosition(Vector3f(1, 0, 1));
-		Vector3f NDC3 = Projection.TransformPosition(Vector3f(-1, 0, 0));
+		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
+		m_CSConstant.LightDirection = m_DirectionLight.GetDirection();
+		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
+		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
 	}
 	
 	void OnRender()
@@ -110,12 +107,16 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.f, 0.f, 0.f), Vector3f(0.f, 0.f, 1.f), Vector3f(0.f, 1.f, 0.f));
+		float CameraHeight = 5000.f;
+		m_Camera = FCamera(Vector3f(0.f, CameraHeight, 0.f), Vector3f(0.f, CameraHeight, 1.f), Vector3f(0.f, 1.f, 0.f));
 		
 		const float FovVertical = MATH_PI / 4.f;
 		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
-
-		m_DirectionLight.SetDirection(Vector3f(-1.f, -1.f, 0.f));
+		
+		float theta = 30 * MATH_PI / 180.f;
+		float z = cos(theta);
+		float y = sin(theta);
+		m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
 	}
 
 	void SetupMesh()
@@ -183,9 +184,7 @@ private:
 		CommandContext.SetRootSignature(m_ScatteringSignature);
 		CommandContext.SetPipelineState(m_ScatteringCSPSO);
 
-		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
-		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
-		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
+		
 		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_CSConstant), &m_CSConstant);
 		CommandContext.SetDynamicDescriptor(2, 0, m_ScatteringBuffer.GetUAV());
 
@@ -209,9 +208,6 @@ private:
 		GfxContext.SetRenderTargets(1, &m_ScatteringBuffer.GetRTV());
 		GfxContext.ClearColor(m_ScatteringBuffer);
 
-		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
-		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
-		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_CSConstant), &m_CSConstant);
 
 		GfxContext.Draw(3);
@@ -252,6 +248,7 @@ private:
 	struct
 	{
 		Vector4f ScreenParams;
+		Vector4f LightDirection;
 		FMatrix InvProjectionMatrix;
 		FMatrix InvViewMatrix;
 	} m_CSConstant;
