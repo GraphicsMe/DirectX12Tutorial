@@ -1,13 +1,15 @@
 #pragma pack_matrix(row_major)
 
 static const float PI = 3.14159265f;
-static const float PlanetRadius = 6371000.0f;
-static const float AtmosphereHeight = 80000.0f;
-static const float DensityScaleHeight = 7994.0f;
-static const float3 LightIntensity = float3(4.f, 4.f, 4.f);
+static const float PlanetRadius = 6371000.0f;	//6360km
+static const float AtmosphereHeight = 80000.0f;	//60km
+static const float2 DensityScaleHeight = float2(7994.0f, 1200.f);
+static const float3 LightIntensity = 4.f;
 static const float3 SunColor = 1.f;//float3(0.9372549019607843, 0.5568627450980392, 0.2196078431372549);
-static const float3 RayleiCoef = float3(5.8f, 13.5f, 33.1f) * 0.000001f;
+static const float3 RayleiCoef = float3(5.8f, 13.5f, 33.1f) * 1e-6f;
+static const float3 MieCoef = 20e-6f;
 static const float3 PlanetCenter = float3(0.f, -PlanetRadius, 0.f);
+static const float MieG = 0.76f;
 
 
 struct VertexOutput
@@ -37,7 +39,7 @@ VertexOutput vs_main(in uint VertID : SV_VertexID)
 	return Output;
 }
 
-float2 RaySphereIntersection(float3 RayOrigin, float3 RayDir, float3 SphereCenter, float SphereRadius)
+bool RaySphereIntersection(float3 RayOrigin, float3 RayDir, float3 SphereCenter, float SphereRadius, out float t0, out float t1)
 {
 	float3 OA = RayOrigin - SphereCenter;
 	float A = dot(RayDir, RayDir);
@@ -46,29 +48,35 @@ float2 RaySphereIntersection(float3 RayOrigin, float3 RayDir, float3 SphereCente
 	float delta = B * B - 4 * A * C;
 	if (delta < 0)
 	{
-		return float2(-1, -1);
+		return false;
 	}
 	else
 	{
 		delta = sqrt(delta);
-		return float2(-B - delta, -B + delta) / (2 * A);
+		t0 = (-B - delta) / (2 * A);
+		t1 = (-B + delta) / (2 * A);
+		return true;
 	}
 }
 
-float PhaseFunction(float CosAngle)
+float2 PhaseFunction(float CosAngle)
 {
-	return (3.0 / (16.0 * PI)) * (1 + CosAngle * CosAngle);
+	float PhaseR = (3.0 / (16.0 * PI)) * (1 + CosAngle * CosAngle);
+	float g2 = MieG * MieG;
+	float PhaseM = 3.f / (8.f * PI) * ((1.f - g2) * (1.f + CosAngle * CosAngle)) / ((2.f + g2) * pow(1.f + g2 - 2.f * MieG * CosAngle, 1.5f));
+	return float2(PhaseR, PhaseM);
 }
 
-bool CalcLightOpticalDepth(float3 Position, float3 LightDir, out float OpticalDepth)
+bool CalcLightOpticalDepth(float3 Position, float3 LightDir, out float2 OpticalDepth)
 {
-	float2 Intersection = RaySphereIntersection(Position, LightDir, PlanetCenter, PlanetRadius+AtmosphereHeight);
-	if (Intersection.y < 0)
+	float t0, t1;
+	if (!RaySphereIntersection(Position, LightDir, PlanetCenter, PlanetRadius+AtmosphereHeight, t0, t1) || t1 < 0)
 		return false;
+	float HitLength = t1;
 	float StepCount = 20.0;
-	float StepSize = Intersection.y / StepCount;
-	float3 Step = LightDir * Intersection.y / StepCount;
-	float Intensity = 0.0;
+	float StepSize = HitLength / StepCount;
+	float3 Step = LightDir * HitLength / StepCount;
+	float2 Intensity = 0.0;
 	for (float s = 0.5; s < StepCount; s += 1.0)
 	{
 		float3 SamplePos = Position + Step * s;
@@ -83,35 +91,49 @@ bool CalcLightOpticalDepth(float3 Position, float3 LightDir, out float OpticalDe
 
 float4 AtmosphericScattering(float3 RayOrigin, float3 RayDir, float DistanceScale, float SampleCount)
 {
-	float2 Intersection = RaySphereIntersection(RayOrigin, RayDir, PlanetCenter, PlanetRadius+AtmosphereHeight);
+	float tmin = 0, tmax = -1.f;
+	float t0, t1;
+	if (RaySphereIntersection(RayOrigin, RayDir, PlanetCenter, PlanetRadius, t0, t1) && t1 > 0)
+		tmax = max(0.f, t0);
+
+	if (!RaySphereIntersection(RayOrigin, RayDir, PlanetCenter, PlanetRadius + AtmosphereHeight, t0, t1) || t1 < 0)
+		return 0.f;
+
+	if (t0 > tmin && t0 > 0) tmin = t0;
+	if (tmax < 0) tmax = t1;
 	
-	float RayLength = Intersection.y;
+	float RayLength = tmax - tmin;
 	float ds = RayLength / SampleCount;
 	float3 Step = RayLength * RayDir / SampleCount;
-	float3 Scattering = 0.0;
-	float OpticalDepthPA = 0.0;
-	float Th = PhaseFunction(dot(RayDir, -LightDirection.xyz));
+	float3 RayleiScattering = 0.0;
+	float3 MieScattering = 0.0;
+	float2 OpticalDepthPA = 0.0;
+	float2 Phase = PhaseFunction(dot(RayDir, -LightDirection.xyz));
 	for (int i = 0; i < SampleCount; ++i)
 	{
-		float3 P = RayOrigin + (i + 0.5) * Step;
+		float3 P = RayOrigin + (tmin + i + 0.5) * Step;
 
-		float OpticalDepthCP;
+		float2 OpticalDepthCP;
 		bool OverGround = CalcLightOpticalDepth(P, -LightDirection.xyz, OpticalDepthCP);
 		float height = length(P-PlanetCenter) - PlanetRadius;
 		if (OverGround)
 		{
-			OpticalDepthPA += exp(-height / DensityScaleHeight) * ds;
-			float Tr = exp(-RayleiCoef * (OpticalDepthCP + OpticalDepthPA));
-			float h = exp(-abs(height) / DensityScaleHeight);
-			Scattering += Th * h * Tr * ds;
+			float2 h = exp(-height / DensityScaleHeight) * ds;
+			OpticalDepthPA += h;
+			float2 OpticalDepth = OpticalDepthCP + OpticalDepthPA;
+			float3 TrR = exp(-RayleiCoef * OpticalDepth.x);
+			float3 TrM = exp(-MieCoef    * OpticalDepth.y);
+			RayleiScattering += h.x * TrR;
+			MieScattering += h.y * TrM;
 		}
 		else
 		{
 			return float4(0.0, 0.0, 0.0, 1.0);
 		}
 	}
-	Scattering *= SunColor * LightIntensity * RayleiCoef;
-	return float4(Scattering, 1.0);
+	RayleiScattering *= SunColor * LightIntensity * RayleiCoef * Phase.x;
+	MieScattering *= SunColor * LightIntensity * MieCoef * Phase.y;
+	return float4(RayleiScattering+MieScattering, 1.0);
 }
 
 float4 ps_main(in VertexOutput Input) : SV_Target0

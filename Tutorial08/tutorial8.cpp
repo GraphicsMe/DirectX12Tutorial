@@ -113,7 +113,7 @@ private:
 		const float FovVertical = MATH_PI / 4.f;
 		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 		
-		float theta = 30 * MATH_PI / 180.f;
+		float theta = 20 * MATH_PI / 180.f;
 		float z = cos(theta);
 		float y = sin(theta);
 		m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));

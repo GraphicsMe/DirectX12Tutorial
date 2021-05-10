@@ -18,7 +18,19 @@ VertexOutput vs_main(in uint VertID : SV_VertexID)
 	return Output;
 }
 
+float3 ACESFilm(float3 x)
+{
+	//return x;
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+}
+
 float4 ps_main(in VertexOutput Input) : SV_Target0
 {
-	return ScatteringTexture.Sample(LinearSampler, Input.Tex);
+	float3 Color = ScatteringTexture.Sample(LinearSampler, Input.Tex).xyz;
+	return float4(ACESFilm(Color), 1.0);
 }
