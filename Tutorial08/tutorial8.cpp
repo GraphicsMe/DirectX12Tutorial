@@ -107,16 +107,38 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		float CameraHeight = 5000.f;
-		m_Camera = FCamera(Vector3f(0.f, CameraHeight, 0.f), Vector3f(0.f, CameraHeight, 1.f), Vector3f(0.f, 1.f, 0.f));
-		
-		const float FovVertical = MATH_PI / 4.f;
-		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
-		
-		float theta = 20 * MATH_PI / 180.f;
-		float z = cos(theta);
-		float y = sin(theta);
-		m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
+		const static bool ViewFromGround = true;
+		if (ViewFromGround)
+		{
+			float CameraHeight = 5000.f;
+			m_Camera = FCamera(Vector3f(0.f, CameraHeight, 0.f), Vector3f(0.f, CameraHeight, 1.f), Vector3f(0.f, 1.f, 0.f));
+
+			const float FovVertical = MATH_PI / 4.f;
+			m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
+
+			float theta = 10 * MATH_PI / 180.f;
+			float z = cos(theta);
+			float y = sin(theta);
+			m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
+
+			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, -6371000.0f, 0.f, 6371000.0f);
+		}
+		else
+		{
+			float AtmospherRadius = 7000000.f*2.5f;//6451000.f;
+			m_Camera = FCamera(Vector3f(0.f, 0.f, -AtmospherRadius), Vector3f(0.f, 0, 0.f), Vector3f(0.f, 1.f, 0.f));
+
+			const float FovVertical = MATH_PI / 4.f;
+			m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
+
+			float theta = 90 * MATH_PI / 180.f;
+			float z = cos(theta);
+			float y = sin(theta);
+			//m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
+			m_DirectionLight.SetDirection(Vector3f(0.f, 0.f, 1.f));
+
+			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, 0.f, 0.f, 6371000.0f);
+		}
 	}
 
 	void SetupMesh()
@@ -247,10 +269,11 @@ private:
 private:
 	struct
 	{
-		Vector4f ScreenParams;
-		Vector4f LightDirection;
 		FMatrix InvProjectionMatrix;
 		FMatrix InvViewMatrix;
+		Vector4f ScreenParams;
+		Vector4f LightDirection;
+		Vector4f EarthCenterAndRadius;
 	} m_CSConstant;
 
 	__declspec(align(16)) struct {

@@ -1,14 +1,13 @@
 #pragma pack_matrix(row_major)
 
 static const float PI = 3.14159265f;
-static const float PlanetRadius = 6371000.0f;	//6360km
+
 static const float AtmosphereHeight = 80000.0f;	//60km
 static const float2 DensityScaleHeight = float2(7994.0f, 1200.f);
 static const float3 LightIntensity = 4.f;
 static const float3 SunColor = 1.f;//float3(0.9372549019607843, 0.5568627450980392, 0.2196078431372549);
 static const float3 RayleiCoef = float3(5.8f, 13.5f, 33.1f) * 1e-6f;
 static const float3 MieCoef = 20e-6f;
-static const float3 PlanetCenter = float3(0.f, -PlanetRadius, 0.f);
 static const float MieG = 0.76f;
 
 
@@ -20,10 +19,11 @@ struct VertexOutput
 
 cbuffer CSConstant : register(b0)
 {
-	float4 ScreenParams; //width, height, invWidth, invHeight
-	float4 LightDirection;
 	float4x4 InvProjectionMatrix;
 	float4x4 InvViewMatrix;
+	float4 ScreenParams; //width, height, invWidth, invHeight
+	float4 LightDirection;
+	float4 EarthCenterAndRadius;
 }
 
 Texture2D ScatteringTexture	: register(t0);
@@ -70,7 +70,7 @@ float2 PhaseFunction(float CosAngle)
 bool CalcLightOpticalDepth(float3 Position, float3 LightDir, out float2 OpticalDepth)
 {
 	float t0, t1;
-	if (!RaySphereIntersection(Position, LightDir, PlanetCenter, PlanetRadius+AtmosphereHeight, t0, t1) || t1 < 0)
+	if (!RaySphereIntersection(Position, LightDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w+AtmosphereHeight, t0, t1) || t1 < 0)
 		return false;
 	float HitLength = t1;
 	float StepCount = 20.0;
@@ -80,7 +80,7 @@ bool CalcLightOpticalDepth(float3 Position, float3 LightDir, out float2 OpticalD
 	for (float s = 0.5; s < StepCount; s += 1.0)
 	{
 		float3 SamplePos = Position + Step * s;
-		float height = length(SamplePos - PlanetCenter) - PlanetRadius;
+		float height = length(SamplePos - EarthCenterAndRadius.xyz) - EarthCenterAndRadius.w;
 		if (height < 0.0)
 			return false;
 		Intensity += exp(-height / DensityScaleHeight);
@@ -93,10 +93,10 @@ float4 AtmosphericScattering(float3 RayOrigin, float3 RayDir, float DistanceScal
 {
 	float tmin = 0, tmax = -1.f;
 	float t0, t1;
-	if (RaySphereIntersection(RayOrigin, RayDir, PlanetCenter, PlanetRadius, t0, t1) && t1 > 0)
+	if (RaySphereIntersection(RayOrigin, RayDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w, t0, t1) && t1 > 0)
 		tmax = max(0.f, t0);
 
-	if (!RaySphereIntersection(RayOrigin, RayDir, PlanetCenter, PlanetRadius + AtmosphereHeight, t0, t1) || t1 < 0)
+	if (!RaySphereIntersection(RayOrigin, RayDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w + AtmosphereHeight, t0, t1) || t1 < 0)
 		return 0.f;
 
 	if (t0 > tmin && t0 > 0) tmin = t0;
@@ -111,11 +111,11 @@ float4 AtmosphericScattering(float3 RayOrigin, float3 RayDir, float DistanceScal
 	float2 Phase = PhaseFunction(dot(RayDir, -LightDirection.xyz));
 	for (int i = 0; i < SampleCount; ++i)
 	{
-		float3 P = RayOrigin + (tmin + i + 0.5) * Step;
+		float3 P = RayOrigin + tmin * RayDir + (i + 0.5) * Step;
 
 		float2 OpticalDepthCP;
 		bool OverGround = CalcLightOpticalDepth(P, -LightDirection.xyz, OpticalDepthCP);
-		float height = length(P-PlanetCenter) - PlanetRadius;
+		float height = length(P- EarthCenterAndRadius.xyz) - EarthCenterAndRadius.w;
 		if (OverGround)
 		{
 			float2 h = exp(-height / DensityScaleHeight) * ds;
