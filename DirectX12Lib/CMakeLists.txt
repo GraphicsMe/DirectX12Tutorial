@@ -61,10 +61,32 @@ set(SOURCES
 	src/Light.cpp
 )
 
+set(SHADER_FILES
+	../Resources/shaders/AtmosphericScatteringCS.hlsl
+	../Resources/shaders/AtmosphericScatteringPS.hlsl
+	../Resources/shaders/PostProcess.hlsl
+	../Resources/shaders/BlurCS.hlsl
+	../Resources/shaders/BlurHorizontalCS.hlsl
+	../Resources/shaders/BlurVerticalCS.hlsl
+	../Resources/shaders/Shadow.hlsl
+	../Resources/shaders/ShadowPCF.hlsl
+	../Resources/shaders/ShadowVSM.hlsl
+	../Resources/shaders/VSMConvertCS.hlsl
+	../Resources/shaders/simple.hlsl
+	../Resources/shaders/triangle.frag
+	../Resources/shaders/triangle.vert
+	../Resources/shaders/triangle.hlsl
+)
+source_group("Shaders" FILES ${SHADER_FILES})
+
 add_library(DirectX12Lib
 	${HEADER_FILES}
 	${SOURCES}
-	)
+	${SHADER_FILES}
+)
+
 target_include_directories(DirectX12Lib PUBLIC include)
 
 target_link_libraries(DirectX12Lib LINK_PUBLIC DirectXTex)
+
+set_source_files_properties(${SHADER_FILES} PROPERTIES VS_TOOL_OVERRIDE "None")
