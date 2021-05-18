@@ -14,6 +14,7 @@ FLight::FLight()
 FDirectionalLight::FDirectionalLight()
 {
 	SetDirection(Vector3f(1.f));
+	SetIntensity(1.f);
 	UpdateShadowBound(FBoundingBox(Vector3f(-1000.f), Vector3f(1000.f)));
 }
 
@@ -22,6 +23,11 @@ void FDirectionalLight::SetDirection(const Vector3f& Direction)
 	m_Direction = Direction.Normalize();
 	m_ViewMat = FMatrix::MatrixLookAtLH(Vector3f(0.f), m_Direction, Vector3f(0.f, 1.f, 0.f));
 	UpdateShadowMatrix();
+}
+
+void FDirectionalLight::SetIntensity(float Intensity)
+{
+	m_Intensity = Intensity;
 }
 
 const FMatrix& FDirectionalLight::GetViewMatrix() const

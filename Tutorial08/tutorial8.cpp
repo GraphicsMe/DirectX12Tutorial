@@ -51,7 +51,7 @@ public:
 	void OnUpdate()
 	{
 		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
-		m_CSConstant.LightDirection = m_DirectionLight.GetDirection();
+		m_CSConstant.LightDirAndIntensity = Vector4f(m_DirectionLight.GetDirection(), m_DirectionLight.GetIntensity());
 		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
 		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
 	}
@@ -107,26 +107,35 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		const static bool ViewFromGround = true;
-		if (ViewFromGround)
+		const static float EarthRadius = 6360e3;
+		const static float AtmospherRadius = 6420e3;
+
+		m_CSConstant.DensityScaleHeight = Vector2f(7994.0f, 1200.f);
+		m_CSConstant.AtmosphereRadius = AtmospherRadius;
+		m_CSConstant.RayleiCoef = Vector3f(3.8f, 13.5f, 33.1f) * 1e-6f; //float3(5.8f, 13.5f, 33.1f) * 1e-6f;
+		m_CSConstant.MieG = 0.76f; //[-1, 1], from backward to forward
+		m_CSConstant.MieCoef = 21e-6f;
+
+		const static bool bViewFromGround = true;
+		if (bViewFromGround)
 		{
-			float CameraHeight = 5000.f;
+			float CameraHeight = 1000.f;
 			m_Camera = FCamera(Vector3f(0.f, CameraHeight, 0.f), Vector3f(0.f, CameraHeight, 1.f), Vector3f(0.f, 1.f, 0.f));
 
-			const float FovVertical = MATH_PI / 4.f;
+			const float FovVertical = 65.f * MATH_PI / 180;
 			m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 
-			float theta = 10 * MATH_PI / 180.f;
+			float theta = 30 * MATH_PI / 180.f;
 			float z = cos(theta);
 			float y = sin(theta);
 			m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
+			m_DirectionLight.SetIntensity(10.f);
 
-			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, -6371000.0f, 0.f, 6371000.0f);
+			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, -EarthRadius, 0.f, EarthRadius);
 		}
 		else
 		{
-			float AtmospherRadius = 7000000.f*2.5f;//6451000.f;
-			m_Camera = FCamera(Vector3f(0.f, 0.f, -AtmospherRadius), Vector3f(0.f, 0, 0.f), Vector3f(0.f, 1.f, 0.f));
+			m_Camera = FCamera(Vector3f(0.f, 0.f, -AtmospherRadius*3), Vector3f(0.f, 0, 0.f), Vector3f(0.f, 1.f, 0.f));
 
 			const float FovVertical = MATH_PI / 4.f;
 			m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
@@ -134,10 +143,11 @@ private:
 			float theta = 90 * MATH_PI / 180.f;
 			float z = cos(theta);
 			float y = sin(theta);
-			//m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
-			m_DirectionLight.SetDirection(Vector3f(0.f, 0.f, 1.f));
+			//m_DirectionLight.SetDirection(Vector3f(-1.f, 0.f, -0.3f));
+			m_DirectionLight.SetDirection(Vector3f(0.f, 0.f, 1.0f));
+			m_DirectionLight.SetIntensity(20.f);
 
-			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, 0.f, 0.f, 6371000.0f);
+			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, 0.f, 0.f, EarthRadius);
 		}
 	}
 
@@ -254,7 +264,6 @@ private:
 
 		GfxContext.ClearColor(BackBuffer);
 		
-
 		//m_PSConstant.LightDirection = m_DirectionLight.GetDirection();
 		//GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstant), &m_PSConstant);
 	
@@ -267,17 +276,22 @@ private:
 	}
 
 private:
-	struct
+	__declspec(align(16)) struct
 	{
-		FMatrix InvProjectionMatrix;
-		FMatrix InvViewMatrix;
-		Vector4f ScreenParams;
-		Vector4f LightDirection;
-		Vector4f EarthCenterAndRadius;
+		FMatrix		InvProjectionMatrix;
+		FMatrix		InvViewMatrix;
+		Vector4f	ScreenParams;
+		Vector4f	LightDirAndIntensity;
+		Vector4f	EarthCenterAndRadius;
+		Vector2f	DensityScaleHeight;
+		float		AtmosphereRadius;
+		float		MieG;
+		float		MieCoef;
+		Vector3f	RayleiCoef;
 	} m_CSConstant;
 
 	__declspec(align(16)) struct {
-		Vector3f LightDirection;
+		Vector3f LightDirAndIntensity;
 	} m_PSConstant;
 
 	FRootSignature m_ScatteringSignature;

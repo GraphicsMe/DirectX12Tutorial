@@ -2,14 +2,8 @@
 
 static const float PI = 3.14159265f;
 
-static const float AtmosphereHeight = 80000.0f;	//60km
-static const float2 DensityScaleHeight = float2(7994.0f, 1200.f);
-static const float3 LightIntensity = 4.f;
 static const float3 SunColor = 1.f;//float3(0.9372549019607843, 0.5568627450980392, 0.2196078431372549);
-static const float3 RayleiCoef = float3(5.8f, 13.5f, 33.1f) * 1e-6f;
-static const float3 MieCoef = 20e-6f;
-static const float MieG = 0.76f;
-
+static const float StepCount = 32.f;
 
 struct VertexOutput
 {
@@ -22,8 +16,13 @@ cbuffer CSConstant : register(b0)
 	float4x4 InvProjectionMatrix;
 	float4x4 InvViewMatrix;
 	float4 ScreenParams; //width, height, invWidth, invHeight
-	float4 LightDirection;
+	float4 LightDirAndIntensity; 
 	float4 EarthCenterAndRadius;
+	float2 DensityScaleHeight;
+	float AtmosphereRadius;
+	float MieG;
+	float MieCoef;
+	float3 RayleiCoef;
 }
 
 Texture2D ScatteringTexture	: register(t0);
@@ -67,17 +66,16 @@ float2 PhaseFunction(float CosAngle)
 	return float2(PhaseR, PhaseM);
 }
 
-bool CalcLightOpticalDepth(float3 Position, float3 LightDir, out float2 OpticalDepth)
+bool CalcLightOpticalDepth(float3 Position, float3 LightDir, float SampleCount, out float2 OpticalDepth)
 {
 	float t0, t1;
-	if (!RaySphereIntersection(Position, LightDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w+AtmosphereHeight, t0, t1) || t1 < 0)
+	if (!RaySphereIntersection(Position, LightDir, EarthCenterAndRadius.xyz, AtmosphereRadius, t0, t1) || t1 < 0)
 		return false;
 	float HitLength = t1;
-	float StepCount = 20.0;
-	float StepSize = HitLength / StepCount;
-	float3 Step = LightDir * HitLength / StepCount;
+	float StepSize = HitLength / SampleCount;
+	float3 Step = LightDir * HitLength / SampleCount;
 	float2 Intensity = 0.0;
-	for (float s = 0.5; s < StepCount; s += 1.0)
+	for (float s = 0.5; s < SampleCount; s += 1.0)
 	{
 		float3 SamplePos = Position + Step * s;
 		float height = length(SamplePos - EarthCenterAndRadius.xyz) - EarthCenterAndRadius.w;
@@ -93,14 +91,14 @@ float4 AtmosphericScattering(float3 RayOrigin, float3 RayDir, float DistanceScal
 {
 	float tmin = 0, tmax = -1.f;
 	float t0, t1;
-	if (RaySphereIntersection(RayOrigin, RayDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w, t0, t1) && t1 > 0)
-		tmax = max(0.f, t0);
+	if (RaySphereIntersection(RayOrigin, RayDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w, t0, t1) && t0 > 0)
+		tmax = t0;
 
-	if (!RaySphereIntersection(RayOrigin, RayDir, EarthCenterAndRadius.xyz, EarthCenterAndRadius.w + AtmosphereHeight, t0, t1) || t1 < 0)
+	if (!RaySphereIntersection(RayOrigin, RayDir, EarthCenterAndRadius.xyz, AtmosphereRadius, t0, t1) || t1 < 0)
 		return 0.f;
 
-	if (t0 > tmin && t0 > 0) tmin = t0;
-	if (tmax < 0) tmax = t1;
+	if (t0 > tmin && t0 > 0.0) tmin = t0;
+	if (tmax < 0.0) tmax = t1;
 	
 	float RayLength = tmax - tmin;
 	float ds = RayLength / SampleCount;
@@ -108,31 +106,30 @@ float4 AtmosphericScattering(float3 RayOrigin, float3 RayDir, float DistanceScal
 	float3 RayleiScattering = 0.0;
 	float3 MieScattering = 0.0;
 	float2 OpticalDepthPA = 0.0;
-	float2 Phase = PhaseFunction(dot(RayDir, -LightDirection.xyz));
+	float2 Phase = PhaseFunction(dot(RayDir, -LightDirAndIntensity.xyz));
 	for (int i = 0; i < SampleCount; ++i)
 	{
 		float3 P = RayOrigin + tmin * RayDir + (i + 0.5) * Step;
 
 		float2 OpticalDepthCP;
-		bool OverGround = CalcLightOpticalDepth(P, -LightDirection.xyz, OpticalDepthCP);
+		bool OverGround = CalcLightOpticalDepth(P, -LightDirAndIntensity.xyz, StepCount, OpticalDepthCP);
 		float height = length(P- EarthCenterAndRadius.xyz) - EarthCenterAndRadius.w;
 		if (OverGround)
 		{
 			float2 h = exp(-height / DensityScaleHeight) * ds;
 			OpticalDepthPA += h;
 			float2 OpticalDepth = OpticalDepthCP + OpticalDepthPA;
-			float3 TrR = exp(-RayleiCoef * OpticalDepth.x);
-			float3 TrM = exp(-MieCoef    * OpticalDepth.y);
-			RayleiScattering += h.x * TrR;
-			MieScattering += h.y * TrM;
+			float3 Tr = exp(-(RayleiCoef * OpticalDepth.x + MieCoef * OpticalDepth.y));
+			RayleiScattering += h.x * Tr;
+			MieScattering += h.y * Tr;
 		}
 		else
 		{
 			return float4(0.0, 0.0, 0.0, 1.0);
 		}
 	}
-	RayleiScattering *= SunColor * LightIntensity * RayleiCoef * Phase.x;
-	MieScattering *= SunColor * LightIntensity * MieCoef * Phase.y;
+	RayleiScattering *= SunColor * LightDirAndIntensity.w * RayleiCoef * Phase.x;
+	MieScattering *= SunColor * LightDirAndIntensity.w * MieCoef * Phase.y;
 	return float4(RayleiScattering+MieScattering, 1.0);
 }
 
@@ -146,5 +143,5 @@ float4 ps_main(in VertexOutput Input) : SV_Target0
 	float4 WorldPos = mul(ViewPos, InvViewMatrix);
 	float4 CameraWorldPos = mul(float4(0.0, 0.0, 0.0, 1.0), InvViewMatrix);
 	float3 ViewDir = normalize(WorldPos.xyz - CameraWorldPos.xyz);
-	return AtmosphericScattering(CameraWorldPos.xyz, ViewDir, 1.0, 16);
+	return AtmosphericScattering(CameraWorldPos.xyz, ViewDir, 1.0, StepCount);
 }
