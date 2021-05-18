@@ -187,7 +187,7 @@ ComPtr<ID3DBlob> D3D12RHI::CreateShader(const std::wstring& ShaderFile, const st
 #endif
 
 	ComPtr<ID3DBlob> ShaderBlob;
-	if(!SUCCEEDED(D3DCompileFromFile(ShaderFile.c_str(), nullptr, nullptr, EntryPoint.c_str(), TargetModel.c_str(), compileFlags, 0, ShaderBlob.GetAddressOf(), &errors)))
+	if(!SUCCEEDED(D3DCompileFromFile(ShaderFile.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, EntryPoint.c_str(), TargetModel.c_str(), compileFlags, 0, ShaderBlob.GetAddressOf(), &errors)))
 	{
 		const char* errStr = (const char*)errors->GetBufferPointer();
 		std::cout << errStr << std::endl;

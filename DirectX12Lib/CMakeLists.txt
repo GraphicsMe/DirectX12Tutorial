@@ -64,6 +64,7 @@ set(SOURCES
 set(SHADER_FILES
 	../Resources/shaders/AtmosphericScatteringCS.hlsl
 	../Resources/shaders/AtmosphericScatteringPS.hlsl
+	../Resources/shaders/AtmosphericScatteringCommon.hlsl
 	../Resources/shaders/PostProcess.hlsl
 	../Resources/shaders/BlurCS.hlsl
 	../Resources/shaders/BlurHorizontalCS.hlsl

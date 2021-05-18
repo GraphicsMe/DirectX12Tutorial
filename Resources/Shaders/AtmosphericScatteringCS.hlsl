@@ -1,14 +1,9 @@
 #pragma pack_matrix(row_major)
+#include "AtmosphericScatteringCommon.hlsl"
 
 Texture2D<float> Input		: register(t0);
 RWTexture2D<float4> Output	: register(u0);
 
-cbuffer CSConstant : register(b0)
-{
-	float4 ScreenParams; //width, height, invWidth, invHeight
-	float4x4 InvProjectionMatrix;
-	float4x4 InvViewMatrix;
-}
 
 [numthreads(8, 8, 1)]
 void cs_main(uint3 DispatchThreadID: SV_DispatchThreadID)
@@ -17,5 +12,7 @@ void cs_main(uint3 DispatchThreadID: SV_DispatchThreadID)
 	float4 ViewPos = mul(NDCPos, InvProjectionMatrix);
 	ViewPos /= ViewPos.w;
 	float4 WorldPos = mul(ViewPos, InvViewMatrix);
-	Output[DispatchThreadID.xy] = WorldPos;
+	float4 CameraWorldPos = mul(float4(0.0, 0.0, 0.0, 1.0), InvViewMatrix);
+	float3 ViewDir = normalize(WorldPos.xyz - CameraWorldPos.xyz);
+	Output[DispatchThreadID.xy] = AtmosphericScattering(CameraWorldPos.xyz, ViewDir, 1.0, StepCount);;
 }

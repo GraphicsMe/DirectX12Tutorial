@@ -50,17 +50,17 @@ public:
 
 	void OnUpdate()
 	{
-		m_CSConstant.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
-		m_CSConstant.LightDirAndIntensity = Vector4f(m_DirectionLight.GetDirection(), m_DirectionLight.GetIntensity());
-		m_CSConstant.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
-		m_CSConstant.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
+		m_Constants.ScreenParams = Vector4f(1.f * m_GameDesc.Width, 1.f * m_GameDesc.Height, 1.f / m_GameDesc.Width, 1.f / m_GameDesc.Height);
+		m_Constants.LightDirAndIntensity = Vector4f(m_DirectionLight.GetDirection(), m_DirectionLight.GetIntensity());
+		m_Constants.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
+		m_Constants.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
 	}
 	
 	void OnRender()
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		const static bool USE_CS = false;
+		const static bool USE_CS = true;
 		if (USE_CS)
 			ScatteringPassCS(CommandContext);
 		else
@@ -110,11 +110,11 @@ private:
 		const static float EarthRadius = 6360e3;
 		const static float AtmospherRadius = 6420e3;
 
-		m_CSConstant.DensityScaleHeight = Vector2f(7994.0f, 1200.f);
-		m_CSConstant.AtmosphereRadius = AtmospherRadius;
-		m_CSConstant.RayleiCoef = Vector3f(3.8f, 13.5f, 33.1f) * 1e-6f; //float3(5.8f, 13.5f, 33.1f) * 1e-6f;
-		m_CSConstant.MieG = 0.76f; //[-1, 1], from backward to forward
-		m_CSConstant.MieCoef = 21e-6f;
+		m_Constants.DensityScaleHeight = Vector2f(7994.0f, 1200.f);
+		m_Constants.AtmosphereRadius = AtmospherRadius;
+		m_Constants.RayleiCoef = Vector3f(3.8f, 13.5f, 33.1f) * 1e-6f; //float3(5.8f, 13.5f, 33.1f) * 1e-6f;
+		m_Constants.MieG = 0.76f; //[-1, 1], from backward to forward
+		m_Constants.MieCoef = 21e-6f;
 
 		const static bool bViewFromGround = true;
 		if (bViewFromGround)
@@ -131,7 +131,7 @@ private:
 			m_DirectionLight.SetDirection(Vector3f(0.f, -y, -z));
 			m_DirectionLight.SetIntensity(10.f);
 
-			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, -EarthRadius, 0.f, EarthRadius);
+			m_Constants.EarthCenterAndRadius = Vector4f(0.f, -EarthRadius, 0.f, EarthRadius);
 		}
 		else
 		{
@@ -147,7 +147,7 @@ private:
 			m_DirectionLight.SetDirection(Vector3f(0.f, 0.f, 1.0f));
 			m_DirectionLight.SetIntensity(20.f);
 
-			m_CSConstant.EarthCenterAndRadius = Vector4f(0.f, 0.f, 0.f, EarthRadius);
+			m_Constants.EarthCenterAndRadius = Vector4f(0.f, 0.f, 0.f, EarthRadius);
 		}
 	}
 
@@ -217,7 +217,7 @@ private:
 		CommandContext.SetPipelineState(m_ScatteringCSPSO);
 
 		
-		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_CSConstant), &m_CSConstant);
+		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
 		CommandContext.SetDynamicDescriptor(2, 0, m_ScatteringBuffer.GetUAV());
 
 		uint32_t GroupCountX = (m_GameDesc.Width  + 7) / 8;
@@ -240,7 +240,7 @@ private:
 		GfxContext.SetRenderTargets(1, &m_ScatteringBuffer.GetRTV());
 		GfxContext.ClearColor(m_ScatteringBuffer);
 
-		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_CSConstant), &m_CSConstant);
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
 
 		GfxContext.Draw(3);
 	}
@@ -263,9 +263,6 @@ private:
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		GfxContext.ClearColor(BackBuffer);
-		
-		//m_PSConstant.LightDirection = m_DirectionLight.GetDirection();
-		//GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstant), &m_PSConstant);
 	
 		GfxContext.SetDynamicDescriptor(0, 0, m_ScatteringBuffer.GetSRV());
 
@@ -288,11 +285,7 @@ private:
 		float		MieG;
 		float		MieCoef;
 		Vector3f	RayleiCoef;
-	} m_CSConstant;
-
-	__declspec(align(16)) struct {
-		Vector3f LightDirAndIntensity;
-	} m_PSConstant;
+	} m_Constants;
 
 	FRootSignature m_ScatteringSignature;
 	FRootSignature m_PostSignature;
