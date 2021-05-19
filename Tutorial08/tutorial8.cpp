@@ -28,6 +28,8 @@ extern FCommandListManager g_CommandListManager;
 
 
 const int SHADOW_BUFFER_SIZE = 1024;
+const static bool USE_CS = true;
+
 
 class Tutorial8 : public FGame
 {
@@ -60,7 +62,6 @@ public:
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		const static bool USE_CS = true;
 		if (USE_CS)
 			ScatteringPassCS(CommandContext);
 		else
@@ -247,6 +248,10 @@ private:
 
 	void PostProcess(FCommandContext& GfxContext)
 	{
+		if (USE_CS)
+		{
+			g_CommandListManager.GetGraphicsQueue().StallForProducer(g_CommandListManager.GetComputeQueue());
+		}
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_PostSignature);
 		GfxContext.SetPipelineState(m_PostPSO);
