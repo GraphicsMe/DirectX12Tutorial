@@ -1,9 +1,21 @@
 ﻿#include <iostream>
 #include <algorithm>
+#include <map>
+
+#include <windowsx.h>
 
 #include "WindowWin32.h"
 #include "Game.h"
+#include "GameInput.h"
 
+std::map<int, int> g_MouseMapping = {
+	{WM_LBUTTONUP, VK_LBUTTON},
+	{WM_MBUTTONUP, VK_MBUTTON},
+	{WM_RBUTTONUP, VK_RBUTTON},
+	{WM_LBUTTONDOWN, VK_LBUTTON},
+	{WM_MBUTTONDOWN, VK_MBUTTON},
+	{WM_RBUTTONDOWN, VK_RBUTTON},
+};
 
 const TCHAR WindowWin32::AppWindowClass[] = L"DirectX12TutorialWindow";
 
@@ -90,17 +102,63 @@ LRESULT WindowWin32::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 	
 	switch (uMsg)
 	{
+	case WM_ACTIVATE:
+	{
+		if (wParam == WA_ACTIVE)
+		{
+			GameInput::Reset();
+		}
+		break;
+	}
 	case WM_KEYDOWN:
-		Game->OnKeyDown(static_cast<uint8_t>(wParam));
+	case WM_SYSKEYDOWN:
+	{
+		GameInput::SetKeyState(static_cast<uint8_t>(wParam), EKeyState::Down);
 		if (wParam == VK_ESCAPE)
 		{
 			::PostQuitMessage(0);
 		}
 		break;
+	}
 
 	case WM_KEYUP:
-		Game->OnKeyUp(static_cast<uint8_t>(wParam));
+	case WM_SYSKEYUP:
+	{
+		GameInput::SetKeyState(static_cast<uint8_t>(wParam), EKeyState::Up);
 		break;
+	}
+
+	case WM_LBUTTONDOWN:
+	case WM_MBUTTONDOWN:
+	case WM_RBUTTONDOWN:
+	{
+		GameInput::SetKeyState(g_MouseMapping[uMsg], EKeyState::Down);
+		GameInput::MouseStart(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		SetCapture(hWnd);
+		break;
+	}
+
+	case WM_LBUTTONUP:
+	case WM_MBUTTONUP:
+	case WM_RBUTTONUP:
+	{
+		GameInput::SetKeyState(g_MouseMapping[uMsg], EKeyState::Up);
+		GameInput::MouseStop();
+		ReleaseCapture();
+		break;
+	}
+
+	case WM_MOUSEMOVE:
+	{
+		GameInput::MouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		break;
+	}
+
+	case WM_MOUSEWHEEL:
+	{
+		GameInput::MouseZoom(GET_WHEEL_DELTA_WPARAM(wParam));
+		break;
+	}
 
 	case WM_DESTROY:
 		::PostQuitMessage(0);

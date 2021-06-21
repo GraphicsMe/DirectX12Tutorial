@@ -1,5 +1,6 @@
 #include "ApplicationWin32.h"
 #include "Game.h"
+#include "GameInput.h"
 #include "D3D12RHI.h"
 #include "Timer.h"
 #include <iostream>
@@ -7,6 +8,7 @@
 
 bool ApplicationWin32::Initialize(FGame* game)
 {
+	GameInput::Initialize();
 	WindowWin32::Get().Initialize(game);
 	D3D12RHI::Get().Initialize();
 	return true;

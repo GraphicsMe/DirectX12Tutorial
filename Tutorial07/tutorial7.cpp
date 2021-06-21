@@ -17,6 +17,7 @@
 #include "Model.h"
 #include "ShadowBuffer.h"
 #include "Light.h"
+#include "GameInput.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -70,6 +71,10 @@ public:
 
 		m_Box->SetRotation(FMatrix::RotateY(m_rotateRadians));
 		m_Pillar->SetRotation(FMatrix::RotateY(1.f));
+
+		m_Camera.Update(delta);
+		if (GameInput::IsKeyDown('F'))
+			SetupCameraLight();
 	}
 	
 	void OnRender()
@@ -88,42 +93,11 @@ public:
 		RenderWindow::Get().Present();
 	}
 
-	void OnKeyDown(uint8_t Key)
-	{
-		const static float MOUSE_SENSITIVITY = 0.01f;
-		switch(Key)
-		{
-		case 'E':
-			m_Camera.MoveUp(1.f);
-			break;
-		case 'Q':
-			m_Camera.MoveUp(-1.f);
-			break;
-		case 'D':
-			m_Camera.MoveRight(1.f);
-			break;
-		case 'A':
-			m_Camera.MoveRight(-1.f);
-			break;
-		case 'W':
-			m_Camera.MoveForward(1.f);
-			break;
-		case 'S':
-			m_Camera.MoveForward(-1.f);
-			break;
-		case 'C':
-			m_Camera.Rotate(1.f * MOUSE_SENSITIVITY, 0.f);
-			break;
-		case 'Z':
-			m_Camera.Rotate(-1.f * MOUSE_SENSITIVITY, 0.f);
-			break;
-		}
-	}
-
 private:
 	void SetupCameraLight()
 	{
 		m_Camera = FCamera(Vector3f(0.f, 1.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera.SetMouseRotateSpeed(1e-4f);
 		
 		const float FovVertical = MATH_PI / 4.f;
 		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);

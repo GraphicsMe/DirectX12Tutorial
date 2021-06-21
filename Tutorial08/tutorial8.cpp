@@ -73,48 +73,18 @@ public:
 		RenderWindow::Get().Present();
 	}
 
-	void OnKeyDown(uint8_t Key)
-	{
-		const static float MOUSE_SENSITIVITY = 0.01f;
-		switch (Key)
-		{
-		case 'E':
-			m_Camera.MoveUp(1.f);
-			break;
-		case 'Q':
-			m_Camera.MoveUp(-1.f);
-			break;
-		case 'D':
-			m_Camera.MoveRight(1.f);
-			break;
-		case 'A':
-			m_Camera.MoveRight(-1.f);
-			break;
-		case 'W':
-			m_Camera.MoveForward(1.f);
-			break;
-		case 'S':
-			m_Camera.MoveForward(-1.f);
-			break;
-		case 'C':
-			m_Camera.Rotate(1.f * MOUSE_SENSITIVITY, 0.f);
-			break;
-		case 'Z':
-			m_Camera.Rotate(-1.f * MOUSE_SENSITIVITY, 0.f);
-			break;
-		}
-	}
 
 private:
 	void SetupCameraLight()
 	{
+		// parameters are from "A Scalable and Production Ready Sky and Atmosphere Rendering Technique"
 		const static float EarthRadius = 6360e3;
-		const static float AtmospherRadius = 6420e3;
+		const static float AtmospherRadius = 6460e3;
 
-		m_Constants.DensityScaleHeight = Vector2f(7994.0f, 1200.f);
+		m_Constants.DensityScaleHeight = Vector2f(8000.0f, 1200.f);
 		m_Constants.AtmosphereRadius = AtmospherRadius;
-		m_Constants.RayleiCoef = Vector3f(3.8f, 13.5f, 33.1f) * 1e-6f; //float3(5.8f, 13.5f, 33.1f) * 1e-6f;
-		m_Constants.MieG = 0.76f; //[-1, 1], from backward to forward
+		m_Constants.RayleiCoef = Vector3f(5.802f, 13.558f, 33.1f) * 1e-6f; 
+		m_Constants.MieG = 0.8f; //[-1, 1], from backward to forward
 		m_Constants.MieCoef = 21e-6f;
 
 		const static bool bViewFromGround = true;

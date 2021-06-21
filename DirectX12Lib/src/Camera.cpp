@@ -1,4 +1,5 @@
 ﻿#include "Camera.h"
+#include "GameInput.h"
 #include <stdio.h>
 
 FCamera::FCamera()
@@ -20,6 +21,37 @@ FCamera::FCamera(const Vector3f& CamPosition, const Vector3f& LookAtPosition, co
 	UpdateViewMatrix();
 }
 
+void FCamera::Update(float DeltaTime)
+{
+	float MoveDelta = float(m_MoveSpeed * DeltaTime);
+	if (GameInput::IsKeyDown('W'))
+	{
+		this->MoveForward(MoveDelta);
+	}
+	if (GameInput::IsKeyDown('S'))
+	{
+		this->MoveForward(-MoveDelta);
+	}
+	if (GameInput::IsKeyDown('A'))
+	{
+		this->MoveRight(-MoveDelta);
+	}
+	if (GameInput::IsKeyDown('D'))
+	{
+		this->MoveRight(MoveDelta);
+	}
+	if (GameInput::IsKeyDown('Q'))
+	{
+		this->MoveUp(MoveDelta);
+	}
+	if (GameInput::IsKeyDown('E'))
+	{
+		this->MoveUp(-MoveDelta);
+	}
+
+	ProcessMouseMove(DeltaTime);
+}
+
 Vector4f FCamera::GetPosition() const
 {
 	return Vector4f(Position, 1.f);
@@ -38,9 +70,13 @@ const FMatrix FCamera::GetViewMatrix() const
 
 void FCamera::MoveForward(float Value)
 {
-	Vector3f Delta = Forward * Value;
-	Position += Delta;
-	UpdateViewMatrix();
+	if (CameraLength > Value)
+	{
+		CameraLength -= Value;
+		Vector3f Delta = Forward * Value;
+		Position += Delta;
+		UpdateViewMatrix();
+	}
 }
 
 void FCamera::MoveRight(float Value)
@@ -59,42 +95,44 @@ void FCamera::MoveUp(float Value)
 
 void FCamera::Orbit(float Yaw, float Pitch)
 {
-	printf("Orbit %f %f\n", Yaw, Pitch);
 	Vector3f Focus = Position + Forward * CameraLength;
 	float D0 = -Right.Dot(Focus);
 	float D1 = -Up.Dot(Focus);
 	float D2 = -Forward.Dot(Focus);
 
-	// 1. to orbit space
-	FMatrix ToOrbit(Vector4f(Right, D0), Vector4f(Up, D1), Vector4f(Forward, D2), Vector4f(0.f, 0.f, 0.f, 1.f));
-    ToOrbit = ToOrbit.Transpose();
-
-	// 3. translate camera in orbit space
+	// 1. translate camera to focus
 	FMatrix CameraTranslate = FMatrix::TranslateMatrix(Vector3f(0.f, 0.f, -CameraLength));
 	FMatrix Result = CameraTranslate;
 
-	// 2. rotate in orbit space
-	FMatrix Rot = FMatrix::MatrixRotationRollPitchYaw(0, Pitch, Yaw);
+	Vector3f Forward1 = Vector3f(Forward.x, 0.f, Forward.z).Normalize();
+	Vector3f Up1 = Cross(Forward1, Right);
+
+	// 2. pitch camera to horizontal
+	float ToHorizontalPitch = acos(Forward.Dot(Forward1));
+	ToHorizontalPitch = Forward.y < 0.f ? ToHorizontalPitch : -ToHorizontalPitch;
+	FMatrix ToHorrizontal = FMatrix::MatrixRotationRollPitchYaw(0.f, ToHorizontalPitch, 0.f);
+	Result *= ToHorrizontal;
+
+	// 3. rotate camera in horizontal
+	FMatrix Rot = FMatrix::MatrixRotationRollPitchYaw(0.f, Pitch, Yaw);
 	Result *= Rot;
 
 	// 4. translate to world space
-	FMatrix OrbitToWorld = FMatrix(Right, Up, Forward, Focus);
+	FMatrix OrbitToWorld = FMatrix(Right, Up1, Forward1, Vector3f(0.f));
 	Result *= OrbitToWorld;
 
 	Right = Result.r0;
 	Up = Result.r1;
 	Forward = Result.r2;
-	Position = Result.r3;
+	Position = Focus - Forward * CameraLength; // Focus will not change
 	UpdateViewMatrix();
 }
 
 void FCamera::Rotate(float Yaw, float Pitch)
 {
-	printf("Rotate %f %f\n", Yaw, Pitch);
-	// pitch, yaw, roll
 	FMatrix Rot = FMatrix::MatrixRotationRollPitchYaw(0.f, Pitch, Yaw);
 	FMatrix Trans(Right, Up, Forward, Vector3f(0.f));
-	FMatrix Result = Rot * Trans;
+	FMatrix Result = Trans * Rot;
 
 	Right = Result.r0;
 	Up = Result.r1;
@@ -138,4 +176,44 @@ void FCamera::UpdateProjMatrix()
 const FMatrix FCamera::GetProjectionMatrix() const
 {
 	return m_ProjMat;
+}
+
+void FCamera::ProcessMouseMove(float DeltaTime)
+{
+	bool LeftMouseButtonDown = GameInput::IsKeyDown(VK_LBUTTON);
+	bool RightMouseButtonDown = GameInput::IsKeyDown(VK_RBUTTON);
+	bool AltKeyDown = GameInput::IsKeyDown(VK_MENU);
+	Vector2i MouseDelta = GameInput::GetMoveDelta();
+	float RotateDelta = float(m_RotateSpeed * DeltaTime);
+	if (MouseDelta.x != 0 || MouseDelta.y != 0)
+	{
+		if (RightMouseButtonDown)
+		{
+			// rotate camera
+			this->Rotate(MouseDelta.x * RotateDelta, MouseDelta.y * RotateDelta);
+		}
+		else if (LeftMouseButtonDown && AltKeyDown)
+		{
+			// orbit camera around focus
+			this->Orbit(MouseDelta.x * RotateDelta, MouseDelta.y * RotateDelta);
+		}
+		else if (LeftMouseButtonDown)
+		{
+			if (abs(MouseDelta.x) >= abs(MouseDelta.y))
+			{
+				this->Rotate(MouseDelta.x * RotateDelta, 0.f);
+			}
+			else
+			{
+				this->MoveForward(float(-MouseDelta.y * m_MoveSpeed * DeltaTime));
+			}
+		}
+		GameInput::MouseMoveProcessed();
+	}
+
+	float Zoom = GameInput::ConsumeMouseZoom();
+	if (Zoom != 0.f)
+	{
+		this->MoveForward(Zoom * m_ZoomSpeed);
+	}
 }

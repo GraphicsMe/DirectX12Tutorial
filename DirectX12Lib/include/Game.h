@@ -26,9 +26,6 @@ public:
 	virtual void OnRender();
 	virtual void OnShutdown();
 
-	virtual void OnKeyDown(uint8_t Key) {}
-	virtual void OnKeyUp(uint8_t Key) {}
-
 	int GetWidth() const { return m_GameDesc.Width; }
 	int GetHeight() const { return m_GameDesc.Height; }
 	std::wstring GetWindowTitle() const { return m_GameDesc.Caption; }

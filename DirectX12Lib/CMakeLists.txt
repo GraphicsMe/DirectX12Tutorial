@@ -29,6 +29,7 @@
 	include/Model.h
 	include/ShadowBuffer.h
 	include/Light.h
+	include/GameInput.h
 )
 
 set(SOURCES
@@ -59,6 +60,7 @@ set(SOURCES
 	src/Model.cpp
 	src/ShadowBuffer.cpp
 	src/Light.cpp
+	src/GameInput.cpp
 )
 
 set(SHADER_FILES
