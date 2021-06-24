@@ -49,3 +49,8 @@ add_executable(Tutorial08 Tutorial08/tutorial8.cpp)
 target_link_libraries(Tutorial08 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial08 PROPERTIES
 	PROJECT_LABEL "Tutorial08 - Atmospheric Scattering")
+
+add_executable(Tutorial09 Tutorial09/tutorial9.cpp)
+target_link_libraries(Tutorial09 LINK_PUBLIC DirectX12Lib)
+set_target_properties(Tutorial09 PROPERTIES
+	PROJECT_LABEL "Tutorial09 - IBL Maps Generator")

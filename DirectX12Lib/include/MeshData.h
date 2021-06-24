@@ -87,7 +87,7 @@ public:
 
 	friend FObjLoader;
 
-protected:
+public:
 	std::string m_filepath;
 	std::vector<Vector3f> m_positions;
 	std::vector<Vector3f> m_colors;

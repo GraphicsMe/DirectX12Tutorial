@@ -129,6 +129,8 @@ void MeshData::AddMaterial(const MaterialData& Material)
 void MeshData::AddSubMesh(uint32_t StartIndex, uint32_t IndexCount, uint32_t MaterialIndex)
 {
 	Assert (StartIndex < m_indices.size() && IndexCount <= m_indices.size());
+	if (IndexCount == 0)
+		IndexCount = (uint32_t)m_indices.size();
 	m_submeshes.emplace_back(StartIndex, IndexCount, MaterialIndex);
 }
 

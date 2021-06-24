@@ -30,6 +30,8 @@
 	include/ShadowBuffer.h
 	include/Light.h
 	include/GameInput.h
+	include/CubeBuffer.h
+	include/SkyBox.h
 )
 
 set(SOURCES
@@ -61,6 +63,8 @@ set(SOURCES
 	src/ShadowBuffer.cpp
 	src/Light.cpp
 	src/GameInput.cpp
+	src/CubeBuffer.cpp
+	src/SkyBox.cpp
 )
 
 set(SHADER_FILES
@@ -79,6 +83,7 @@ set(SHADER_FILES
 	../Resources/shaders/triangle.frag
 	../Resources/shaders/triangle.vert
 	../Resources/shaders/triangle.hlsl
+	../Resources/shaders/EnvironmentShaders.hlsl
 )
 source_group("Shaders" FILES ${SHADER_FILES})
 

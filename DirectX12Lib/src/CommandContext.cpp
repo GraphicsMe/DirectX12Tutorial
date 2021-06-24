@@ -3,6 +3,7 @@
 #include "RootSignature.h"
 #include "DepthBuffer.h"
 #include "ColorBuffer.h"
+#include "CubeBuffer.h"
 #include "PipelineState.h"
 
 #include "d3dx12.h"
@@ -348,6 +349,11 @@ void FCommandContext::SetViewportAndScissor(const D3D12_VIEWPORT& Viewport, cons
 void FCommandContext::ClearColor(FColorBuffer& Target)
 {
 	m_CommandList->ClearRenderTargetView(Target.GetRTV(), Target.GetClearColor().data, 0, nullptr);
+}
+
+void FCommandContext::ClearColor(FCubeBuffer& Target, int Face, int Mip)
+{
+	m_CommandList->ClearRenderTargetView(Target.GetRTV(Face, Mip), Target.GetClearColor().data, 0, nullptr);
 }
 
 void FCommandContext::ClearDepth(FDepthBuffer& Target)

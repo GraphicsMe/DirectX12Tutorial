@@ -8,6 +8,7 @@
 #include <limits>
 
 const float MATH_PI = 3.141592654f;
+const float MATH_PI_HALF = 0.5f * MATH_PI;
 
 struct FBoundingBox;
 

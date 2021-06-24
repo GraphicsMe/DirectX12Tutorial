@@ -10,6 +10,7 @@
 
 class FColorBuffer;
 class FDepthBuffer;
+class FCubeBuffer;
 class FCommandContext;
 class FRootSignature;
 class FD3D12Resource;
@@ -93,6 +94,7 @@ public:
 	void SetViewportAndScissor(const D3D12_VIEWPORT& Viewport, const D3D12_RECT& Scissor);
 
 	void ClearColor(FColorBuffer& Target);
+	void ClearColor(FCubeBuffer& Target, int Face, int Mip);
 	void ClearDepth(FDepthBuffer& Target);
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[]);
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV);

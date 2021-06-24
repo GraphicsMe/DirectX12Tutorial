@@ -1,4 +1,5 @@
-﻿#include "MeshData.h"
+﻿#pragma once
+#include "MeshData.h"
 #include "GpuBuffer.h"
 #include "Texture.h"
 #include "MathLib.h"
@@ -13,10 +14,12 @@ class FCommandContext;
 class FModel
 {
 public:
+	FModel();
 	FModel(const std::string& FileName);
-	~FModel();
+	virtual ~FModel();
 
-	void Draw(FCommandContext& CommandContext);
+	virtual bool IsSkyBox() const {return false;}
+	virtual void Draw(FCommandContext& CommandContext);
 
 	void GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout);
 
@@ -29,7 +32,7 @@ public:
 
 	const FBoundingBox& GetBoundingBox() const { return m_BoundingBox; }
 
-private:
+protected:
 	void InitializeResource();
 	void UpdateModelMatrix();
 	void UpdateBoundingBox();

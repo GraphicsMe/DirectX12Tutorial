@@ -129,6 +129,11 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12RHI::AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_T
 	return g_DescriptorAllocator[Type].Allocate(Count);
 }
 
+uint32_t D3D12RHI::GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE Type)
+{
+	return g_DescriptorAllocator[Type].GetDescriptorSize();
+}
+
 D3D12RHI::D3D12RHI()
 {
 }

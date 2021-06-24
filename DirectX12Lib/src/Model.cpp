@@ -3,6 +3,14 @@
 #include "MeshData.h"
 #include "CommandContext.h"
 
+
+FModel::FModel()
+	: m_Scale(1.f)
+	, m_MeshData(nullptr)
+{
+
+}
+
 FModel::FModel(const std::string& FileName)
 	: m_FileName(FileName)
 	, m_Scale(1.f)
@@ -34,7 +42,8 @@ void FModel::Draw(FCommandContext& CommandContext)
 	for (size_t i = 0; i < m_MeshData->GetMeshCount(); ++i)
 	{
 		size_t MtlIndex = m_MeshData->GetSubMaterialIndex(i);
-		CommandContext.SetDynamicDescriptor(2, 0, m_Textures[MtlIndex].GetSRV());
+		if (MtlIndex < m_Textures.size())
+			CommandContext.SetDynamicDescriptor(2, 0, m_Textures[MtlIndex].GetSRV());
 		CommandContext.DrawIndexed((UINT)m_MeshData->GetSubIndexCount(i), (UINT)m_MeshData->GetSubIndexStart(i));
 	}
 }

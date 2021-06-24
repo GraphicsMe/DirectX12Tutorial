@@ -12,6 +12,7 @@ public:
 	FDescriptorAllocator(D3D12_DESCRIPTOR_HEAP_TYPE Type);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE Allocate(uint32_t Count);
+	uint32_t GetDescriptorSize() const { return m_DescriptorSize; }
 
 	static void DestroyAll();
 
