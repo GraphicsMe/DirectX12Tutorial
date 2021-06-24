@@ -19,6 +19,7 @@
 #include "Light.h"
 #include "CubeBuffer.h"
 #include "SkyBox.h"
+#include "CubeMapCross.h"
 #include "GameInput.h"
 
 #include <d3d12.h>
@@ -30,7 +31,7 @@
 extern FCommandListManager g_CommandListManager;
 
 const int CUBE_MAP_SIZE = 1024;
-
+const bool CUBEMAP_DEBUG_VIEW = true;
 
 class Tutorial9 : public FGame
 {
@@ -68,8 +69,10 @@ public:
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		GenerateCubeMap();
-		SkyPass(CommandContext);
+		if (CUBEMAP_DEBUG_VIEW)
+			ShowCubeMapDebugView(CommandContext);
+		else
+			SkyPass(CommandContext);
 		
 		CommandContext.Finish(true);
 
@@ -92,6 +95,7 @@ private:
 	{
 		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr");
 		m_SkyBox = new FSkyBox();
+		m_CubeMapCross = new FCubeMapCross();
 	}
 
 	void SetupShaders()
@@ -100,6 +104,8 @@ private:
 		m_LongLatToCubePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_LongLatToCube", "ps_5_1");
 		m_SkyVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_SkyCube", "vs_5_1");
 		m_SkyPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SkyCube", "ps_5_1");
+		m_CubeMapCrossVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_CubeMapCross", "vs_5_1");
+		m_CubeMapCrossPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_CubeMapCross", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -134,7 +140,7 @@ private:
 		m_SkySignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_SkySignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
 		m_SkySignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
-		m_SkySignature.Finalize(L"Post Process RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		m_SkySignature.Finalize(L"Sky RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		m_SkyPSO.SetRootSignature(m_SkySignature);
 		m_SkyPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
@@ -146,6 +152,29 @@ private:
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
 		m_SkyPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkyPS.Get()));
 		m_SkyPSO.Finalize();
+
+		m_CubeMapCrossViewSignature.Reset(3, 1);
+		m_CubeMapCrossViewSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_CubeMapCrossViewSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_CubeMapCrossViewSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+		m_CubeMapCrossViewSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_CubeMapCrossViewSignature.Finalize(L"Cube Map Cross View RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		m_CubeMapCrossViewPSO.SetRootSignature(m_CubeMapCrossViewSignature);
+		m_CubeMapCrossViewPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_CubeMapCrossViewPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_CubeMapCrossViewPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+
+		std::vector<D3D12_INPUT_ELEMENT_DESC> DebugMeshLayout;
+		m_CubeMapCross->GetMeshLayout(DebugMeshLayout);
+		Assert(DebugMeshLayout.size() > 0);
+		m_CubeMapCrossViewPSO.SetInputLayout((UINT)DebugMeshLayout.size(), &DebugMeshLayout[0]);
+
+		m_CubeMapCrossViewPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_CubeMapCrossViewPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_CubeMapCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
+		m_CubeMapCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossPS.Get()));
+		m_CubeMapCrossViewPSO.Finalize();
 	}
 
 	void GenerateCubeMap()
@@ -161,14 +190,14 @@ private:
 		
 		GfxContext.SetDynamicDescriptor(1, 0, m_TextureLongLat.GetSRV());
 
-		m_Constants.ModelMatrix = FMatrix(); // identity
+		m_VSConstants.ModelMatrix = FMatrix(); // identity
 		for (int i = 0; i < 6; ++i)
 		{
 			GfxContext.SetRenderTargets(1, &m_CubeBuffer.GetRTV(i));
 			GfxContext.ClearColor(m_CubeBuffer, i, 0);
 
-			m_Constants.ViewProjMatrix = m_CubeBuffer.GetViewProjMatrix(i);
-			GfxContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
+			m_VSConstants.ViewProjMatrix = m_CubeBuffer.GetViewProjMatrix(i);
+			GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 			
 			m_SkyBox->Draw(GfxContext);
 		}
@@ -198,13 +227,47 @@ private:
 		GfxContext.ClearColor(BackBuffer);
 		GfxContext.ClearDepth(DepthBuffer);
 
-		m_Constants.ModelMatrix = FMatrix::TranslateMatrix(m_Camera.GetPosition()); // move with camera
-		m_Constants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
-		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
+		m_VSConstants.ModelMatrix = FMatrix::TranslateMatrix(m_Camera.GetPosition()); // move with camera
+		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
 		GfxContext.SetDynamicDescriptor(1, 0, m_CubeBuffer.GetSRV());
 
 		m_SkyBox->Draw(GfxContext);
+
+		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
+	}
+
+	void ShowCubeMapDebugView(FCommandContext& GfxContext)
+	{
+		// Set necessary state.
+		GfxContext.SetRootSignature(m_CubeMapCrossViewSignature);
+		GfxContext.SetPipelineState(m_CubeMapCrossViewPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		int Size = std::min(m_GameDesc.Width, m_GameDesc.Height);
+		GfxContext.SetViewportAndScissor((m_GameDesc.Width - Size)/2, (m_GameDesc.Height - Size) / 2, Size, Size);
+
+		RenderWindow& renderWindow = RenderWindow::Get();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+
+		// Indicate that the back buffer will be used as a render target.
+		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
+
+		GfxContext.ClearColor(BackBuffer);
+
+		m_VSConstants.ModelMatrix = FMatrix(); // identity
+		m_VSConstants.ViewProjMatrix = FMatrix::MatrixOrthoLH(1.f, 1.f, -1.f, 1.f);
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+		m_PSConstants.Exposure = 1.f;
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
+
+		m_CubeMapCross->Draw(GfxContext);
 
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
@@ -215,13 +278,20 @@ private:
 	{
 		FMatrix ModelMatrix;
 		FMatrix ViewProjMatrix;
-	} m_Constants;
+	} m_VSConstants;
+
+	__declspec(align(16)) struct
+	{
+		float Exposure;
+	} m_PSConstants;
 
 	FRootSignature m_GenCubeSignature;
 	FRootSignature m_SkySignature;
+	FRootSignature m_CubeMapCrossViewSignature;
 
 	FGraphicsPipelineState m_GenCubePSO;
 	FGraphicsPipelineState m_SkyPSO;
+	FGraphicsPipelineState m_CubeMapCrossViewPSO;
 
 	FCubeBuffer m_CubeBuffer;
 	FTexture m_TextureLongLat;
@@ -229,11 +299,12 @@ private:
 	ComPtr<ID3DBlob> m_LongLatToCubeVS;
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_SkyPS, m_SkyVS;
+	ComPtr<ID3DBlob> m_CubeMapCrossPS, m_CubeMapCrossVS;
 	ComPtr<ID3DBlob> m_LongLatToCubePS;
 
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
-	FSkyBox* m_SkyBox;
+	FModel* m_SkyBox, *m_CubeMapCross;
 
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };

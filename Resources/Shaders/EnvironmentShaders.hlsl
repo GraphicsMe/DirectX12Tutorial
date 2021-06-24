@@ -23,6 +23,10 @@ struct VertexOutput
 	float3 LocalDirection : TEXCOORD;
 };
 
+
+//-------------------------------------------------------
+// Convert Longtitude-Latitude Mapping to Cube Mapping
+//-------------------------------------------------------
 VertexOutput VS_LongLatToCube(VertexIN In)
 {
 	VertexOutput Out;
@@ -57,16 +61,58 @@ VertexOutput VS_SkyCube(VertexIN In)
 	return Out;
 }
 
-float GetGray(float3 color)
-{
-	return dot(color, float3(0.2126, 0.7152, 0.0722));
-}
 
-
+//-------------------------------------------------------
+// SkyBox
+//-------------------------------------------------------
 TextureCube CubeEnvironment : register(t0);
 
 float4 PS_SkyCube(VertexOutput In) : SV_Target
 {
-	float3 v = normalize(In.LocalDirection);
-	return CubeEnvironment.Sample(LinearSampler, v);
+	// Local Direction don't need to normalized
+	return CubeEnvironment.Sample(LinearSampler, In.LocalDirection);
+}
+
+struct VertexIN_CubeMapCross
+{
+	float3 Position : POSITION;
+	float3 Normal : Normal;
+};
+
+
+//-------------------------------------------------------
+// CubeMap Cross View
+//-------------------------------------------------------
+cbuffer PSContant : register(b0)
+{
+	float Exposure;
+};
+
+VertexOutput VS_CubeMapCross(VertexIN_CubeMapCross In)
+{
+	VertexOutput Out;
+	Out.LocalDirection = In.Normal;
+	Out.Position = mul(mul(float4(In.Position, 1.0), ModelMatrix), ViewProjMatrix);
+	return Out;
+}
+
+// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+float3 ACESFilm( float3 color )
+{
+	float3 x = 0.8 * color;
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+}
+
+float4 PS_CubeMapCross(VertexOutput In) : SV_Target
+{
+	float3 Color = CubeEnvironment.Sample(LinearSampler, In.LocalDirection).xyz;
+
+	Color = ACESFilm(Color * Exposure);
+
+	return float4(pow(Color, 1/2.2), 1.0);
 }

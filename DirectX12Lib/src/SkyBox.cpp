@@ -3,6 +3,8 @@
 FSkyBox::FSkyBox()
 {
 	m_MeshData = new MeshData("SkyBox");
+
+	//https://docs.microsoft.com/en-us/windows/win32/direct3d9/cubic-environment-mapping
 	m_MeshData->m_positions = {
 		{-1.f, 1.f, 1.f},
 		{1.f, 1.f, 1.f },

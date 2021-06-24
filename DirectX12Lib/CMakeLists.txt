@@ -32,6 +32,7 @@
 	include/GameInput.h
 	include/CubeBuffer.h
 	include/SkyBox.h
+	include/CubeMapCross.h
 )
 
 set(SOURCES
@@ -65,6 +66,7 @@ set(SOURCES
 	src/GameInput.cpp
 	src/CubeBuffer.cpp
 	src/SkyBox.cpp
+	src/CubeMapCross.cpp
 )
 
 set(SHADER_FILES
