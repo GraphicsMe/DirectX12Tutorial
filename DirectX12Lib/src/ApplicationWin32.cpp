@@ -3,6 +3,7 @@
 #include "GameInput.h"
 #include "D3D12RHI.h"
 #include "Timer.h"
+#include "ImguiManager.h"
 #include <iostream>
 
 
@@ -11,11 +12,14 @@ bool ApplicationWin32::Initialize(FGame* game)
 	GameInput::Initialize();
 	WindowWin32::Get().Initialize(game);
 	D3D12RHI::Get().Initialize();
+	ImguiManager::Get().Initialize();
+
 	return true;
 }
 
 void ApplicationWin32::Terminate()
 {
+	ImguiManager::Get().Destroy();
 	D3D12RHI::Get().Destroy();
 	WindowWin32::Get().Destroy();
 }

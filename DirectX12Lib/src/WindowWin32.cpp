@@ -7,6 +7,8 @@
 #include "WindowWin32.h"
 #include "Game.h"
 #include "GameInput.h"
+#include "ImguiManager.h"
+
 
 std::map<int, int> g_MouseMapping = {
 	{WM_LBUTTONUP, VK_LBUTTON},
@@ -99,6 +101,9 @@ LRESULT WindowWin32::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 	{
 		Game = reinterpret_cast<FGame*>(::GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	}
+
+	if (ImguiManager::WndProcHandler(hWnd, uMsg, wParam, lParam))
+		return true;
 	
 	switch (uMsg)
 	{

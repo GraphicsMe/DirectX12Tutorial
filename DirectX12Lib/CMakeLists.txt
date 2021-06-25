@@ -33,6 +33,7 @@
 	include/CubeBuffer.h
 	include/SkyBox.h
 	include/CubeMapCross.h
+	include/ImguiManager.h
 )
 
 set(SOURCES
@@ -67,7 +68,28 @@ set(SOURCES
 	src/CubeBuffer.cpp
 	src/SkyBox.cpp
 	src/CubeMapCross.cpp
+	src/ImguiManager.cpp
 )
+
+set( IMGUI_HEADERS
+    include/imgui/imconfig.h
+    include/imgui/imgui.h
+    include/imgui/imgui_impl_win32.h
+    include/imgui/imgui_internal.h
+    include/imgui/imstb_rectpack.h
+    include/imgui/imstb_textedit.h
+    include/imgui/imstb_truetype.h
+)
+
+
+set( IMGUI_SOURCE
+    src/imgui/imgui.cpp
+    src/imgui/imgui_demo.cpp
+    src/imgui/imgui_draw.cpp
+    src/imgui/imgui_impl_win32.cpp
+    src/imgui/imgui_widgets.cpp
+)
+
 
 set(SHADER_FILES
 	../Resources/shaders/AtmosphericScatteringCS.hlsl
@@ -86,16 +108,22 @@ set(SHADER_FILES
 	../Resources/shaders/triangle.vert
 	../Resources/shaders/triangle.hlsl
 	../Resources/shaders/EnvironmentShaders.hlsl
+	../Resources/shaders/ImGUI.hlsl
 )
+
 source_group("Shaders" FILES ${SHADER_FILES})
+source_group("Header Files\\ImGUI" FILES ${IMGUI_HEADERS} )
+source_group("Source Files\\ImGUI" FILES ${IMGUI_SOURCE} )
 
 add_library(DirectX12Lib
 	${HEADER_FILES}
 	${SOURCES}
 	${SHADER_FILES}
+	${IMGUI_HEADERS}
+	${IMGUI_SOURCE}
 )
 
-target_include_directories(DirectX12Lib PUBLIC include)
+target_include_directories(DirectX12Lib PUBLIC include include/imgui)
 
 target_link_libraries(DirectX12Lib LINK_PUBLIC DirectXTex)
 

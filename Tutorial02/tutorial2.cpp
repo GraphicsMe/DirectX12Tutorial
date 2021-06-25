@@ -12,6 +12,7 @@
 #include "RootSignature.h"
 #include "GpuBuffer.h"
 #include "PipelineState.h"
+#include "ImguiManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -40,6 +41,17 @@ public:
 	void OnUpdate()
 	{
 
+	}
+
+	void OnGUI(FCommandContext& CommandContext)
+	{
+		ImguiManager::Get().NewFrame();
+
+		ImGui::Begin("Background Color");
+		ImGui::ColorEdit3("Color", &m_ClearColor.x);
+		ImGui::End();
+
+		ImguiManager::Get().Render(CommandContext, RenderWindow::Get());
 	}
 	
 	void OnRender()
@@ -152,6 +164,7 @@ private:
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		// Record commands.
+		BackBuffer.SetClearColor(m_ClearColor);
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.ClearDepth(DepthBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -159,6 +172,8 @@ private:
 		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
 
 		CommandContext.DrawIndexed(m_IndexBuffer.GetElementCount());
+
+		OnGUI(CommandContext);
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}
@@ -185,6 +200,8 @@ private:
 	FGpuBuffer m_VertexBuffer;
 	FGpuBuffer m_IndexBuffer;
 	FConstBuffer m_ConstBuffer;
+
+	Vector3f m_ClearColor;
 
 	float m_elapsedTime = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
