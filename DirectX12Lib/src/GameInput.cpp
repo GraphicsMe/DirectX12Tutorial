@@ -1,5 +1,6 @@
 #include "GameInput.h"
 #include "Common.h"
+#include "imgui.h"
 
 namespace 
 {
@@ -53,7 +54,7 @@ void GameInput::MouseStop()
 
 void GameInput::MouseMove(int MouseX, int MouseY)
 {
-	if (s_MouseMoving)
+	if (s_MouseMoving && !ImGui::GetIO().WantCaptureMouse)
 	{
 		s_MouseCurrentX = MouseX;
 		s_MouseCurrentY = MouseY;

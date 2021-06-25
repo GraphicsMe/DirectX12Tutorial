@@ -109,6 +109,7 @@ set(SHADER_FILES
 	../Resources/shaders/triangle.hlsl
 	../Resources/shaders/EnvironmentShaders.hlsl
 	../Resources/shaders/ImGUI.hlsl
+	../Resources/shaders/ShaderUtils.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

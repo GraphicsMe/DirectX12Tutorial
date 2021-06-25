@@ -1,5 +1,6 @@
 #pragma pack_matrix(row_major)
 
+#include "ShaderUtils.hlsl"
 
 cbuffer VSContant : register(b0)
 {
@@ -65,12 +66,21 @@ VertexOutput VS_SkyCube(VertexIN In)
 //-------------------------------------------------------
 // SkyBox
 //-------------------------------------------------------
+cbuffer PSContant : register(b0)
+{
+	float Exposure;
+};
+
 TextureCube CubeEnvironment : register(t0);
 
 float4 PS_SkyCube(VertexOutput In) : SV_Target
 {
 	// Local Direction don't need to normalized
-	return CubeEnvironment.Sample(LinearSampler, In.LocalDirection);
+	float3 Color = CubeEnvironment.Sample(LinearSampler, In.LocalDirection).xyz;
+
+	Color = ACESFilm(Color * Exposure);
+
+	return float4(pow(Color, 1 / 2.2), 1.0);
 }
 
 struct VertexIN_CubeMapCross
@@ -83,10 +93,6 @@ struct VertexIN_CubeMapCross
 //-------------------------------------------------------
 // CubeMap Cross View
 //-------------------------------------------------------
-cbuffer PSContant : register(b0)
-{
-	float Exposure;
-};
 
 VertexOutput VS_CubeMapCross(VertexIN_CubeMapCross In)
 {
@@ -94,18 +100,6 @@ VertexOutput VS_CubeMapCross(VertexIN_CubeMapCross In)
 	Out.LocalDirection = In.Normal;
 	Out.Position = mul(mul(float4(In.Position, 1.0), ModelMatrix), ViewProjMatrix);
 	return Out;
-}
-
-// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-float3 ACESFilm( float3 color )
-{
-	float3 x = 0.8 * color;
-	float a = 2.51f;
-	float b = 0.03f;
-	float c = 2.43f;
-	float d = 0.59f;
-	float e = 0.14f;
-	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
 }
 
 float4 PS_CubeMapCross(VertexOutput In) : SV_Target

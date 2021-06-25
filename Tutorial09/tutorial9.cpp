@@ -21,6 +21,7 @@
 #include "SkyBox.h"
 #include "CubeMapCross.h"
 #include "GameInput.h"
+#include "ImguiManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -32,6 +33,15 @@ extern FCommandListManager g_CommandListManager;
 
 const int CUBE_MAP_SIZE = 1024;
 const bool CUBEMAP_DEBUG_VIEW = true;
+
+enum EShowMode
+{
+	SM_SkyBox,
+	SM_CubeMapCross,
+	SM_Irradiance,
+	SM_Prefiltered,
+};
+static int g_ShowMode = SM_CubeMapCross;
 
 class Tutorial9 : public FGame
 {
@@ -65,15 +75,54 @@ public:
 			SetupCameraLight();
 	}
 
+	void OnGUI(FCommandContext& CommandContext)
+	{
+		ImguiManager::Get().NewFrame();
+
+		ImGui::SetNextWindowPos(ImVec2(1, 1));
+		
+		static bool ShowConfig = true;
+		if (ImGui::Begin("Config", &ShowConfig, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::ColorEdit3("Clear Color", &m_ClearColor.x);
+			ImGui::SliderFloat("Exposure", &m_Exposure, 0.f, 10.f, "%.1f");
+
+			ImGui::BeginGroup();
+			ImGui::Text("Show Mode");
+			ImGui::Indent(20);
+			ImGui::RadioButton("Cube Box", &g_ShowMode, SM_SkyBox);		ImGui::SameLine();
+			ImGui::RadioButton("Cube Cross", &g_ShowMode, SM_CubeMapCross);
+			ImGui::RadioButton("Irradiance", &g_ShowMode, SM_Irradiance);	ImGui::SameLine();
+			ImGui::RadioButton("Prefiltered", &g_ShowMode, SM_Prefiltered);
+			ImGui::EndGroup();
+
+			//static bool ShowDemo = false;
+			//ImGui::Checkbox("Show Demo", &ShowDemo);
+			//if (ShowDemo)
+			//	ImGui::ShowDemoWindow(&ShowDemo);
+
+			ImGui::End();
+		}
+
+		ImguiManager::Get().Render(CommandContext, RenderWindow::Get());
+	}
+
 	void OnRender()
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		if (CUBEMAP_DEBUG_VIEW)
-			ShowCubeMapDebugView(CommandContext);
-		else
+		switch (g_ShowMode)
+		{
+		case SM_SkyBox:
 			SkyPass(CommandContext);
-		
+			break;
+		case SM_CubeMapCross:
+		case SM_Irradiance:
+		case SM_Prefiltered:
+			ShowCubeMapDebugView(CommandContext);
+			break;
+		}
+
 		CommandContext.Finish(true);
 
 		RenderWindow::Get().Present();
@@ -136,9 +185,10 @@ private:
 
 		m_CubeBuffer.Create(L"CubeMap", CUBE_MAP_SIZE, CUBE_MAP_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-		m_SkySignature.Reset(2, 1);
+		m_SkySignature.Reset(3, 1);
 		m_SkySignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
-		m_SkySignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+		m_SkySignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_SkySignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
 		m_SkySignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_SkySignature.Finalize(L"Sky RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -224,6 +274,7 @@ private:
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
 
+		BackBuffer.SetClearColor(m_ClearColor);
 		GfxContext.ClearColor(BackBuffer);
 		GfxContext.ClearDepth(DepthBuffer);
 
@@ -231,9 +282,14 @@ private:
 		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
-		GfxContext.SetDynamicDescriptor(1, 0, m_CubeBuffer.GetSRV());
+		m_PSConstants.Exposure = m_Exposure;
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
 
 		m_SkyBox->Draw(GfxContext);
+
+		OnGUI(GfxContext);
 
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
@@ -256,18 +312,21 @@ private:
 
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
+		BackBuffer.SetClearColor(m_ClearColor);
 		GfxContext.ClearColor(BackBuffer);
 
 		m_VSConstants.ModelMatrix = FMatrix(); // identity
 		m_VSConstants.ViewProjMatrix = FMatrix::MatrixOrthoLH(1.f, 1.f, -1.f, 1.f);
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
-		m_PSConstants.Exposure = 1.f;
+		m_PSConstants.Exposure = m_Exposure;
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
 		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
 
 		m_CubeMapCross->Draw(GfxContext);
+
+		OnGUI(GfxContext);
 
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
@@ -306,6 +365,8 @@ private:
 	FDirectionalLight m_DirectionLight;
 	FModel* m_SkyBox, *m_CubeMapCross;
 
+	Vector3f m_ClearColor;
+	float m_Exposure = 1.f;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 
