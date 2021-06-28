@@ -40,6 +40,8 @@ protected:
 
 private:
     ImGuiContext* m_pImGuiCtx = nullptr;
+	bool m_newFrame = false;
+
 	FTexture m_FontTexture;
 	FRootSignature m_RootSignature;
 	ComPtr<ID3DBlob> m_ImGUIVS, m_ImGUIPS;

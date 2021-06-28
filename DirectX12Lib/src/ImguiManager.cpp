@@ -112,7 +112,10 @@ void ImguiManager::Initialize()
 
 void ImguiManager::Destroy()
 {
-	ImGui::EndFrame();
+    if (m_newFrame)
+    {
+        ImGui::EndFrame();
+    }
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext(m_pImGuiCtx);
 	m_pImGuiCtx = nullptr;
@@ -123,6 +126,7 @@ void ImguiManager::NewFrame()
     ImGui::SetCurrentContext( m_pImGuiCtx );
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
+    m_newFrame = true;
 }
 
 void ImguiManager::Render(FCommandContext& CommandContext, RenderWindow& renderWindow )
