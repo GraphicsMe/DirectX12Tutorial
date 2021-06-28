@@ -83,16 +83,48 @@ float4 PS_SkyCube(VertexOutput In) : SV_Target
 	return float4(pow(Color, 1 / 2.2), 1.0);
 }
 
-struct VertexIN_CubeMapCross
+
+//-------------------------------------------------------
+// Show Texture2D
+//-------------------------------------------------------
+
+struct VertexOutput_Texture2D
 {
-	float3 Position : POSITION;
-	float3 Normal : Normal;
+	float4 Pos	: SV_Position;
+	float2 Tex	: TEXCOORD;
 };
+
+Texture2D InputTexture	: register(t0);
+
+VertexOutput_Texture2D VS_ShowTexture2D(in uint VertID : SV_VertexID)
+{
+	VertexOutput_Texture2D Output;
+	// Texture coordinates range [0, 2], but only [0, 1] appears on screen.
+	float2 Tex = float2(uint2(VertID, VertID << 1) & 2);
+	Output.Tex = Tex;
+	Output.Pos = float4(lerp(float2(-1, 1), float2(1, -1), Tex), 0, 1);
+	return Output;
+}
+
+float4 PS_ShowTexture2D(in VertexOutput_Texture2D In) : SV_Target0
+{
+	float3 Color = InputTexture.Sample(LinearSampler, In.Tex).xyz;
+
+	Color = ACESFilm(Color * Exposure);
+
+	return float4(pow(Color, 1 / 2.2), 1.0);
+}
 
 
 //-------------------------------------------------------
 // CubeMap Cross View
 //-------------------------------------------------------
+
+struct VertexIN_CubeMapCross
+{
+	float3 Position : POSITION;
+	float3 Normal : Normal;
+};
 
 VertexOutput VS_CubeMapCross(VertexIN_CubeMapCross In)
 {

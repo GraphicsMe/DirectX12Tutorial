@@ -36,6 +36,7 @@ const bool CUBEMAP_DEBUG_VIEW = true;
 
 enum EShowMode
 {
+	SM_LongLat,
 	SM_SkyBox,
 	SM_CubeMapCross,
 	SM_Irradiance,
@@ -90,9 +91,10 @@ public:
 			ImGui::BeginGroup();
 			ImGui::Text("Show Mode");
 			ImGui::Indent(20);
-			ImGui::RadioButton("Cube Box", &g_ShowMode, SM_SkyBox);		ImGui::SameLine();
+			ImGui::RadioButton("Long-Lat View", &g_ShowMode, SM_LongLat);
+			ImGui::RadioButton("Cube Box", &g_ShowMode, SM_SkyBox);
 			ImGui::RadioButton("Cube Cross", &g_ShowMode, SM_CubeMapCross);
-			ImGui::RadioButton("Irradiance", &g_ShowMode, SM_Irradiance);	ImGui::SameLine();
+			ImGui::RadioButton("Irradiance", &g_ShowMode, SM_Irradiance);
 			ImGui::RadioButton("Prefiltered", &g_ShowMode, SM_Prefiltered);
 			ImGui::EndGroup();
 
@@ -113,6 +115,9 @@ public:
 
 		switch (g_ShowMode)
 		{
+		case SM_LongLat:
+			ShowTexture2D(CommandContext, m_TextureLongLat);
+			break;
 		case SM_SkyBox:
 			SkyPass(CommandContext);
 			break;
@@ -123,6 +128,9 @@ public:
 			break;
 		}
 
+		OnGUI(CommandContext);
+
+		CommandContext.TransitionResource(RenderWindow::Get().GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 		CommandContext.Finish(true);
 
 		RenderWindow::Get().Present();
@@ -155,6 +163,8 @@ private:
 		m_SkyPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SkyCube", "ps_5_1");
 		m_CubeMapCrossVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_CubeMapCross", "vs_5_1");
 		m_CubeMapCrossPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_CubeMapCross", "ps_5_1");
+		m_ShowTexture2DVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_ShowTexture2D", "vs_5_1");
+		m_ShowTexture2DPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_ShowTexture2D", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -202,6 +212,24 @@ private:
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
 		m_SkyPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkyPS.Get()));
 		m_SkyPSO.Finalize();
+
+		m_Show2DTextureSignature.Reset(3, 1);
+		m_Show2DTextureSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_Show2DTextureSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_Show2DTextureSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+		m_Show2DTextureSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_Show2DTextureSignature.Finalize(L"Show 2D Texture View RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		m_Show2DTexturePSO.SetRootSignature(m_Show2DTextureSignature);
+		m_Show2DTexturePSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_Show2DTexturePSO.SetBlendState(FPipelineState::BlendDisable);
+		m_Show2DTexturePSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		// no need to set mesh layout
+		m_Show2DTexturePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_Show2DTexturePSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_Show2DTexturePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ShowTexture2DVS.Get()));
+		m_Show2DTexturePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_ShowTexture2DPS.Get()));
+		m_Show2DTexturePSO.Finalize();
 
 		m_CubeMapCrossViewSignature.Reset(3, 1);
 		m_CubeMapCrossViewSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -288,10 +316,42 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
 
 		m_SkyBox->Draw(GfxContext);
+	}
 
-		OnGUI(GfxContext);
+	void ShowTexture2D(FCommandContext& GfxContext, FTexture& Texture2D)
+	{
+		GfxContext.SetRootSignature(m_Show2DTextureSignature);
+		GfxContext.SetPipelineState(m_Show2DTexturePSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		float AspectRatio = Texture2D.GetWidth() * 1.f / Texture2D.GetHeight();
+		int Width = std::min(m_GameDesc.Width, Texture2D.GetWidth());
+		int Height = std::min(m_GameDesc.Height, Texture2D.GetHeight());
+		Width = std::min(Width, static_cast<int>(Height * AspectRatio));
+		Height = std::min(Height, static_cast<int>(Width / AspectRatio));
+		GfxContext.SetViewportAndScissor((m_GameDesc.Width - Width) / 2, (m_GameDesc.Height - Height) / 2, Width, Height);
 
-		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
+		RenderWindow& renderWindow = RenderWindow::Get();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+
+		// Indicate that the back buffer will be used as a render target.
+		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
+
+		BackBuffer.SetClearColor(m_ClearColor);
+		GfxContext.ClearColor(BackBuffer);
+
+		m_VSConstants.ModelMatrix = FMatrix(); // identity
+		m_VSConstants.ViewProjMatrix = FMatrix::MatrixOrthoLH(1.f, 1.f, -1.f, 1.f);
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+		m_PSConstants.Exposure = m_Exposure;
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 0, m_TextureLongLat.GetSRV());
+
+		GfxContext.Draw(3);
 	}
 
 	void ShowCubeMapDebugView(FCommandContext& GfxContext)
@@ -325,10 +385,6 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
 
 		m_CubeMapCross->Draw(GfxContext);
-
-		OnGUI(GfxContext);
-
-		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
 
 
@@ -346,10 +402,12 @@ private:
 
 	FRootSignature m_GenCubeSignature;
 	FRootSignature m_SkySignature;
+	FRootSignature m_Show2DTextureSignature;
 	FRootSignature m_CubeMapCrossViewSignature;
 
 	FGraphicsPipelineState m_GenCubePSO;
 	FGraphicsPipelineState m_SkyPSO;
+	FGraphicsPipelineState m_Show2DTexturePSO;
 	FGraphicsPipelineState m_CubeMapCrossViewPSO;
 
 	FCubeBuffer m_CubeBuffer;
@@ -359,6 +417,7 @@ private:
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_SkyPS, m_SkyVS;
 	ComPtr<ID3DBlob> m_CubeMapCrossPS, m_CubeMapCrossVS;
+	ComPtr<ID3DBlob> m_ShowTexture2DVS, m_ShowTexture2DPS;
 	ComPtr<ID3DBlob> m_LongLatToCubePS;
 
 	FCamera m_Camera;
@@ -374,7 +433,7 @@ int main()
 {
 	ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 	GameDesc Desc;
-	Desc.Caption = L"Tutorial 9 - IBL Maps Generator";
+	Desc.Caption = L"IBL Maps Generator";
 	Tutorial9 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);
 	CoUninitialize();
