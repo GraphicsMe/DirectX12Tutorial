@@ -28,6 +28,8 @@ public:
 	void SetClearColor(const Vector4f& Color) { m_ClearColor = Color; }
 	const Vector4f& GetClearColor() const { return m_ClearColor; }
 
+	void SaveCubeMap(const std::wstring& FileName);
+
 protected:
 	D3D12_RESOURCE_FLAGS CombineResourceFlags(void) const
 	{

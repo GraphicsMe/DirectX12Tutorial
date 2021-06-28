@@ -59,6 +59,7 @@ public:
 		SetupPipelineState();
 
 		GenerateCubeMap();
+		SaveCubeMap();
 	}
 
 	void OnShutdown()
@@ -280,6 +281,11 @@ private:
 			m_SkyBox->Draw(GfxContext);
 		}
 		GfxContext.Finish(true);
+	}
+
+	void SaveCubeMap()
+	{
+		m_CubeBuffer.SaveCubeMap(L"spruit_sunrise_2k_cubemap.dds");
 	}
 
 	void SkyPass(FCommandContext& GfxContext)

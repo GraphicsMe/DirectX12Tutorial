@@ -1,6 +1,11 @@
 ﻿#include "CubeBuffer.h"
 #include "D3D12RHI.h"
+#include "DirectXTex.h"
+#include "CommandQueue.h"
+#include "CommandListManager.h"
+#include "CommandContext.h"
 
+extern FCommandListManager g_CommandListManager;
 
 FMatrix FCubeBuffer::GetViewMatrix(int Face)
 {
@@ -107,4 +112,23 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 	}
 	
 	
+}
+
+
+void FCubeBuffer::SaveCubeMap(const std::wstring& FileName)
+{
+	using namespace DirectX;
+	ScratchImage image;
+
+	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
+	if (SUCCEEDED(hr))
+	{
+		hr = DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DDS_FLAGS_NONE, FileName.c_str());
+		if (FAILED(hr))
+		{
+			printf("Falied to save cubemap to dds file\n");
+		}
+	}
 }
