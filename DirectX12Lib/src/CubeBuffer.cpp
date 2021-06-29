@@ -44,6 +44,8 @@ FMatrix FCubeBuffer::GetViewProjMatrix(int Face)
 void FCubeBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips, DXGI_FORMAT Format)
 {
 	m_NumMipMaps = (NumMips == 0) ? ComputeNumMips(Width, Height) : NumMips;
+	Assert(Width == Height);
+	m_Size = Width;
 
 	D3D12_RESOURCE_FLAGS Flags = CombineResourceFlags();
 	D3D12_RESOURCE_DESC ResDesc = DescribeTex2D(Width, Height, 6, m_NumMipMaps, Format, Flags); //ArraySize=6

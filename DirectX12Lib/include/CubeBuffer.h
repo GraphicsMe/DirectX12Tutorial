@@ -12,6 +12,7 @@ public:
 		: m_ClearColor(Color)
 		, m_NumMipMaps(1)
 		, m_SampleCount(1)
+		, m_Size(0)
 	{
 		m_SRVHandle.ptr = 0;
 	}
@@ -29,6 +30,8 @@ public:
 	const Vector4f& GetClearColor() const { return m_ClearColor; }
 
 	void SaveCubeMap(const std::wstring& FileName);
+
+	int GetSize() const { return m_Size; }
 
 protected:
 	D3D12_RESOURCE_FLAGS CombineResourceFlags(void) const
@@ -52,6 +55,7 @@ protected:
 
 
 protected:
+	int m_Size;
 	Vector4f m_ClearColor;
 	uint32_t m_NumMipMaps;
 	uint32_t m_SampleCount;

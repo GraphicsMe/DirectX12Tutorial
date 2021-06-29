@@ -36,8 +36,6 @@ VertexOutput VS_LongLatToCube(VertexIN In)
 	return Out;
 }
 
-
-static const float PI = 3.14159265359;
 static const float2 invAtan = { 0.5 / PI, -1 / PI };
 float2 SampleSphericalMap(float3 Direction)
 {
@@ -54,6 +52,10 @@ float4 PS_LongLatToCube(VertexOutput In) : SV_Target
 }
 
 
+//-------------------------------------------------------
+// SkyBox
+//-------------------------------------------------------
+
 VertexOutput VS_SkyCube(VertexIN In)
 {
 	VertexOutput Out;
@@ -62,10 +64,6 @@ VertexOutput VS_SkyCube(VertexIN In)
 	return Out;
 }
 
-
-//-------------------------------------------------------
-// SkyBox
-//-------------------------------------------------------
 cbuffer PSContant : register(b0)
 {
 	float Exposure;
@@ -81,6 +79,70 @@ float4 PS_SkyCube(VertexOutput In) : SV_Target
 	Color = ACESFilm(Color * Exposure);
 
 	return float4(pow(Color, 1 / 2.2), 1.0);
+}
+
+
+//-------------------------------------------------------
+// Generate Irradiance map
+//-------------------------------------------------------
+
+// VS is same as VS_SkyCube
+
+float4 PS_GenIrradiance(VertexOutput In) : SV_Target
+{
+	//return CubeEnvironment.Sample(LinearSampler, In.LocalDirection);
+	float3 Normal = normalize(In.LocalDirection);
+	float3 Irradiance = {0.0, 0.0, 0.0};
+
+	float3 Up = { 0.0, 1.0, 0.0 };
+	float3 Right = cross(Up, Normal);
+	Up = cross(Normal, Right);
+
+	float sampleDelta = PI / 20;
+	float NumSamples = 0.0;
+	for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
+	{
+		for (float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta)
+		{
+			// spherical to cartesian (in tangent space)
+			float sintheta = sin(theta);
+			float costheta = cos(theta);
+			float3 tangentSample = float3(sintheta * cos(phi),  sintheta * sin(phi), costheta);
+			// tangent space to world
+			//float3 sampleVec = tangentSample.x * Right + tangentSample.y * Up + tangentSample.z * Normal;
+			float3 sampleVec = TangentToWorld(tangentSample, Normal);
+			float3 sampleColor = CubeEnvironment.Sample(LinearSampler, sampleVec).rgb;
+
+			Irradiance += sampleColor * costheta * sintheta;
+			NumSamples++;
+		}
+	}
+
+	Irradiance = PI*Irradiance / NumSamples;
+
+	return float4(Irradiance, 1.0);
+}
+
+
+float4 PS_GenIrradiance1(VertexOutput In, float4 SvPosition : SV_POSITION) : SV_Target
+{
+	float3 N = normalize(In.LocalDirection);
+
+	int2 PixelPos = int2(SvPosition.xy);
+	uint2 Random = Rand3DPCG16(uint3(PixelPos, In.Position.x * 1024)).xy;
+
+	float3 Irradiance = 0;
+	const uint NumSamples = 400;
+	for (uint i = 0; i < NumSamples; i++)
+	{
+		float2 E = Hammersley(i, NumSamples, Random);
+		float3 L = TangentToWorld(CosineSampleHemisphere(E).xyz, N);
+		float NoL = saturate(dot(N, L));
+		float Factor = NoL > 0 ? 1.0 : 0.0;
+		Irradiance += CubeEnvironment.Sample(LinearSampler, L).rgb * Factor;
+	}
+	Irradiance /= NumSamples;
+	return float4(Irradiance, 1.0);
 }
 
 

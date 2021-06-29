@@ -32,6 +32,7 @@
 extern FCommandListManager g_CommandListManager;
 
 const int CUBE_MAP_SIZE = 1024;
+const int IRRADIANCE_SIZE = 256;
 const bool CUBEMAP_DEBUG_VIEW = true;
 
 enum EShowMode
@@ -42,7 +43,6 @@ enum EShowMode
 	SM_Irradiance,
 	SM_Prefiltered,
 };
-static int g_ShowMode = SM_CubeMapCross;
 
 class Tutorial9 : public FGame
 {
@@ -59,6 +59,8 @@ public:
 		SetupPipelineState();
 
 		GenerateCubeMap();
+		GenerateIrradianceMap();
+
 		SaveCubeMap();
 	}
 
@@ -92,11 +94,11 @@ public:
 			ImGui::BeginGroup();
 			ImGui::Text("Show Mode");
 			ImGui::Indent(20);
-			ImGui::RadioButton("Long-Lat View", &g_ShowMode, SM_LongLat);
-			ImGui::RadioButton("Cube Box", &g_ShowMode, SM_SkyBox);
-			ImGui::RadioButton("Cube Cross", &g_ShowMode, SM_CubeMapCross);
-			ImGui::RadioButton("Irradiance", &g_ShowMode, SM_Irradiance);
-			ImGui::RadioButton("Prefiltered", &g_ShowMode, SM_Prefiltered);
+			ImGui::RadioButton("Long-Lat View", &m_ShowMode, SM_LongLat);
+			ImGui::RadioButton("Cube Box", &m_ShowMode, SM_SkyBox);
+			ImGui::RadioButton("Cube Cross", &m_ShowMode, SM_CubeMapCross);
+			ImGui::RadioButton("Irradiance", &m_ShowMode, SM_Irradiance);
+			ImGui::RadioButton("Prefiltered", &m_ShowMode, SM_Prefiltered);
 			ImGui::EndGroup();
 
 			//static bool ShowDemo = false;
@@ -114,7 +116,7 @@ public:
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		switch (g_ShowMode)
+		switch (m_ShowMode)
 		{
 		case SM_LongLat:
 			ShowTexture2D(CommandContext, m_TextureLongLat);
@@ -123,9 +125,11 @@ public:
 			SkyPass(CommandContext);
 			break;
 		case SM_CubeMapCross:
+			ShowCubeMapDebugView(CommandContext, m_CubeBuffer);
+			break;
 		case SM_Irradiance:
 		case SM_Prefiltered:
-			ShowCubeMapDebugView(CommandContext);
+			ShowCubeMapDebugView(CommandContext, m_IrradianceCube);
 			break;
 		}
 
@@ -151,7 +155,7 @@ private:
 
 	void SetupMesh()
 	{
-		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr");
+		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr
 		m_SkyBox = new FSkyBox();
 		m_CubeMapCross = new FCubeMapCross();
 	}
@@ -162,10 +166,12 @@ private:
 		m_LongLatToCubePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_LongLatToCube", "ps_5_1");
 		m_SkyVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_SkyCube", "vs_5_1");
 		m_SkyPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SkyCube", "ps_5_1");
+		m_GenIrradiancePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SkyCube", "ps_5_1");
 		m_CubeMapCrossVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_CubeMapCross", "vs_5_1");
 		m_CubeMapCrossPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_CubeMapCross", "ps_5_1");
 		m_ShowTexture2DVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_ShowTexture2D", "vs_5_1");
 		m_ShowTexture2DPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_ShowTexture2D", "ps_5_1");
+		m_GenIrradiancePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenIrradiance", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -188,8 +194,8 @@ private:
 		m_GenCubePSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 
 		m_GenCubePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		DXGI_FORMAT Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		m_GenCubePSO.SetRenderTargetFormats(1, &Format, DXGI_FORMAT_UNKNOWN);
+		DXGI_FORMAT CubeFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+		m_GenCubePSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
 		m_GenCubePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_LongLatToCubeVS.Get()));
 		m_GenCubePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_LongLatToCubePS.Get()));
 		m_GenCubePSO.Finalize();
@@ -213,6 +219,19 @@ private:
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
 		m_SkyPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkyPS.Get()));
 		m_SkyPSO.Finalize();
+
+		m_GenIrradiancePSO.SetRootSignature(m_SkySignature);
+		m_GenIrradiancePSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_GenIrradiancePSO.SetBlendState(FPipelineState::BlendDisable);
+		m_GenIrradiancePSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		m_GenIrradiancePSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_GenIrradiancePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_GenIrradiancePSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
+		m_GenIrradiancePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
+		m_GenIrradiancePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_GenIrradiancePS.Get()));
+		m_GenIrradiancePSO.Finalize();
+
+		m_IrradianceCube.Create(L"Irradiance Map", IRRADIANCE_SIZE, IRRADIANCE_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 		m_Show2DTextureSignature.Reset(3, 1);
 		m_Show2DTextureSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -278,6 +297,34 @@ private:
 			m_VSConstants.ViewProjMatrix = m_CubeBuffer.GetViewProjMatrix(i);
 			GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 			
+			m_SkyBox->Draw(GfxContext);
+		}
+		GfxContext.Finish(true);
+	}
+
+	void GenerateIrradianceMap()
+	{
+		FCommandContext& GfxContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
+
+		GfxContext.SetRootSignature(m_SkySignature);
+		GfxContext.SetPipelineState(m_GenIrradiancePSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		GfxContext.SetViewportAndScissor(0, 0, IRRADIANCE_SIZE, IRRADIANCE_SIZE); // very important, cubemap size
+
+		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
+
+		m_VSConstants.ModelMatrix = FMatrix(); // identity
+		for (int i = 0; i < 6; ++i)
+		{
+			GfxContext.SetRenderTargets(1, &m_IrradianceCube.GetRTV(i));
+			GfxContext.ClearColor(m_IrradianceCube, i, 0);
+
+			m_VSConstants.ViewProjMatrix = m_IrradianceCube.GetViewProjMatrix(i);
+			GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
 			m_SkyBox->Draw(GfxContext);
 		}
 		GfxContext.Finish(true);
@@ -360,20 +407,21 @@ private:
 		GfxContext.Draw(3);
 	}
 
-	void ShowCubeMapDebugView(FCommandContext& GfxContext)
+	void ShowCubeMapDebugView(FCommandContext& GfxContext, FCubeBuffer& CubeBuffer)
 	{
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_CubeMapCrossViewSignature);
 		GfxContext.SetPipelineState(m_CubeMapCrossViewPSO);
 		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		int Size = std::min(m_GameDesc.Width, m_GameDesc.Height);
+		Size = std::min(Size, CubeBuffer.GetSize());
 		GfxContext.SetViewportAndScissor((m_GameDesc.Width - Size)/2, (m_GameDesc.Height - Size) / 2, Size, Size);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
 
 		// Indicate that the back buffer will be used as a render target.
-		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
@@ -388,7 +436,7 @@ private:
 		m_PSConstants.Exposure = m_Exposure;
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
-		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 0, CubeBuffer.GetSRV());
 
 		m_CubeMapCross->Draw(GfxContext);
 	}
@@ -415,9 +463,10 @@ private:
 	FGraphicsPipelineState m_SkyPSO;
 	FGraphicsPipelineState m_Show2DTexturePSO;
 	FGraphicsPipelineState m_CubeMapCrossViewPSO;
+	FGraphicsPipelineState m_GenIrradiancePSO;
 
-	FCubeBuffer m_CubeBuffer;
 	FTexture m_TextureLongLat;
+	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
 
 	ComPtr<ID3DBlob> m_LongLatToCubeVS;
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
@@ -425,11 +474,13 @@ private:
 	ComPtr<ID3DBlob> m_CubeMapCrossPS, m_CubeMapCrossVS;
 	ComPtr<ID3DBlob> m_ShowTexture2DVS, m_ShowTexture2DPS;
 	ComPtr<ID3DBlob> m_LongLatToCubePS;
+	ComPtr<ID3DBlob> m_GenIrradiancePS;
 
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
 	FModel* m_SkyBox, *m_CubeMapCross;
 
+	int m_ShowMode = SM_CubeMapCross;
 	Vector3f m_ClearColor;
 	float m_Exposure = 1.f;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
