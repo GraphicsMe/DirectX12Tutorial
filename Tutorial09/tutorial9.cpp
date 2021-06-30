@@ -22,6 +22,7 @@
 #include "CubeMapCross.h"
 #include "GameInput.h"
 #include "ImguiManager.h"
+#include "GenerateMips.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -101,6 +102,11 @@ public:
 			ImGui::RadioButton("Prefiltered", &m_ShowMode, SM_Prefiltered);
 			ImGui::EndGroup();
 
+			if (m_ShowMode == SM_CubeMapCross)
+			{
+				ImGui::SliderInt("Mip Level", &m_MipLevel, 0, m_CubeBuffer.GetNumMips()-1);
+			}
+
 			//static bool ShowDemo = false;
 			//ImGui::Checkbox("Show Demo", &ShowDemo);
 			//if (ShowDemo)
@@ -176,7 +182,7 @@ private:
 
 	void SetupPipelineState()
 	{
-		FSamplerDesc DefaultSamplerDesc;
+		FSamplerDesc DefaultSamplerDesc(D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 		m_GenCubeSignature.Reset(2, 1);
 		m_GenCubeSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_GenCubeSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
@@ -200,7 +206,7 @@ private:
 		m_GenCubePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_LongLatToCubePS.Get()));
 		m_GenCubePSO.Finalize();
 
-		m_CubeBuffer.Create(L"CubeMap", CUBE_MAP_SIZE, CUBE_MAP_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
+		m_CubeBuffer.Create(L"CubeMap", CUBE_MAP_SIZE, CUBE_MAP_SIZE, 0/*full mipmap chain*/, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 		m_SkySignature.Reset(3, 1);
 		m_SkySignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -233,11 +239,12 @@ private:
 
 		m_IrradianceCube.Create(L"Irradiance Map", IRRADIANCE_SIZE, IRRADIANCE_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
+		FSamplerDesc PointSamplerDesc(D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 		m_Show2DTextureSignature.Reset(3, 1);
 		m_Show2DTextureSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_Show2DTextureSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_Show2DTextureSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-		m_Show2DTextureSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_Show2DTextureSignature.InitStaticSampler(0, PointSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_Show2DTextureSignature.Finalize(L"Show 2D Texture View RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		m_Show2DTexturePSO.SetRootSignature(m_Show2DTextureSignature);
@@ -255,7 +262,7 @@ private:
 		m_CubeMapCrossViewSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_CubeMapCrossViewSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_CubeMapCrossViewSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-		m_CubeMapCrossViewSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_CubeMapCrossViewSignature.InitStaticSampler(0, PointSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_CubeMapCrossViewSignature.Finalize(L"Cube Map Cross View RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		m_CubeMapCrossViewPSO.SetRootSignature(m_CubeMapCrossViewSignature);
@@ -291,7 +298,7 @@ private:
 		m_VSConstants.ModelMatrix = FMatrix(); // identity
 		for (int i = 0; i < 6; ++i)
 		{
-			GfxContext.SetRenderTargets(1, &m_CubeBuffer.GetRTV(i));
+			GfxContext.SetRenderTargets(1, &m_CubeBuffer.GetRTV(i, 0));
 			GfxContext.ClearColor(m_CubeBuffer, i, 0);
 
 			m_VSConstants.ViewProjMatrix = m_CubeBuffer.GetViewProjMatrix(i);
@@ -299,6 +306,8 @@ private:
 			
 			m_SkyBox->Draw(GfxContext);
 		}
+		GfxContext.Flush(true);
+		FGenerateMips::Generate(m_CubeBuffer, GfxContext);
 		GfxContext.Finish(true);
 	}
 
@@ -314,12 +323,15 @@ private:
 		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 
-		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetCubeSRV());
+
+		m_PSConstants.NumSamplesPerDir = m_NumSamplesPerDir;
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
 		m_VSConstants.ModelMatrix = FMatrix(); // identity
 		for (int i = 0; i < 6; ++i)
 		{
-			GfxContext.SetRenderTargets(1, &m_IrradianceCube.GetRTV(i));
+			GfxContext.SetRenderTargets(1, &m_IrradianceCube.GetRTV(i, 0));
 			GfxContext.ClearColor(m_IrradianceCube, i, 0);
 
 			m_VSConstants.ViewProjMatrix = m_IrradianceCube.GetViewProjMatrix(i);
@@ -366,7 +378,7 @@ private:
 		m_PSConstants.Exposure = m_Exposure;
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
-		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetCubeSRV());
 
 		m_SkyBox->Draw(GfxContext);
 	}
@@ -413,8 +425,8 @@ private:
 		GfxContext.SetRootSignature(m_CubeMapCrossViewSignature);
 		GfxContext.SetPipelineState(m_CubeMapCrossViewPSO);
 		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		int Size = std::min(m_GameDesc.Width, m_GameDesc.Height);
-		Size = std::min(Size, CubeBuffer.GetSize());
+		uint32_t Size = std::min(m_GameDesc.Width, m_GameDesc.Height);
+		Size = std::min(Size, CubeBuffer.GetWidth());
 		GfxContext.SetViewportAndScissor((m_GameDesc.Width - Size)/2, (m_GameDesc.Height - Size) / 2, Size, Size);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
@@ -434,9 +446,10 @@ private:
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
 		m_PSConstants.Exposure = m_Exposure;
+		m_PSConstants.MipLevel = m_MipLevel;
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
-		GfxContext.SetDynamicDescriptor(2, 0, CubeBuffer.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 0, CubeBuffer.GetCubeSRV());
 
 		m_CubeMapCross->Draw(GfxContext);
 	}
@@ -452,6 +465,8 @@ private:
 	__declspec(align(16)) struct
 	{
 		float Exposure;
+		int MipLevel;
+		int NumSamplesPerDir;
 	} m_PSConstants;
 
 	FRootSignature m_GenCubeSignature;
@@ -483,6 +498,8 @@ private:
 	int m_ShowMode = SM_CubeMapCross;
 	Vector3f m_ClearColor;
 	float m_Exposure = 1.f;
+	int m_MipLevel = 0;
+	int m_NumSamplesPerDir = 10;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 

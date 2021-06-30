@@ -130,8 +130,8 @@ private:
 	{
 		m_ScatteringCS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/AtmosphericScatteringCS.hlsl", "cs_main", "cs_5_1");
 		m_ScatteringPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/AtmosphericScatteringPS.hlsl", "ps_main", "ps_5_1");
-		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "vs_main", "vs_5_1");
-		m_PostPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "ps_main", "ps_5_1");
+		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
+		m_PostPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "PS_Main", "ps_5_1");
 	}
 
 	void SetupPipelineState()

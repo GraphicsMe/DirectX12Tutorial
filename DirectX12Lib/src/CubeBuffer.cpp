@@ -45,7 +45,7 @@ void FCubeBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Heig
 {
 	m_NumMipMaps = (NumMips == 0) ? ComputeNumMips(Width, Height) : NumMips;
 	Assert(Width == Height);
-	m_Size = Width;
+	m_Width = m_Height = Width;
 
 	D3D12_RESOURCE_FLAGS Flags = CombineResourceFlags();
 	D3D12_RESOURCE_DESC ResDesc = DescribeTex2D(Width, Height, 6, m_NumMipMaps, Format, Flags); //ArraySize=6
@@ -67,15 +67,30 @@ void FCubeBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Heig
 
 D3D12_CPU_DESCRIPTOR_HANDLE FCubeBuffer::GetRTV(int Face, int Mip) const
 {
+	uint32_t DescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	D3D12_CPU_DESCRIPTOR_HANDLE Result = m_RTVHandle;
+	Result.ptr += DescriptorSize * GetSubresourceIndex(Face, Mip);
+	return Result;
+}
+
+
+D3D12_CPU_DESCRIPTOR_HANDLE FCubeBuffer::GetFaceMipSRV(int Face, int Mip) const
+{
+	uint32_t DescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	D3D12_CPU_DESCRIPTOR_HANDLE Result = m_FaceMipSRVHandle;
+	Result.ptr += DescriptorSize * GetSubresourceIndex(Face, Mip);
+	return Result;
+}
+
+uint32_t FCubeBuffer::GetSubresourceIndex(int Face, int Mip) const
+{
 	//Face0: Mip0, Mip1, Mip2, ...
 	//Face1: Mip0, Mip1, Mip2, ...
 	//...
 	//Face5: Mip0, Mip1, Mip2, ...
-	uint32_t DescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	D3D12_CPU_DESCRIPTOR_HANDLE Result = m_RTVHandle;
-	Result.ptr += DescriptorSize * (Face * m_NumMipMaps + Mip);
-	return Result;
+	return Face * m_NumMipMaps + Mip;
 }
+
 
 void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, uint32_t ArraySize, uint32_t NumMips /*= 1*/)
 {
@@ -88,8 +103,8 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 	SRVDesc.TextureCube.MostDetailedMip = 0;
 	SRVDesc.TextureCube.ResourceMinLODClamp = 0.0f;
 
-	m_SRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, m_SRVHandle);
+	m_CubeSRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+	Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, m_CubeSRVHandle);
 
 	D3D12_RENDER_TARGET_VIEW_DESC RTVDesc = {};
 	RTVDesc.Format = Format;
@@ -97,23 +112,33 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 	RTVDesc.Texture2DArray.PlaneSlice = 0;
 
 	m_RTVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, ArraySize * NumMips);
+	m_FaceMipSRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ArraySize * NumMips);
 
-	uint32_t DescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	D3D12_CPU_DESCRIPTOR_HANDLE CurrentHandle = m_RTVHandle;
+	uint32_t RTVDescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	uint32_t SRVDescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTVHandle = m_RTVHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE CurrentSRVHandle = m_FaceMipSRVHandle;
 	for (uint32_t Face = 0; Face < ArraySize; ++Face)
 	{
 		for (uint32_t Mip = 0; Mip < NumMips; ++Mip)
 		{
 			RTVDesc.Texture2DArray.MipSlice = Mip;
 			RTVDesc.Texture2DArray.FirstArraySlice = Face;
-			RTVDesc.Texture2DArray.ArraySize = 1; // @todo: or 6?
-
-			Device->CreateRenderTargetView(m_Resource.Get(), &RTVDesc, CurrentHandle);
-			CurrentHandle.ptr += DescriptorSize;
+			RTVDesc.Texture2DArray.ArraySize = 1;
+			Device->CreateRenderTargetView(m_Resource.Get(), &RTVDesc, CurrentRTVHandle);
+			CurrentRTVHandle.ptr += RTVDescriptorSize;
+		
+			SRVDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			SRVDesc.Texture2DArray.MostDetailedMip = Mip;
+			SRVDesc.Texture2DArray.MipLevels = 1;
+			SRVDesc.Texture2DArray.FirstArraySlice = Face;
+			SRVDesc.Texture2DArray.ArraySize = 1;
+			SRVDesc.Texture2DArray.PlaneSlice = 0;
+			SRVDesc.Texture2DArray.ResourceMinLODClamp = 0.f;
+			Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, CurrentSRVHandle);
+			CurrentSRVHandle.ptr += SRVDescriptorSize;
 		}
 	}
-	
-	
 }
 
 

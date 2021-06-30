@@ -14,6 +14,7 @@
 #include "CommandListManager.h"
 #include "DescriptorAllocator.h"
 #include "PipelineState.h"
+#include "GenerateMips.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -167,11 +168,14 @@ bool D3D12RHI::Initialize()
 	// 4. create render window(swapchain)
 	RenderWindow::Get().Initialize();
 
+	FGenerateMips::Initialize();
+
 	return true;
 }
 
 void D3D12RHI::Destroy()
 {
+	FGenerateMips::Destroy();
 	FCommandContext::DestroyAllContexts();
 	g_CommandListManager.Destroy();
 	FPipelineState::DestroyAll();

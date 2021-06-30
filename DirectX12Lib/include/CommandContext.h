@@ -72,6 +72,7 @@ public:
 	ID3D12GraphicsCommandList* GetCommandList() { return m_CommandList; }
 
 	void TransitionResource(FD3D12Resource& Resource, D3D12_RESOURCE_STATES NewState, bool Flush = false);
+	void TransitionSubResource(FD3D12Resource& Resource, D3D12_RESOURCE_STATES OldState, D3D12_RESOURCE_STATES NewState, uint32_t Subresource);
 
 	void SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr);
 	void SetDescriptorHeaps(UINT HeapCount, D3D12_DESCRIPTOR_HEAP_TYPE Type[], ID3D12DescriptorHeap* HeapPtrs[]);

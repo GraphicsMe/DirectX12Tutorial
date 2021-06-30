@@ -34,6 +34,23 @@ float3 ACESFilm(float3 color)
 	return saturate((x*(a*x + b)) / (x*(c*x + d) + e));
 }
 
+float LinearToSrgbChannel(float lin)
+{
+	if (lin < 0.00313067) return lin * 12.92;
+	return pow(lin, (1.0 / 2.4)) * 1.055 - 0.055;
+}
+
+float3 LinearToSrgb(float3 lin)
+{
+	//return pow(lin, 1/2.2);
+	return float3(LinearToSrgbChannel(lin.r), LinearToSrgbChannel(lin.g), LinearToSrgbChannel(lin.b));
+}
+
+float3 ToneMapping(float3 Color)
+{
+	return LinearToSrgb(ACESFilm(Color));
+}
+
 /** Reverses all the 32 bits. from UE4 Common.ush */
 uint ReverseBits32(uint bits)
 {

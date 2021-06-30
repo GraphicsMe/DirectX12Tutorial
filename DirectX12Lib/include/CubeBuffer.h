@@ -12,9 +12,10 @@ public:
 		: m_ClearColor(Color)
 		, m_NumMipMaps(1)
 		, m_SampleCount(1)
-		, m_Size(0)
 	{
-		m_SRVHandle.ptr = 0;
+		m_CubeSRVHandle.ptr = 0;
+		m_FaceMipSRVHandle.ptr = 0;
+		m_RTVHandle.ptr = 0;
 	}
 
 	static FMatrix GetProjMatrix();
@@ -23,15 +24,18 @@ public:
 
 	void Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips, DXGI_FORMAT Format = DXGI_FORMAT_R16G16B16A16_FLOAT);
 
-	const D3D12_CPU_DESCRIPTOR_HANDLE& GetSRV(void) const { return m_SRVHandle; }
-	D3D12_CPU_DESCRIPTOR_HANDLE GetRTV(int Face, int Mip = 0) const;
+	D3D12_CPU_DESCRIPTOR_HANDLE GetRTV(int Face, int Mip) const;
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCubeSRV(void) const { return m_CubeSRVHandle; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetFaceMipSRV(int Face, int Mip) const;
 
 	void SetClearColor(const Vector4f& Color) { m_ClearColor = Color; }
 	const Vector4f& GetClearColor() const { return m_ClearColor; }
 
 	void SaveCubeMap(const std::wstring& FileName);
 
-	int GetSize() const { return m_Size; }
+	uint32_t GetMipWidth(int Mip) const { return m_Width >> Mip; }
+	uint32_t GetNumMips() const { return m_NumMipMaps; }
+	uint32_t GetSubresourceIndex(int Face, int Mip) const;
 
 protected:
 	D3D12_RESOURCE_FLAGS CombineResourceFlags(void) const
@@ -55,11 +59,10 @@ protected:
 
 
 protected:
-	int m_Size;
 	Vector4f m_ClearColor;
 	uint32_t m_NumMipMaps;
 	uint32_t m_SampleCount;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE m_SRVHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_CubeSRVHandle, m_FaceMipSRVHandle;
 	D3D12_CPU_DESCRIPTOR_HANDLE m_RTVHandle;
 };

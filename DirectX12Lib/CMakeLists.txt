@@ -34,6 +34,7 @@
 	include/SkyBox.h
 	include/CubeMapCross.h
 	include/ImguiManager.h
+	include/GenerateMips.h
 )
 
 set(SOURCES
@@ -69,6 +70,7 @@ set(SOURCES
 	src/SkyBox.cpp
 	src/CubeMapCross.cpp
 	src/ImguiManager.cpp
+	src/GenerateMips.cpp
 )
 
 set( IMGUI_HEADERS
@@ -110,6 +112,7 @@ set(SHADER_FILES
 	../Resources/shaders/EnvironmentShaders.hlsl
 	../Resources/shaders/ImGUI.hlsl
 	../Resources/shaders/ShaderUtils.hlsl
+	../Resources/shaders/GenerateMips.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

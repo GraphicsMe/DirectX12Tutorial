@@ -67,6 +67,8 @@ VertexOutput VS_SkyCube(VertexIN In)
 cbuffer PSContant : register(b0)
 {
 	float Exposure;
+	int MipLevel;
+	int NumSamplesPerDir;
 };
 
 TextureCube CubeEnvironment : register(t0);
@@ -76,9 +78,7 @@ float4 PS_SkyCube(VertexOutput In) : SV_Target
 	// Local Direction don't need to normalized
 	float3 Color = CubeEnvironment.Sample(LinearSampler, In.LocalDirection).xyz;
 
-	Color = ACESFilm(Color * Exposure);
-
-	return float4(pow(Color, 1 / 2.2), 1.0);
+	return float4(ToneMapping(Color * Exposure), 1.0);
 }
 
 
@@ -98,7 +98,12 @@ float4 PS_GenIrradiance(VertexOutput In) : SV_Target
 	float3 Right = cross(Up, Normal);
 	Up = cross(Normal, Right);
 
-	float sampleDelta = PI / 20;
+	float sampleDelta = 1.0 / NumSamplesPerDir;
+
+	uint2 Dimension;
+	CubeEnvironment.GetDimensions(Dimension.x, Dimension.y);
+	float lod = max(log2(Dimension.x / float(NumSamplesPerDir)) + 1.0, 0.0);
+
 	float NumSamples = 0.0;
 	for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
 	{
@@ -111,7 +116,7 @@ float4 PS_GenIrradiance(VertexOutput In) : SV_Target
 			// tangent space to world
 			//float3 sampleVec = tangentSample.x * Right + tangentSample.y * Up + tangentSample.z * Normal;
 			float3 sampleVec = TangentToWorld(tangentSample, Normal);
-			float3 sampleColor = CubeEnvironment.Sample(LinearSampler, sampleVec).rgb;
+			float3 sampleColor = CubeEnvironment.SampleLevel(LinearSampler, sampleVec, lod).rgb;
 
 			Irradiance += sampleColor * costheta * sintheta;
 			NumSamples++;
@@ -172,9 +177,7 @@ float4 PS_ShowTexture2D(in VertexOutput_Texture2D In) : SV_Target0
 {
 	float3 Color = InputTexture.Sample(LinearSampler, In.Tex).xyz;
 
-	Color = ACESFilm(Color * Exposure);
-
-	return float4(pow(Color, 1 / 2.2), 1.0);
+	return float4(ToneMapping(Color * Exposure), 1.0);
 }
 
 
@@ -198,9 +201,7 @@ VertexOutput VS_CubeMapCross(VertexIN_CubeMapCross In)
 
 float4 PS_CubeMapCross(VertexOutput In) : SV_Target
 {
-	float3 Color = CubeEnvironment.Sample(LinearSampler, In.LocalDirection).xyz;
+	float3 Color = CubeEnvironment.SampleLevel(LinearSampler, In.LocalDirection, MipLevel).xyz;
 
-	Color = ACESFilm(Color * Exposure);
-
-	return float4(pow(Color, 1/2.2), 1.0);
+	return float4(ToneMapping(Color * Exposure), 1.0);
 }

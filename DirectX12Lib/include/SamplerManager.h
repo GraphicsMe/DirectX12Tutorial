@@ -5,12 +5,12 @@
 class FSamplerDesc : public D3D12_SAMPLER_DESC
 {
 public:
-	FSamplerDesc()
+	FSamplerDesc(D3D12_FILTER FilterMode=D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE AddressMode=D3D12_TEXTURE_ADDRESS_MODE_WRAP)
 	{
-		Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-		AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		Filter = FilterMode;
+		AddressU = AddressMode;
+		AddressV = AddressMode;
+		AddressW = AddressMode;
 		MipLODBias = 0.f;
 		MaxAnisotropy = 1;
 		ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;

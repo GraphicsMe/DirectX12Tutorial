@@ -230,6 +230,32 @@ void FCommandContext::TransitionResource(FD3D12Resource& Resource, D3D12_RESOURC
 	}
 }
 
+void FCommandContext::TransitionSubResource(FD3D12Resource& Resource, D3D12_RESOURCE_STATES OldState,D3D12_RESOURCE_STATES NewState, uint32_t Subresource)
+{
+	//@todo: more control on subresource state
+	//D3D12_RESOURCE_STATES OldState = Resource.m_CurrentState;
+	//if (OldState != NewState)
+	{
+		Assert(m_NumBarriersToFlush < 16);
+		D3D12_RESOURCE_BARRIER& BarrierDesc = m_ResourceBarrierBuffer[m_NumBarriersToFlush++];
+
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = Resource.GetResource();
+		BarrierDesc.Transition.StateBefore = OldState;
+		BarrierDesc.Transition.StateAfter = NewState;
+		BarrierDesc.Transition.Subresource = Subresource;
+
+		Resource.m_CurrentState = NewState;
+	}
+
+	//@todo
+	//if (Flush || m_NumBarriersToFlush == 16)
+	{
+		FlushResourceBarriers();
+	}
+}
+
 void FCommandContext::SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE Type, ID3D12DescriptorHeap* HeapPtr)
 {
 	if (m_CurrentDescriptorHeaps[Type] != HeapPtr)
@@ -337,7 +363,7 @@ void FCommandContext::SetViewport(const D3D12_VIEWPORT& vp)
 void FCommandContext::SetViewportAndScissor(UINT x, UINT y, UINT w, UINT h)
 {
 	SetViewport((float)x, (float)y, (float)w, (float)h);
-	SetScissor(x, y, x+w, h+h);
+	SetScissor(x, y, x+w, y+h);
 }
 
 void FCommandContext::SetViewportAndScissor(const D3D12_VIEWPORT& Viewport, const D3D12_RECT& Scissor)
