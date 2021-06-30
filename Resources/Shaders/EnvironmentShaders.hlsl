@@ -129,7 +129,7 @@ float4 PS_GenIrradiance(VertexOutput In) : SV_Target
 }
 
 
-float4 PS_GenIrradiance1(VertexOutput In, float4 SvPosition : SV_POSITION) : SV_Target
+float4 PS_GenIrradiance_Cosine(VertexOutput In, float4 SvPosition : SV_POSITION) : SV_Target
 {
 	float3 N = normalize(In.LocalDirection);
 
@@ -144,7 +144,7 @@ float4 PS_GenIrradiance1(VertexOutput In, float4 SvPosition : SV_POSITION) : SV_
 		float3 L = TangentToWorld(CosineSampleHemisphere(E).xyz, N);
 		float NoL = saturate(dot(N, L));
 		float Factor = NoL > 0 ? 1.0 : 0.0;
-		Irradiance += CubeEnvironment.Sample(LinearSampler, L).rgb * Factor;
+		Irradiance += CubeEnvironment.SampleLevel(LinearSampler, L, 0).rgb * Factor;
 	}
 	Irradiance /= NumSamples;
 	return float4(Irradiance, 1.0);
