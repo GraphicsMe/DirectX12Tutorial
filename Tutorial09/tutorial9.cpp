@@ -43,6 +43,7 @@ enum EShowMode
 	SM_CubeMapCross,
 	SM_Irradiance,
 	SM_Prefiltered,
+	SM_SphericalHarmonics,
 };
 
 class Tutorial9 : public FGame
@@ -62,7 +63,8 @@ public:
 		GenerateCubeMap();
 		GenerateIrradianceMap();
 
-		SaveCubeMap();
+		//SaveCubeMap();
+		GenerateSHcoeffs();
 	}
 
 	void OnShutdown()
@@ -100,6 +102,7 @@ public:
 			ImGui::RadioButton("Cube Cross", &m_ShowMode, SM_CubeMapCross);
 			ImGui::RadioButton("Irradiance", &m_ShowMode, SM_Irradiance);
 			ImGui::RadioButton("Prefiltered", &m_ShowMode, SM_Prefiltered);
+			ImGui::RadioButton("SphericalHarmonics", &m_ShowMode, SM_SphericalHarmonics);
 			ImGui::EndGroup();
 
 			if (m_ShowMode == SM_CubeMapCross)
@@ -136,6 +139,9 @@ public:
 		case SM_Irradiance:
 		case SM_Prefiltered:
 			ShowCubeMapDebugView(CommandContext, m_IrradianceCube);
+			break;
+		case SM_SphericalHarmonics:
+			ShowSHCubeMapDebugView(CommandContext, m_CubeBuffer);
 			break;
 		}
 
@@ -178,6 +184,9 @@ private:
 		m_ShowTexture2DVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_ShowTexture2D", "vs_5_1");
 		m_ShowTexture2DPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_ShowTexture2D", "ps_5_1");
 		m_GenIrradiancePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenIrradiance", "ps_5_1");
+
+		m_SphericalHarmonicsPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SphericalHarmonics", "ps_5_1");
+
 	}
 
 	void SetupPipelineState()
@@ -280,6 +289,21 @@ private:
 		m_CubeMapCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
 		m_CubeMapCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossPS.Get()));
 		m_CubeMapCrossViewPSO.Finalize();
+
+		// SH PSO
+		m_SphericalHarmonicsCrossViewPSO.SetRootSignature(m_CubeMapCrossViewSignature);
+		m_SphericalHarmonicsCrossViewPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_SphericalHarmonicsCrossViewPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_SphericalHarmonicsCrossViewPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		m_SphericalHarmonicsCrossViewPSO.SetInputLayout((UINT)DebugMeshLayout.size(), &DebugMeshLayout[0]);
+
+		m_SphericalHarmonicsCrossViewPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_SphericalHarmonicsCrossViewPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_SphericalHarmonicsCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
+		m_SphericalHarmonicsCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SphericalHarmonicsPS.Get()));
+		m_SphericalHarmonicsCrossViewPSO.Finalize();
+
+
 	}
 
 	void GenerateCubeMap()
@@ -345,6 +369,16 @@ private:
 	void SaveCubeMap()
 	{
 		m_CubeBuffer.SaveCubeMap(L"spruit_sunrise_2k_cubemap.dds");
+	}
+
+	void GenerateSHcoeffs()
+	{
+		m_SHCoeffs = m_CubeBuffer.GenerateSHcoeffs(m_SHDegree, m_SHSampleNum);
+
+		for (int i=0;i<m_SHCoeffs.size();++i)
+		{
+			printf("[%f,%f,%f]\n", m_SHCoeffs[i].x, m_SHCoeffs[i].y, m_SHCoeffs[i].z);
+		}
 	}
 
 	void SkyPass(FCommandContext& GfxContext)
@@ -454,6 +488,69 @@ private:
 		m_CubeMapCross->Draw(GfxContext);
 	}
 
+	void ShowSHCubeMapDebugView(FCommandContext& GfxContext, FCubeBuffer& CubeBuffer)
+	{
+		// Set necessary state.
+		GfxContext.SetRootSignature(m_CubeMapCrossViewSignature);
+		GfxContext.SetPipelineState(m_SphericalHarmonicsCrossViewPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		uint32_t Size = std::min(m_GameDesc.Width, m_GameDesc.Height);
+		Size = std::min(Size, CubeBuffer.GetWidth());
+		GfxContext.SetViewportAndScissor((m_GameDesc.Width - Size) / 2, (m_GameDesc.Height - Size) / 2, Size, Size);
+
+		RenderWindow& renderWindow = RenderWindow::Get();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+
+		// Indicate that the back buffer will be used as a render target.
+		GfxContext.TransitionResource(CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
+
+		BackBuffer.SetClearColor(m_ClearColor);
+		GfxContext.ClearColor(BackBuffer);
+
+		m_VSConstants.ModelMatrix = FMatrix(); // identity
+		m_VSConstants.ViewProjMatrix = FMatrix::MatrixOrthoLH(1.f, 1.f, -1.f, 1.f);
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+		m_PSConstants.Exposure = m_Exposure;
+		m_PSConstants.Degree = m_SHDegree;
+
+#if 0
+		//Test
+		{
+			m_PSConstants.Coeffs[0] = Vector3f(0.695716f, 0.687074f, 0.850051f);
+			m_PSConstants.Coeffs[1] = Vector3f(-0.0459522f, -0.0609238f, -0.100773f);
+			m_PSConstants.Coeffs[2] = Vector3f(0.500634f, 0.520243f, 0.712448f);
+			m_PSConstants.Coeffs[3] = Vector3f(-0.0575933f, -0.0329037f, -0.0265196f);
+			m_PSConstants.Coeffs[4] = Vector3f(-0.0694421f, -0.0585204f, -0.0672366f);
+			m_PSConstants.Coeffs[5] = Vector3f(-0.041728f, -0.0538929f, -0.084576);
+			m_PSConstants.Coeffs[6] = Vector3f(0.00833671f, 0.0534902f, 0.112016f);
+			m_PSConstants.Coeffs[7] = Vector3f(-0.104005f, -0.0725926f, -0.0730126f);
+			m_PSConstants.Coeffs[8] = Vector3f(0.0135042f, 0.00762932f, 0.0148929f);
+			m_PSConstants.Coeffs[9] = Vector3f(-0.015106f, -0.00712441f, -0.00698922);
+			m_PSConstants.Coeffs[10] = Vector3f(-0.0862863f, -0.0746445f, -0.0934173f);
+			m_PSConstants.Coeffs[11] = Vector3f(0.0382759f, 0.0347831f, 0.0428672f);
+			m_PSConstants.Coeffs[12] = Vector3f(-0.141227f, -0.125088f, -0.157915f);
+			m_PSConstants.Coeffs[13] = Vector3f(-0.0163175, -0.0125922f, -0.0148044f);
+			m_PSConstants.Coeffs[14] = Vector3f(0.0471778f, 0.04255f, 0.0595879f);
+			m_PSConstants.Coeffs[15] = Vector3f(0.0652876f, 0.0691427f, 0.0805324f);
+		}
+#else
+		for (int i = 0; i < m_SHCoeffs.size(); ++i)
+		{
+			m_PSConstants.Coeffs[i] = m_SHCoeffs[i];
+		}
+#endif
+
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 0, CubeBuffer.GetCubeSRV());
+
+		m_CubeMapCross->Draw(GfxContext);
+	}
+
 
 private:
 	__declspec(align(16)) struct
@@ -464,10 +561,16 @@ private:
 
 	__declspec(align(16)) struct
 	{
-		float Exposure;
-		int MipLevel;
-		int NumSamplesPerDir;
+		float		Exposure;
+		int			MipLevel;
+		int			NumSamplesPerDir;
+		int			Degree;
+		Vector4f	Coeffs[16];
 	} m_PSConstants;
+
+	int	m_SHDegree = 4;
+	int m_SHSampleNum = 10000;
+	std::vector<Vector3f> m_SHCoeffs;
 
 	FRootSignature m_GenCubeSignature;
 	FRootSignature m_SkySignature;
@@ -479,6 +582,7 @@ private:
 	FGraphicsPipelineState m_Show2DTexturePSO;
 	FGraphicsPipelineState m_CubeMapCrossViewPSO;
 	FGraphicsPipelineState m_GenIrradiancePSO;
+	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 
 	FTexture m_TextureLongLat;
 	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
@@ -487,6 +591,7 @@ private:
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_SkyPS, m_SkyVS;
 	ComPtr<ID3DBlob> m_CubeMapCrossPS, m_CubeMapCrossVS;
+	ComPtr<ID3DBlob> m_SphericalHarmonicsPS;
 	ComPtr<ID3DBlob> m_ShowTexture2DVS, m_ShowTexture2DPS;
 	ComPtr<ID3DBlob> m_LongLatToCubePS;
 	ComPtr<ID3DBlob> m_GenIrradiancePS;

@@ -1,9 +1,12 @@
 ﻿#include "CubeBuffer.h"
 #include "D3D12RHI.h"
 #include "DirectXTex.h"
+#include "DirectXTexP.h"
 #include "CommandQueue.h"
 #include "CommandListManager.h"
 #include "CommandContext.h"
+
+using namespace DirectX;
 
 extern FCommandListManager g_CommandListManager;
 
@@ -144,9 +147,7 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 
 void FCubeBuffer::SaveCubeMap(const std::wstring& FileName)
 {
-	using namespace DirectX;
 	ScratchImage image;
-
 	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
@@ -159,3 +160,220 @@ void FCubeBuffer::SaveCubeMap(const std::wstring& FileName)
 		}
 	}
 }
+
+class Vertex
+{
+public:
+	Vector3f pos, color;
+};
+void RandomSample(const DirectX::ScratchImage& InputImage, int Width, int Height, int SampleNum, std::vector<Vertex>& OutSamples)
+{
+	DirectX::ScratchImage dstSImg;
+	dstSImg.Initialize2D(DXGI_FORMAT_R32G32B32A32_FLOAT, InputImage.GetMetadata().width, InputImage.GetMetadata().height, InputImage.GetMetadata().arraySize, InputImage.GetMetadata().mipLevels);
+	for (int i = 0; i < InputImage.GetImageCount(); i++)
+	{
+		DirectX::_ConvertFromR16G16B16A16(InputImage.GetImages()[i], dstSImg.GetImages()[i]);
+		
+		//const Image img = dstSImg.GetImages()[i];
+		//{
+		//	float* dst = (float*)(img.pixels);
+		//	size_t rowPitch = 0;
+		//	size_t slicePitch = 0;
+		//	ComputePitch(img.format, img.width, img.height, rowPitch, slicePitch);
+		//	for (int rowIndex = 0; rowIndex < img.height; rowIndex++)
+		//	{
+		//		float* dst = (float*)(img.pixels + rowPitch * rowIndex);
+		//		for (int colIndex = 0; colIndex < img.width; colIndex++)
+		//		{
+		//		}
+		//	}
+		//}
+	}
+
+	//HRESULT hr = DirectX::SaveToDDSFile(dstSImg.GetImages(), dstSImg.GetImageCount(), dstSImg.GetMetadata(), DDS_FLAGS_NONE, L"test_image.dds");
+
+	OutSamples.clear();
+	OutSamples.resize(SampleNum);
+
+	for (int i = 0; i < SampleNum; ++i)
+	{
+		float x, y, z;
+		do {
+			x = NormalRandom();
+			y = NormalRandom();
+			z = NormalRandom();
+		} while (x == 0 && y == 0 && z == 0);
+
+		Vertex vex;
+
+		Vector3f pos(x, y, z);
+		vex.pos = pos.Normalize();
+
+		CubeUV cubeuv = XYZ2CubeUV(pos);
+
+		int colIndex = (int)(cubeuv.u * (Width - 1));
+		int rowIndex = (int)((1.f - cubeuv.v) * (Height - 1));
+
+		const DirectX::Image* images = dstSImg.GetImages();
+		int Lod0FaceIndex = cubeuv.index * dstSImg.GetMetadata().mipLevels;
+		const DirectX::Image image = images[Lod0FaceIndex];
+
+		size_t rowPitch = 0;
+		size_t slicePitch = 0;
+		ComputePitch(image.format, image.width, image.height, rowPitch, slicePitch);
+
+		float* dst = (float*)(image.pixels + rowPitch * rowIndex);
+		float R = dst[colIndex * 4 + 0];
+		float G = dst[colIndex * 4 + 1];
+		float B = dst[colIndex * 4 + 2];
+
+		//printf("[%f,%f,%f]\n", R, G, B);
+		vex.color = { R,G,B };
+		if (vex.color.x < 0 || vex.color.y < 0 || vex.color.z < 0)
+		{
+			int xxx = 0;
+		}
+
+		OutSamples[i] = vex;
+	}
+}
+
+std::vector<float> Basis(const int Degree , const Vector3f& pos)
+{
+	int n = Degree * Degree;
+	std::vector<float> Y(n);
+	Vector3f normal = pos.Normalize();
+	float x = normal.x;
+	float y = normal.y;
+	float z = normal.z;
+
+	if (Degree >= 1)
+	{
+		Y[0] = 1.f / 2.f * sqrt(1.f / MATH_PI);
+	}
+	if (Degree >= 2)
+	{
+		Y[1] = sqrt(3.f / (4.f * MATH_PI)) * z;
+		Y[2] = sqrt(3.f / (4.f * MATH_PI)) * y;
+		Y[3] = sqrt(3.f / (4.f * MATH_PI)) * x;
+	}
+	if (Degree >= 3)
+	{
+		Y[4] = 1.f / 2.f * sqrt(15.f / MATH_PI) * x * z;
+		Y[5] = 1.f / 2.f * sqrt(15.f / MATH_PI) * z * y;
+		Y[6] = 1.f / 4.f * sqrt(5.f / MATH_PI) * (-x * x - z * z + 2 * y * y);
+		Y[7] = 1.f / 2.f * sqrt(15.f / MATH_PI) * y * x;
+		Y[8] = 1.f / 4.f * sqrt(15.f / MATH_PI) * (x * x - z * z);
+	}
+	if (Degree >= 4)
+	{
+		Y[9] = 1.f / 4.f * sqrt(35.f / (2.f * MATH_PI)) * (3 * x * x - z * z) * z;
+		Y[10] = 1.f / 2.f * sqrt(105.f / MATH_PI) * x * z * y;
+		Y[11] = 1.f / 4.f * sqrt(21.f / (2.f * MATH_PI)) * z * (4 * y * y - x * x - z * z);
+		Y[12] = 1.f / 4.f * sqrt(7.f / MATH_PI) * y * (2 * y * y - 3 * x * x - 3 * z * z);
+		Y[13] = 1.f / 4.f * sqrt(21.f / (2.f * MATH_PI)) * x * (4 * y * y - x * x - z * z);
+		Y[14] = 1.f / 4.f * sqrt(105.f / MATH_PI) * (x * x - z * z) * y;
+		Y[15] = 1.f / 4.f * sqrt(35.f / (2 * MATH_PI)) * (x * x - 3 * z * z) * x;
+	}
+	return Y;
+}
+
+std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
+{
+	std::vector<Vector3f> SHcoeffs;
+	DirectX::ScratchImage image;
+	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
+	if (SUCCEEDED(hr))
+	{
+		std::vector<Vertex> Samples;
+		RandomSample(image, image.GetMetadata().width, image.GetMetadata().height, SampleNum, Samples);
+
+		int n = Degree * Degree;
+		SHcoeffs.resize(n);
+		memset(SHcoeffs.data(), 0, sizeof(Vector3f) * SHcoeffs.size());
+
+		for (const Vertex& v : Samples)
+		{
+			std::vector<float> Y = Basis(Degree, v.pos);
+			for (int i = 0; i < n; ++i)
+			{
+				SHcoeffs[i] = SHcoeffs[i] + Y[i] * v.color;
+			}
+		}
+		for (Vector3f& coef : SHcoeffs)
+		{
+			coef = 4 * MATH_PI * coef / (float)Samples.size();
+		}
+		
+		//...Convolve with SH-projected cosinus lobe
+		//float ConvolveCosineLobeBandFactor[9] =
+		//{
+		//	MATH_PI,
+		//	2.0f * MATH_PI / 3.0f, 2.0f * MATH_PI / 3.0f, 2.0f * MATH_PI / 3.0f,
+		//	MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f,
+		//};
+		//for (int i = 0; i < 9; i++)
+		//{
+		//	SHcoeffs[i] = SHcoeffs[i] * ConvolveCosineLobeBandFactor[i];
+		//}
+	}
+	
+	// render test
+	//RenderCubemap(Degree, SHcoeffs, image.GetMetadata().width, image.GetMetadata().height);
+
+	image.Release();
+	return SHcoeffs;
+}
+
+void FCubeBuffer::RenderCubemap(int Degree,std::vector<Vector3f> SHCoeffs, int width, int height)
+{
+	DirectX::ScratchImage dstSImg;
+	dstSImg.Initialize2D(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 6, 1);
+
+	int n = Degree * Degree;
+
+	for (int k = 0; k < 6; k++)
+	{
+		const Image img = dstSImg.GetImages()[k];
+		
+		float* dst = (float*)(img.pixels);
+		size_t rowPitch = 0;
+		size_t slicePitch = 0;
+		ComputePitch(img.format, img.width, img.height, rowPitch, slicePitch);
+
+		for (int rowIndex = 0; rowIndex < height; rowIndex++)
+		{
+			float* dst = (float*)(img.pixels + rowPitch * rowIndex);
+			for (int colIndex = 0; colIndex < width; colIndex++)
+			{
+				float u = (float)colIndex / (width - 1);
+				float v = 1.f - (float)rowIndex / (height - 1);
+
+				Vector3f pos = CubeUV2XYZ({ k, u, v });
+				pos = pos.Normalize();
+				std::vector<float> Y = Basis(Degree,pos);
+
+				Vector3f color(0, 0, 0);
+				for (int i = 0; i < n; i++)
+				{
+					color = color + Y[i] * SHCoeffs[i];
+				}
+				
+				dst[colIndex * 4 + 0] = color.x;
+				dst[colIndex * 4 + 1] = color.y;
+				dst[colIndex * 4 + 2] = color.z;
+				dst[colIndex * 4 + 3] = 255;
+
+				if (color.x < 0 || color.y < 0 || color.z < 0)
+				{
+					int xxx = 0;
+				}
+
+			}
+		}
+	}
+
+	//HRESULT hr = DirectX::SaveToDDSFile(dstSImg.GetImages(), dstSImg.GetImageCount(), dstSImg.GetMetadata(), DDS_FLAGS_NONE, L"reconstruct_test_image.dds");
+}
+

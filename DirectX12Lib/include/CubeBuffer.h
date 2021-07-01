@@ -37,6 +37,9 @@ public:
 	uint32_t GetNumMips() const { return m_NumMipMaps; }
 	uint32_t GetSubresourceIndex(int Face, int Mip) const;
 
+	std::vector<Vector3f> GenerateSHcoeffs(int Degree, int SampleNum);
+	void RenderCubemap(int Degree,std::vector<Vector3f> SHCoeffs, int width, int height);
+
 protected:
 	D3D12_RESOURCE_FLAGS CombineResourceFlags(void) const
 	{

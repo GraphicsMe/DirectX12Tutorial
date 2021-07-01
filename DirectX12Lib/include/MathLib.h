@@ -6,6 +6,8 @@
 #include <functional>
 #include <algorithm>
 #include <limits>
+#include <cmath>
+#include <random>
 
 const float MATH_PI = 3.141592654f;
 const float MATH_PI_HALF = 0.5f * MATH_PI;
@@ -106,6 +108,12 @@ template<typename T, typename scalar>
 Vector3<T> operator * (const Vector3<T>& lhs, scalar s)
 {
 	return Vector3<T>(lhs.x * s, lhs.y * s, lhs.z * s); 
+}
+
+template<typename T, typename scalar>
+Vector3<T> operator / (const Vector3<T>& lhs, scalar s)
+{
+	return Vector3<T>(lhs.x / s, lhs.y / s, lhs.z / s);
 }
 
 template<typename T, typename scalar>
@@ -310,4 +318,56 @@ template <typename T> inline size_t HashState(const T* StateDesc, size_t Count =
 {
 	static_assert((sizeof(T) & 3) == 0 && alignof(T) >= 4, "State object is not word-aligned");
 	return HashRange((uint32_t*)StateDesc, (uint32_t*)(StateDesc + Count), Hash);
+}
+
+struct CubeUV
+{
+	int index;
+	float u, v;
+};
+
+inline Vector3f CubeUV2XYZ(const CubeUV& c)
+{
+	float u = c.u * 2.f - 1.f;
+	float v = c.v * 2.f - 1.f;
+	switch (c.index)
+	{
+	case 0: return { 1,  v, -u }; 	// +x
+	case 1: return { -1,  v,  u }; 	// -x
+	case 2: return { u,  1, -v };  // +y
+	case 3: return { u, -1,  v };	// -y
+	case 4: return { u,  v,  1 };  // +z
+	case 5: return { -u,  v, -1 };	// -z
+	}
+	return Vector3f();
+}
+
+inline CubeUV XYZ2CubeUV(const Vector3f& p)
+{
+	float ax = std::abs(p.x);
+	float ay = std::abs(p.y);
+	float az = std::abs(p.z);
+	CubeUV c;
+	if (ax >= ay && ax >= az)	// x face
+	{
+		c = { p.x >= 0 ? 0 : 1, -p.z / p.x, p.y / ax };
+	}
+	else if (ay >= az)	// y face
+	{
+		c = { p.y >= 0 ? 2 : 3, p.x / ay, -p.z / p.y };
+	}
+	else // z face
+	{
+		c = { p.z >= 0 ? 4 : 5, p.x / p.z, p.y / az };
+	}
+	c.u = c.u * 0.5f + 0.5f;
+	c.v = c.v * 0.5f + 0.5f;
+	return c;
+}
+
+inline float NormalRandom(float mu = 0.f, float sigma = 1.f)
+{
+	static std::default_random_engine generator;
+	static std::normal_distribution<float> distribution(mu, sigma);
+	return distribution(generator);
 }
