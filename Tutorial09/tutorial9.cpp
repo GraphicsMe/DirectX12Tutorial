@@ -110,6 +110,11 @@ public:
 				ImGui::SliderInt("Mip Level", &m_MipLevel, 0, m_CubeBuffer.GetNumMips()-1);
 			}
 
+			if (m_ShowMode == SM_SphericalHarmonics)
+			{
+				ImGui::SliderInt("SH Degree", &m_SHDegree, 1, 4);
+			}
+
 			//static bool ShowDemo = false;
 			//ImGui::Checkbox("Show Demo", &ShowDemo);
 			//if (ShowDemo)
@@ -373,7 +378,7 @@ private:
 
 	void GenerateSHcoeffs()
 	{
-		m_SHCoeffs = m_CubeBuffer.GenerateSHcoeffs(m_SHDegree, m_SHSampleNum);
+		m_SHCoeffs = m_CubeBuffer.GenerateSHcoeffs(4, m_SHSampleNum);
 
 		for (int i=0;i<m_SHCoeffs.size();++i)
 		{

@@ -244,7 +244,7 @@ float4 PS_SphericalHarmonics(VertexOutput In) : SV_Target
 	basis[14] = 1.f / 4.f * sqrt(105.f / PI) * (x2 - z2) * y;
 	basis[15] = 1.f / 4.f * sqrt(35.f / (2 * PI)) * (x2 - 3 * z2) * x;
 
-	for (int i = 0; i < 9; i++)
+	for (int i = 0; i < Degree * Degree; i++)
 		Color += Coeffs[i] * basis[i];
 
 	Color = ACESFilm(Color * Exposure);

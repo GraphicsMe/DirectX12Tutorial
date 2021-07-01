@@ -5,6 +5,7 @@
 #include "CommandQueue.h"
 #include "CommandListManager.h"
 #include "CommandContext.h"
+#include "Texture.h"
 
 using namespace DirectX;
 
@@ -229,6 +230,7 @@ void RandomSample(const DirectX::ScratchImage& InputImage, int Width, int Height
 
 		//printf("[%f,%f,%f]\n", R, G, B);
 		vex.color = { R,G,B };
+		//vex.color = { 1,0,0 };
 		if (vex.color.x < 0 || vex.color.y < 0 || vex.color.z < 0)
 		{
 			int xxx = 0;
@@ -281,9 +283,51 @@ std::vector<float> Basis(const int Degree , const Vector3f& pos)
 std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 {
 	std::vector<Vector3f> SHcoeffs;
+	HRESULT hr;
+
+#if 0
 	DirectX::ScratchImage image;
 	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
+	hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
+#else
+	DirectX::ScratchImage image_posx;
+	DirectX::ScratchImage image_negx;
+	DirectX::ScratchImage image_posy;
+	DirectX::ScratchImage image_negy;
+	DirectX::ScratchImage image_posz;
+	DirectX::ScratchImage image_negz;
+
+	hr = DirectX::LoadFromWICFile(L"../Resources/CubeMap/CNTower/posx.jpg", DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image_posx);
+	hr = DirectX::LoadFromWICFile(L"../Resources/CubeMap/CNTower/negx.jpg", DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image_negx);
+	hr = DirectX::LoadFromWICFile(L"../Resources/CubeMap/CNTower/posy.jpg", DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image_posy);
+	hr = DirectX::LoadFromWICFile(L"../Resources/CubeMap/CNTower/negy.jpg", DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image_negy);
+	hr = DirectX::LoadFromWICFile(L"../Resources/CubeMap/CNTower/posz.jpg", DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image_posz);
+	hr = DirectX::LoadFromWICFile(L"../Resources/CubeMap/CNTower/negz.jpg", DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image_negz);
+
+	DirectX::ScratchImage image;
+	image.Initialize2D(DXGI_FORMAT_R16G16B16A16_FLOAT, image_posx.GetMetadata().width, image_posx.GetMetadata().height, 6, 1);
+	DirectX::ScratchImage temp;
+	temp.Initialize2D(DXGI_FORMAT_R16G16B16A16_FLOAT, image_posx.GetMetadata().width, image_posx.GetMetadata().height, 1, 1);
+
+	hr = DirectX::_ConvertToR16G16B16A16(image_posx.GetImages()[0], temp);
+	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[0]);
+
+	hr = DirectX::_ConvertToR16G16B16A16(image_negx.GetImages()[0], temp);
+	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[1]);
+
+	hr = DirectX::_ConvertToR16G16B16A16(image_posy.GetImages()[0], temp);
+	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[2]);
+
+	hr = DirectX::_ConvertToR16G16B16A16(image_negy.GetImages()[0], temp);
+	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[3]);
+
+	hr = DirectX::_ConvertToR16G16B16A16(image_posz.GetImages()[0], temp);
+	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[4]);
+
+	hr = DirectX::_ConvertToR16G16B16A16(image_negz.GetImages()[0], temp);
+	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[5]);
+#endif
+
 	if (SUCCEEDED(hr))
 	{
 		std::vector<Vertex> Samples;
@@ -298,7 +342,7 @@ std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 			std::vector<float> Y = Basis(Degree, v.pos);
 			for (int i = 0; i < n; ++i)
 			{
-				SHcoeffs[i] = SHcoeffs[i] + Y[i] * v.color;
+				SHcoeffs[i] = SHcoeffs[i] + Y[i] * v.color; 
 			}
 		}
 		for (Vector3f& coef : SHcoeffs)
@@ -306,17 +350,18 @@ std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 			coef = 4 * MATH_PI * coef / (float)Samples.size();
 		}
 		
-		//...Convolve with SH-projected cosinus lobe
-		//float ConvolveCosineLobeBandFactor[9] =
-		//{
-		//	MATH_PI,
-		//	2.0f * MATH_PI / 3.0f, 2.0f * MATH_PI / 3.0f, 2.0f * MATH_PI / 3.0f,
-		//	MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f,
-		//};
-		//for (int i = 0; i < 9; i++)
-		//{
-		//	SHcoeffs[i] = SHcoeffs[i] * ConvolveCosineLobeBandFactor[i];
-		//}
+		//...Convolve with SH - projected cosinus lobe
+		float ConvolveCosineLobeBandFactor[16] =
+		{
+			MATH_PI,
+			2.0f * MATH_PI / 3.0f, 2.0f * MATH_PI / 3.0f, 2.0f * MATH_PI / 3.0f,
+			MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f, MATH_PI / 4.0f,
+			0,0,0,0,0,0,0
+		};
+		for (int i = 0; i < Degree*Degree; i++)
+		{
+			SHcoeffs[i] = SHcoeffs[i] * ConvolveCosineLobeBandFactor[i];
+		}
 	}
 	
 	// render test
@@ -375,5 +420,6 @@ void FCubeBuffer::RenderCubemap(int Degree,std::vector<Vector3f> SHCoeffs, int w
 	}
 
 	//HRESULT hr = DirectX::SaveToDDSFile(dstSImg.GetImages(), dstSImg.GetImageCount(), dstSImg.GetMetadata(), DDS_FLAGS_NONE, L"reconstruct_test_image.dds");
+	dstSImg.Release();
 }
 
