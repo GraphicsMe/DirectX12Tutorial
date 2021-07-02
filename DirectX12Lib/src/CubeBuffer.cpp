@@ -285,7 +285,7 @@ std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 	std::vector<Vector3f> SHcoeffs;
 	HRESULT hr;
 
-#if 0
+#if 1
 	DirectX::ScratchImage image;
 	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
