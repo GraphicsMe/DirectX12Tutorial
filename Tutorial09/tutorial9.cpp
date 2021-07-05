@@ -34,6 +34,7 @@ extern FCommandListManager g_CommandListManager;
 
 const int CUBE_MAP_SIZE = 1024;
 const int IRRADIANCE_SIZE = 256;
+const int PREFILTERED_SIZE = 256;
 const bool CUBEMAP_DEBUG_VIEW = true;
 
 enum EShowMode
@@ -62,6 +63,7 @@ public:
 
 		GenerateCubeMap();
 		GenerateIrradianceMap();
+		GeneratePrefilteredMap();
 
 		//SaveCubeMap();
 		GenerateSHcoeffs();
@@ -109,8 +111,11 @@ public:
 			{
 				ImGui::SliderInt("Mip Level", &m_MipLevel, 0, m_CubeBuffer.GetNumMips()-1);
 			}
-
-			if (m_ShowMode == SM_SphericalHarmonics)
+			else if (m_ShowMode == SM_Prefiltered)
+			{
+				ImGui::SliderInt("Mip Level", &m_MipLevel, 0, m_PrefilteredCube.GetNumMips() - 1);
+			}
+			else if (m_ShowMode == SM_SphericalHarmonics)
 			{
 				ImGui::SliderInt("SH Degree", &m_SHDegree, 1, 4);
 			}
@@ -142,8 +147,10 @@ public:
 			ShowCubeMapDebugView(CommandContext, m_CubeBuffer);
 			break;
 		case SM_Irradiance:
-		case SM_Prefiltered:
 			ShowCubeMapDebugView(CommandContext, m_IrradianceCube);
+			break;
+		case SM_Prefiltered:
+			ShowCubeMapDebugView(CommandContext, m_PrefilteredCube);
 			break;
 		case SM_SphericalHarmonics:
 			ShowSHCubeMapDebugView(CommandContext, m_CubeBuffer);
@@ -183,15 +190,14 @@ private:
 		m_LongLatToCubePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_LongLatToCube", "ps_5_1");
 		m_SkyVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_SkyCube", "vs_5_1");
 		m_SkyPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SkyCube", "ps_5_1");
-		m_GenIrradiancePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SkyCube", "ps_5_1");
 		m_CubeMapCrossVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_CubeMapCross", "vs_5_1");
 		m_CubeMapCrossPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_CubeMapCross", "ps_5_1");
 		m_ShowTexture2DVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "VS_ShowTexture2D", "vs_5_1");
 		m_ShowTexture2DPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_ShowTexture2D", "ps_5_1");
 		m_GenIrradiancePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenIrradiance", "ps_5_1");
+		m_GenPrefilterPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenPrefiltered", "ps_5_1");
 
 		m_SphericalHarmonicsPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SphericalHarmonics", "ps_5_1");
-
 	}
 
 	void SetupPipelineState()
@@ -253,6 +259,19 @@ private:
 
 		m_IrradianceCube.Create(L"Irradiance Map", IRRADIANCE_SIZE, IRRADIANCE_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
+		m_GenPrefilterPSO.SetRootSignature(m_SkySignature);
+		m_GenPrefilterPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_GenPrefilterPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_GenPrefilterPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		m_GenPrefilterPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_GenPrefilterPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_GenPrefilterPSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
+		m_GenPrefilterPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
+		m_GenPrefilterPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_GenPrefilterPS.Get()));
+		m_GenPrefilterPSO.Finalize();
+
+		m_PrefilteredCube.Create(L"Prefiltered Map", PREFILTERED_SIZE, PREFILTERED_SIZE, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
+
 		FSamplerDesc PointSamplerDesc(D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 		m_Show2DTextureSignature.Reset(3, 1);
 		m_Show2DTextureSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -307,8 +326,6 @@ private:
 		m_SphericalHarmonicsCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SphericalHarmonicsPS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.Finalize();
-
-
 	}
 
 	void GenerateCubeMap()
@@ -368,6 +385,45 @@ private:
 
 			m_SkyBox->Draw(GfxContext);
 		}
+		GfxContext.Finish(true);
+	}
+
+	void GeneratePrefilteredMap()
+	{
+		FCommandContext& GfxContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
+
+		GfxContext.SetRootSignature(m_SkySignature);
+		GfxContext.SetPipelineState(m_GenPrefilterPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		
+		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetCubeSRV());
+
+		m_VSConstants.ModelMatrix = FMatrix(); // identity
+		uint32_t NumMips = m_PrefilteredCube.GetNumMips();
+		m_PSConstants.MaxMipLevel = NumMips;
+		for (uint32_t MipLevel = 0; MipLevel < NumMips; ++MipLevel)
+		{
+			uint32_t Size = PREFILTERED_SIZE >> MipLevel;
+			GfxContext.SetViewportAndScissor(0, 0, Size, Size);
+
+			m_PSConstants.MipLevel = MipLevel;
+			GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+
+			for (int i = 0; i < 6; ++i)
+			{
+				GfxContext.SetRenderTargets(1, &m_PrefilteredCube.GetRTV(i, MipLevel));
+				GfxContext.ClearColor(m_PrefilteredCube, i, MipLevel);
+
+				m_VSConstants.ViewProjMatrix = m_PrefilteredCube.GetViewProjMatrix(i);
+				GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+				m_SkyBox->Draw(GfxContext);
+			}
+		}
+		
 		GfxContext.Finish(true);
 	}
 
@@ -568,6 +624,7 @@ private:
 	{
 		float		Exposure;
 		int			MipLevel;
+		int			MaxMipLevel;
 		int			NumSamplesPerDir;
 		int			Degree;
 		Vector4f	Coeffs[16];
@@ -587,6 +644,7 @@ private:
 	FGraphicsPipelineState m_Show2DTexturePSO;
 	FGraphicsPipelineState m_CubeMapCrossViewPSO;
 	FGraphicsPipelineState m_GenIrradiancePSO;
+	FGraphicsPipelineState m_GenPrefilterPSO;
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 
 	FTexture m_TextureLongLat;
@@ -600,12 +658,13 @@ private:
 	ComPtr<ID3DBlob> m_ShowTexture2DVS, m_ShowTexture2DPS;
 	ComPtr<ID3DBlob> m_LongLatToCubePS;
 	ComPtr<ID3DBlob> m_GenIrradiancePS;
+	ComPtr<ID3DBlob> m_GenPrefilterPS;
 
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
 	FModel* m_SkyBox, *m_CubeMapCross;
 
-	int m_ShowMode = SM_CubeMapCross;
+	int m_ShowMode = SM_Prefiltered;
 	Vector3f m_ClearColor;
 	float m_Exposure = 1.f;
 	int m_MipLevel = 0;

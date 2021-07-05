@@ -22,6 +22,30 @@ float4 Pow2(float4 x)
 	return x * x;
 }
 
+float Pow4(float x)
+{
+	float xx = x * x;
+	return xx * xx;
+}
+
+float2 Pow4(float2 x)
+{
+	float2 xx = x * x;
+	return xx * xx;
+}
+
+float3 Pow4(float3 x)
+{
+	float3 xx = x * x;
+	return xx * xx;
+}
+
+float4 Pow4(float4 x)
+{
+	float4 xx = x * x;
+	return xx * xx;
+}
+
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 ACESFilm(float3 color)
 {
@@ -150,4 +174,22 @@ uint3 Rand3DPCG16(int3 p)
 
 	// only top 16 bits are well shuffled
 	return v >> 16u;
+}
+
+float4 ImportanceSampleGGX(float2 E, float a2)
+{
+	float Phi = 2 * PI * E.x;
+	float CosTheta = sqrt((1 - E.y) / (1 + (a2 - 1) * E.y));
+	float SinTheta = sqrt(1 - CosTheta * CosTheta);
+
+	float3 H;
+	H.x = SinTheta * cos(Phi);
+	H.y = SinTheta * sin(Phi);
+	H.z = CosTheta;
+
+	float d = (CosTheta * a2 - CosTheta) * CosTheta + 1;
+	float D = a2 / (PI*d*d);
+	float PDF = D * CosTheta;
+
+	return float4(H, PDF);
 }

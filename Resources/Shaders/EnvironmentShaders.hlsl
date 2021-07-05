@@ -68,6 +68,7 @@ cbuffer PSContant : register(b0)
 {
 	float	Exposure;
 	int		MipLevel;
+	int		MaxMipLevel;
 	int		NumSamplesPerDir;
 	int		Degree;
 	float3	Coeffs[16];
@@ -249,4 +250,52 @@ float4 PS_SphericalHarmonics(VertexOutput In) : SV_Target
 
 	Color = ACESFilm(Color * Exposure);
 	return float4(Color, 1.0);
+}
+
+
+//-------------------------------------------------------
+// Generate Prefiltered map
+//-------------------------------------------------------
+
+// VS is same as VS_SkyCube
+
+float3 PrefilterEnvMap(uint2 Random, float Roughness, float3 R)
+{
+	float3 FilteredColor = 0;
+	float Weight = 0;
+
+	const uint NumSamples = 64;
+	for (uint i = 0; i < NumSamples; i++)
+	{
+		float2 E = Hammersley(i, NumSamples, Random);
+		float3 H = TangentToWorld(ImportanceSampleGGX(E, Pow4(Roughness)).xyz, R);
+		float3 L = 2 * dot(R, H) * H - R;
+
+		float NoL = saturate(dot(R, L));
+		if (NoL > 0)
+		{
+			FilteredColor += CubeEnvironment.SampleLevel(LinearSampler, L, 0).rgb * NoL;
+			Weight += NoL;
+		}
+	}
+
+	return FilteredColor / max(Weight, 0.001);
+}
+
+float ComputeReflectionCaptureRoughnessFromMip(float Mip, half CubemapMaxMip)
+{
+	float LevelFrom1x1 = CubemapMaxMip - 1 - Mip;
+	return exp2((1.0 - LevelFrom1x1) / 1.2);
+}
+
+float4 PS_GenPrefiltered(VertexOutput In, float4 SvPosition : SV_POSITION) : SV_Target
+{
+	int2 PixelPos = int2(SvPosition.xy);
+	uint2 Random = Rand3DPCG16(uint3(PixelPos, In.Position.x * 1024)).xy;
+
+	float3 R = normalize(In.LocalDirection);
+	//float Roughness = MipLevel / (MaxMipLevel - 1.0);
+	float Roughness = ComputeReflectionCaptureRoughnessFromMip(MipLevel, MaxMipLevel - 1.0);
+	float3 Prefiltered = PrefilterEnvMap(Random, Roughness, R);
+	return float4(Prefiltered, 1.0);
 }

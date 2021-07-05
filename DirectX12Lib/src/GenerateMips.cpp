@@ -9,11 +9,17 @@ FGraphicsPipelineState FGenerateMips::m_GenMipPSO;
 ComPtr<ID3DBlob> FGenerateMips::m_ScreenQuadVS;
 ComPtr<ID3DBlob> FGenerateMips::m_GenerateMipPS;
 
+struct
+{
+	Vector2f TexelSize;
+	int SrcLevel;
+} PSConstants;
+
 void FGenerateMips::Initialize()
 {
 	FSamplerDesc DefaultSamplerDesc;
 	m_GenMipSignature.Reset(2, 1);
-	m_GenMipSignature[0].InitAsConstants(0, D3D12_SHADER_VISIBILITY_PIXEL);
+	m_GenMipSignature[0].InitAsConstants(0, sizeof(PSConstants) / 4, D3D12_SHADER_VISIBILITY_PIXEL);
 	m_GenMipSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
 	m_GenMipSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 	m_GenMipSignature.Finalize(L"Generate Mipmap RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -44,11 +50,7 @@ void FGenerateMips::Generate(FCubeBuffer& CubeBuffer, FCommandContext& CommandCo
 {
 	Assert(CubeBuffer.GetWidth() == CubeBuffer.GetHeight());
 
-	struct
-	{
-		Vector2f TexelSize;
-		int SrcLevel;
-	} PSConstants;
+
 
 	uint32_t SrcSize = CubeBuffer.GetWidth();
 
