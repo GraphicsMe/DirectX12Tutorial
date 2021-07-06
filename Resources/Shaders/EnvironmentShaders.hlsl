@@ -71,6 +71,7 @@ cbuffer PSContant : register(b0)
 	int		MaxMipLevel;
 	int		NumSamplesPerDir;
 	int		Degree;
+	float3		Padding;
 	float3	Coeffs[16];
 };
 
@@ -264,7 +265,10 @@ float3 PrefilterEnvMap(uint2 Random, float Roughness, float3 R)
 	float3 FilteredColor = 0;
 	float Weight = 0;
 
-	const uint NumSamples = 64;
+	uint CubeSize = 1 << (MaxMipLevel - 1);
+	const float SolidAngleTexel = 4 * PI / (6 * CubeSize * CubeSize);
+
+	const uint NumSamples = Roughness < 0.1 ? 32 : 64;
 	for (uint i = 0; i < NumSamples; i++)
 	{
 		float2 E = Hammersley(i, NumSamples, Random);
@@ -272,9 +276,17 @@ float3 PrefilterEnvMap(uint2 Random, float Roughness, float3 R)
 		float3 L = 2 * dot(R, H) * H - R;
 
 		float NoL = saturate(dot(R, L));
+		float NoH = saturate(dot(R, H));
 		if (NoL > 0)
 		{
-			FilteredColor += CubeEnvironment.SampleLevel(LinearSampler, L, 0).rgb * NoL;
+			//https://placeholderart.wordpress.com/2015/07/28/implementation-notes-runtime-environment-map-filtering-for-image-based-lighting/
+			//float PDF = D_GGX( Pow4(Roughness), NoH ) * NoH / (4 * VoH);  //NoH == VoH
+			float PDF = D_GGX(Pow4(Roughness), NoH) * 0.25;
+			float SolidAngleSample = 1.0 / (NumSamples * PDF);
+			float MipBias = 1.0;
+			float Mip = clamp(0.5 * log2(SolidAngleSample / SolidAngleTexel) + MipBias, 0, MaxMipLevel-1);
+
+			FilteredColor += CubeEnvironment.SampleLevel(LinearSampler, L, Mip).rgb * NoL;
 			Weight += NoL;
 		}
 	}

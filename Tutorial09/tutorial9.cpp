@@ -45,6 +45,7 @@ enum EShowMode
 	SM_Irradiance,
 	SM_Prefiltered,
 	SM_SphericalHarmonics,
+	SM_PreintegratedGF,
 };
 
 class Tutorial9 : public FGame
@@ -64,6 +65,7 @@ public:
 		GenerateCubeMap();
 		GenerateIrradianceMap();
 		GeneratePrefilteredMap();
+		PreIntegrateBRDF();
 
 		//SaveCubeMap();
 		GenerateSHcoeffs();
@@ -105,6 +107,7 @@ public:
 			ImGui::RadioButton("Irradiance", &m_ShowMode, SM_Irradiance);
 			ImGui::RadioButton("Prefiltered", &m_ShowMode, SM_Prefiltered);
 			ImGui::RadioButton("SphericalHarmonics", &m_ShowMode, SM_SphericalHarmonics);
+			ImGui::RadioButton("PreintegratedGF", &m_ShowMode, SM_PreintegratedGF);
 			ImGui::EndGroup();
 
 			if (m_ShowMode == SM_CubeMapCross)
@@ -154,6 +157,9 @@ public:
 			break;
 		case SM_SphericalHarmonics:
 			ShowSHCubeMapDebugView(CommandContext, m_CubeBuffer);
+			break;
+		case SM_PreintegratedGF:
+			ShowTexture2D(CommandContext, m_PreintegratedGF);
 			break;
 		}
 
@@ -494,7 +500,6 @@ private:
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
 
 		// Indicate that the back buffer will be used as a render target.
-		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
@@ -509,7 +514,7 @@ private:
 		m_PSConstants.Exposure = m_Exposure;
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
-		GfxContext.SetDynamicDescriptor(2, 0, m_TextureLongLat.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 0, Texture2D.GetSRV());
 
 		GfxContext.Draw(3);
 	}
@@ -521,7 +526,7 @@ private:
 		GfxContext.SetPipelineState(m_CubeMapCrossViewPSO);
 		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		uint32_t Size = std::min(m_GameDesc.Width, m_GameDesc.Height);
-		Size = std::min(Size, CubeBuffer.GetWidth());
+		//Size = std::min(Size, CubeBuffer.GetWidth());
 		GfxContext.SetViewportAndScissor((m_GameDesc.Width - Size)/2, (m_GameDesc.Height - Size) / 2, Size, Size);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
@@ -612,6 +617,79 @@ private:
 		m_CubeMapCross->Draw(GfxContext);
 	}
 
+	float G1(float k, float NoV) { return NoV / (NoV * (1.0f - k) + k); }
+
+	// Geometric Shadowing function
+	float G_Smith(float NoL, float NoV, float roughness)
+	{
+		float k = (roughness * roughness) * 0.5f;
+		return G1(k, NoL) * G1(k, NoV);
+	}
+
+	void PreIntegrateBRDF()
+	{
+		int width = 128; //NoV
+		int height = 32; //Roughness
+		std::vector<Vector2f> ImageData(width * height * sizeof(Vector2f));
+
+		for (int y = 0; y < height; ++y)
+		{
+			float Roughness = (float)(y + 0.5f) / height;
+			float m = Roughness * Roughness;
+			float m2 = m * m;
+
+			for (int x = 0; x < width; ++x)
+			{
+				float NoV = (float)(x + 0.5f) / width;
+
+				Vector3f V;
+				V.x = sqrt(1.0f - NoV * NoV);	// sin
+				V.y = 0.0f;
+				V.z = NoV;						// cos
+
+				float A = 0.0f;
+				float B = 0.0f;
+
+				const uint32_t NumSamples = 128;
+				for (uint32_t i = 0; i < NumSamples; i++)
+				{
+					float E1 = (float)i / NumSamples;
+					float E2 = (double)ReverseBits(i) / (double)0x100000000LL;
+
+					{
+						float Phi = 2.0f * MATH_PI * E1;
+						float CosPhi = cos(Phi);
+						float SinPhi = sin(Phi);
+						float CosTheta = sqrt((1.0f - E2) / (1.0f + (m2 - 1.0f) * E2));
+						float SinTheta = sqrt(1.0f - CosTheta * CosTheta);
+
+						Vector3f H(SinTheta * cos(Phi), SinTheta * sin(Phi), CosTheta);
+						Vector3f L = 2.0f * V.Dot(H) * H - V;
+
+						float NoL = std::max(L.z, 0.0f);
+						float NoH = std::max(H.z, 0.0f);
+						float VoH = std::max(V.Dot(H), 0.0f);
+
+						if (NoL > 0.0f)
+						{
+							float G = G_Smith(NoL, NoV, Roughness);
+							float NoL_Vis_PDF = (G * VoH) / (NoH * NoV);
+							float Fc = pow(1.0f - VoH, 5.f);
+							A += NoL_Vis_PDF * (1.0f - Fc);
+							B += NoL_Vis_PDF * Fc;
+						}
+					}
+				}
+
+				Vector2f& Texel = ImageData[y * width + x];
+				Texel.x = A / NumSamples;
+				Texel.y = B / NumSamples;
+			}
+		}
+
+		m_PreintegratedGF.Create(width, height, DXGI_FORMAT_R32G32_FLOAT, ImageData.data());
+	}
+
 
 private:
 	__declspec(align(16)) struct
@@ -627,6 +705,7 @@ private:
 		int			MaxMipLevel;
 		int			NumSamplesPerDir;
 		int			Degree;
+		Vector3f	Padding;
 		Vector4f	Coeffs[16];
 	} m_PSConstants;
 
@@ -647,7 +726,7 @@ private:
 	FGraphicsPipelineState m_GenPrefilterPSO;
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 
-	FTexture m_TextureLongLat;
+	FTexture m_TextureLongLat, m_PreintegratedGF;
 	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
 
 	ComPtr<ID3DBlob> m_LongLatToCubeVS;

@@ -193,3 +193,11 @@ float4 ImportanceSampleGGX(float2 E, float a2)
 
 	return float4(H, PDF);
 }
+
+// GGX / Trowbridge-Reitz
+// [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
+float D_GGX(float a2, float NoH)
+{
+	float d = (NoH * a2 - NoH) * NoH + 1;	// 2 mad
+	return a2 / (PI*d*d);					// 4 mul, 1 rcp
+}
