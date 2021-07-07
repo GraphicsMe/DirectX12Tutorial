@@ -294,12 +294,6 @@ float3 PrefilterEnvMap(uint2 Random, float Roughness, float3 R)
 	return FilteredColor / max(Weight, 0.001);
 }
 
-float ComputeReflectionCaptureRoughnessFromMip(float Mip, half CubemapMaxMip)
-{
-	float LevelFrom1x1 = CubemapMaxMip - 1 - Mip;
-	return exp2((1.0 - LevelFrom1x1) / 1.2);
-}
-
 float4 PS_GenPrefiltered(VertexOutput In, float4 SvPosition : SV_POSITION) : SV_Target
 {
 	int2 PixelPos = int2(SvPosition.xy);

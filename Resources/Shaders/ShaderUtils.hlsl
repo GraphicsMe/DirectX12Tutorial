@@ -70,6 +70,12 @@ float3 LinearToSrgb(float3 lin)
 	return float3(LinearToSrgbChannel(lin.r), LinearToSrgbChannel(lin.g), LinearToSrgbChannel(lin.b));
 }
 
+float3 sRGBToLinear(half3 Color)
+{
+	Color = max(6.10352e-5, Color); // minimum positive non-denormal (fixes black problem on DX11 AMD and NV)
+	return Color > 0.04045 ? pow(Color * (1.0 / 1.055) + 0.0521327, 2.4) : Color * (1.0 / 12.92);
+}
+
 float3 ToneMapping(float3 Color)
 {
 	return LinearToSrgb(ACESFilm(Color));
@@ -200,4 +206,16 @@ float D_GGX(float a2, float NoH)
 {
 	float d = (NoH * a2 - NoH) * NoH + 1;	// 2 mad
 	return a2 / (PI*d*d);					// 4 mul, 1 rcp
+}
+
+half ComputeReflectionCaptureMipFromRoughness(float Roughness, half CubemapMaxMip)
+{
+	half LevelFrom1x1 = 1.0 - 1.2 * log2(max(Roughness, 0.001));
+	return CubemapMaxMip - 1 - LevelFrom1x1;
+}
+
+float ComputeReflectionCaptureRoughnessFromMip(float Mip, half CubemapMaxMip)
+{
+	float LevelFrom1x1 = CubemapMaxMip - 1 - Mip;
+	return exp2((1.0 - LevelFrom1x1) / 1.2);
 }

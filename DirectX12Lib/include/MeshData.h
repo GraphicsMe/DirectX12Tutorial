@@ -10,7 +10,8 @@ enum VertexElementType : uint8_t
 	VET_Color		= 1,
 	VET_Texcoord	= 2,
 	VET_Normal		= 3,
-	VET_Max			= 4
+	VET_Tangent		= 4,
+	VET_Max			= 5
 };
 
 
@@ -79,8 +80,15 @@ public:
 
 	void AddMaterial(const MaterialData& Material);
 	void AddSubMesh(uint32_t StartIndex, uint32_t IndexCount, uint32_t MaterialIndex);
-	std::string GetBaseColorPath(uint32_t Index);
+	std::string GetBaseColorPath(uint32_t MtlIndex);
+	std::string GetOpacityPath(uint32_t MtlIndex);
+	std::string GetEmissivePath(uint32_t MtlIndex);
+	std::string GetMetallicPath(uint32_t MtlIndex);
+	std::string GetRoughnessPath(uint32_t MtlIndex);
+	std::string GetAOPath(uint32_t MtlIndex);
+	std::string GetNormalPath(uint32_t MtlIndex);
 	const MaterialData& GetMaterialData(size_t Index);
+
 
 	void ComputeBoundingBox();
 	void GetBoundingBox(Vector3f& BoundMin, Vector3f& BoundMax);
@@ -93,6 +101,7 @@ public:
 	std::vector<Vector3f> m_colors;
 	std::vector<Vector2f> m_texcoords;
 	std::vector<Vector3f> m_normals;
+	std::vector<Vector4f> m_tangents;
 	std::vector<uint32_t> m_indices;
 
 	std::vector<MaterialData> m_materials;

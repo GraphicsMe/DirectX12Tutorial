@@ -10,6 +10,7 @@
 #include <random>
 
 const float MATH_PI = 3.141592654f;
+const float MATH_2PI = 2.f * MATH_PI;
 const float MATH_PI_HALF = 0.5f * MATH_PI;
 
 struct FBoundingBox;
@@ -99,6 +100,17 @@ struct Vector3
 	Vector3 Normalize() const
 	{
 		T length = Length();
+		T inv = T(1) / length;
+		return Vector3(x * inv, y * inv, z *inv);
+	}
+
+	Vector3 SafeNormalize(float Epsilon = 1e-4) const
+	{
+		T length = Length();
+		if (length < Epsilon)
+		{
+			return Vector3(T(0));
+		}
 		T inv = T(1) / length;
 		return Vector3(x * inv, y * inv, z *inv);
 	}

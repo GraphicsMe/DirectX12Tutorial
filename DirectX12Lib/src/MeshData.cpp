@@ -25,6 +25,8 @@ bool MeshData::HasVertexElement(VertexElementType type) const
 		return !m_texcoords.empty();
 	case VET_Normal:
 		return !m_normals.empty();
+	case VET_Tangent:
+		return !m_tangents.empty();
 	default:
 		return nullptr;
 	}
@@ -45,6 +47,8 @@ uint32_t MeshData::GetVertexSize(VertexElementType type) const
 		return (uint32_t)m_positions.size() * sizeof(Vector3f);
 	case VET_Texcoord:
 		return (uint32_t)m_texcoords.size() * sizeof(Vector2f);
+	case VET_Tangent:
+		return (uint32_t)m_tangents.size() * sizeof(Vector4f);
 	default:
 		return 0;
 	}
@@ -60,6 +64,8 @@ uint32_t MeshData::GetVertexStride(VertexElementType type) const
 		return sizeof(Vector3f);
 	case VET_Texcoord:
 		return sizeof(Vector2f);
+	case VET_Tangent:
+		return sizeof(Vector4f);
 	default:
 		return 0;
 	}
@@ -77,6 +83,8 @@ const float* MeshData::GetVertexData(VertexElementType type)
 		return (float*)&m_texcoords[0];
 	case VET_Normal:
 		return (float*)&m_normals[0];
+	case VET_Tangent:
+		return (float*)&m_tangents[0];
 	default:
 		return nullptr;
 	}
@@ -134,16 +142,100 @@ void MeshData::AddSubMesh(uint32_t StartIndex, uint32_t IndexCount, uint32_t Mat
 	m_submeshes.emplace_back(StartIndex, IndexCount, MaterialIndex);
 }
 
-std::string MeshData::GetBaseColorPath(uint32_t Index)
+std::string MeshData::GetBaseColorPath(uint32_t MtlIndex)
 {
 	std::string result;
-	if (Index < m_submeshes.size())
+	if (MtlIndex < m_materials.size())
 	{
-		uint32_t MtlIndex = m_submeshes[Index].MaterialIndex;
-		if (MtlIndex < m_materials.size())
-		{
-			result = m_materials[MtlIndex].BaseColorPath;
-		}
+		result = m_materials[MtlIndex].BaseColorPath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/white.png";
+	}
+	return result;
+}
+
+std::string MeshData::GetOpacityPath(uint32_t MtlIndex)
+{
+	std::string result;
+	if (MtlIndex < m_materials.size())
+	{
+		result = m_materials[MtlIndex].OpacityPath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/white.png";
+	}
+	return result;
+}
+
+std::string MeshData::GetEmissivePath(uint32_t MtlIndex)
+{
+	std::string result;
+	if (MtlIndex < m_materials.size())
+	{
+		result = m_materials[MtlIndex].EmissivePath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/black.png";
+	}
+	return result;
+}
+
+std::string MeshData::GetMetallicPath(uint32_t MtlIndex)
+{
+	std::string result;
+	if (MtlIndex < m_materials.size())
+	{
+		result = m_materials[MtlIndex].MetallicPath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/black.png";
+	}
+	return result;
+}
+
+std::string MeshData::GetRoughnessPath(uint32_t MtlIndex)
+{
+	std::string result;
+	if (MtlIndex < m_materials.size())
+	{
+		result = m_materials[MtlIndex].RoughnessPath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/black.png";
+	}
+	return result;
+}
+
+std::string MeshData::GetAOPath(uint32_t MtlIndex)
+{
+	std::string result;
+	if (MtlIndex < m_materials.size())
+	{
+		result = m_materials[MtlIndex].AoPath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/white.png";
+	}
+	return result;
+}
+
+std::string MeshData::GetNormalPath(uint32_t MtlIndex)
+{
+	std::string result;
+	if (MtlIndex < m_materials.size())
+	{
+		result = m_materials[MtlIndex].NormalPath;
+	}
+	if (result.empty())
+	{
+		result = "../Resources/Textures/default_normal.png";
 	}
 	return result;
 }

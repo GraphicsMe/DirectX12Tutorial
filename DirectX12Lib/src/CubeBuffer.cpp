@@ -167,7 +167,7 @@ class Vertex
 public:
 	Vector3f pos, color;
 };
-void RandomSample(const DirectX::ScratchImage& InputImage, int Width, int Height, int SampleNum, std::vector<Vertex>& OutSamples)
+void RandomSample(const DirectX::ScratchImage& InputImage, size_t Width, size_t Height, int SampleNum, std::vector<Vertex>& OutSamples)
 {
 	DirectX::ScratchImage dstSImg;
 	dstSImg.Initialize2D(DXGI_FORMAT_R32G32B32A32_FLOAT, InputImage.GetMetadata().width, InputImage.GetMetadata().height, InputImage.GetMetadata().arraySize, InputImage.GetMetadata().mipLevels);
@@ -216,7 +216,7 @@ void RandomSample(const DirectX::ScratchImage& InputImage, int Width, int Height
 		int rowIndex = (int)((1.f - cubeuv.v) * (Height - 1));
 
 		const DirectX::Image* images = dstSImg.GetImages();
-		int Lod0FaceIndex = cubeuv.index * dstSImg.GetMetadata().mipLevels;
+		size_t Lod0FaceIndex = cubeuv.index * dstSImg.GetMetadata().mipLevels;
 		const DirectX::Image image = images[Lod0FaceIndex];
 
 		size_t rowPitch = 0;

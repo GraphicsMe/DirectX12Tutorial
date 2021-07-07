@@ -3,6 +3,7 @@
 #include "MeshData.h"
 #include "CommandContext.h"
 
+const int TEX_PER_MATERIAL = 7;
 
 FModel::FModel()
 	: m_Scale(1.f)
@@ -11,11 +12,11 @@ FModel::FModel()
 
 }
 
-FModel::FModel(const std::string& FileName)
+FModel::FModel(const std::string& FileName, bool FlipV)
 	: m_FileName(FileName)
 	, m_Scale(1.f)
 {
-	m_MeshData = FObjLoader::LoadObj(FileName);
+	m_MeshData = FObjLoader::LoadObj(FileName, FlipV);
 	InitializeResource();
 }
 
@@ -42,8 +43,15 @@ void FModel::Draw(FCommandContext& CommandContext)
 	for (size_t i = 0; i < m_MeshData->GetMeshCount(); ++i)
 	{
 		size_t MtlIndex = m_MeshData->GetSubMaterialIndex(i);
-		if (MtlIndex < m_Textures.size())
-			CommandContext.SetDynamicDescriptor(2, 0, m_Textures[MtlIndex].GetSRV());
+		if (MtlIndex < m_MeshData->GetMaterialCount())
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE Handles[TEX_PER_MATERIAL];
+			for (int j = 0; j < TEX_PER_MATERIAL ; ++j)
+			{
+				Handles[j] = m_Textures[TEX_PER_MATERIAL * MtlIndex + j].GetSRV();
+			}
+			CommandContext.SetDynamicDescriptors(2, 0, TEX_PER_MATERIAL, Handles);
+		}
 		CommandContext.DrawIndexed((UINT)m_MeshData->GetSubIndexCount(i), (UINT)m_MeshData->GetSubIndexStart(i));
 	}
 }
@@ -66,6 +74,10 @@ void FModel::GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout)
 	if (m_MeshData->HasVertexElement(VET_Normal))
 	{
 		MeshLayout.push_back({ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
+	}
+	if (m_MeshData->HasVertexElement(VET_Tangent))
+	{
+		MeshLayout.push_back({ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
 	}
 }
 
@@ -130,11 +142,18 @@ void FModel::InitializeResource()
 
 	m_IndexBuffer.Create(L"MeshIndexBuffer", m_MeshData->GetIndexCount(), m_MeshData->GetIndexElementSize(), m_MeshData->GetIndexData());
 
-	size_t MaterialCount = m_MeshData->GetMaterialCount();
-	m_Textures.resize(MaterialCount);
-	for (size_t i = 0; i < MaterialCount; ++i)
+	uint32_t MaterialCount = (uint32_t)m_MeshData->GetMaterialCount();
+	m_Textures.resize(MaterialCount * TEX_PER_MATERIAL);
+	for (uint32_t i = 0; i < MaterialCount; ++i)
 	{
 		MaterialData MtlData = m_MeshData->GetMaterialData(i);
-		m_Textures[i].LoadFromFile(ToWideString(MtlData.BaseColorPath));
+		//basecolor, opacity, emissive, metallic, roughness, ao, normal
+		m_Textures[TEX_PER_MATERIAL * i + 0].LoadFromFile(ToWideString(m_MeshData->GetBaseColorPath(i)), true);
+		m_Textures[TEX_PER_MATERIAL * i + 1].LoadFromFile(ToWideString(m_MeshData->GetOpacityPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 2].LoadFromFile(ToWideString(m_MeshData->GetEmissivePath(i)), true);
+		m_Textures[TEX_PER_MATERIAL * i + 3].LoadFromFile(ToWideString(m_MeshData->GetMetallicPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 4].LoadFromFile(ToWideString(m_MeshData->GetRoughnessPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 5].LoadFromFile(ToWideString(m_MeshData->GetAOPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 6].LoadFromFile(ToWideString(m_MeshData->GetNormalPath(i)), false);
 	}
 }

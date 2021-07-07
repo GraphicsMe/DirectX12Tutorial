@@ -113,6 +113,7 @@ set(SHADER_FILES
 	../Resources/shaders/ImGUI.hlsl
 	../Resources/shaders/ShaderUtils.hlsl
 	../Resources/shaders/GenerateMips.hlsl
+	../Resources/shaders/PBR.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

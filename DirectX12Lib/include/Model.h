@@ -15,7 +15,7 @@ class FModel
 {
 public:
 	FModel();
-	FModel(const std::string& FileName);
+	FModel(const std::string& FileName, bool FlipV = false);
 	virtual ~FModel();
 
 	virtual bool IsSkyBox() const {return false;}

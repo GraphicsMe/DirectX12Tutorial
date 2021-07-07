@@ -50,7 +50,7 @@ void FTexture::Create(uint32_t Width, uint32_t Height, DXGI_FORMAT Format, const
 	D3D12RHI::Get().GetD3D12Device()->CreateShaderResourceView(m_Resource.Get(), nullptr, m_CpuDescriptorHandle);
 }
 
-void FTexture::LoadFromFile(const std::wstring& FileName)
+void FTexture::LoadFromFile(const std::wstring& FileName, bool IsSRGB)
 {
 	m_CurrentState = D3D12_RESOURCE_STATE_COPY_DEST;
 
@@ -78,7 +78,7 @@ void FTexture::LoadFromFile(const std::wstring& FileName)
 
 	ThrowIfFailed(hr);
 	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
-	ThrowIfFailed(DirectX::CreateTextureEx(Device, image.GetMetadata(), D3D12_RESOURCE_FLAG_NONE, true, m_Resource.ReleaseAndGetAddressOf()));
+	ThrowIfFailed(DirectX::CreateTextureEx(Device, image.GetMetadata(), D3D12_RESOURCE_FLAG_NONE, IsSRGB, m_Resource.ReleaseAndGetAddressOf()));
 
 	m_Resource->SetName(FileName.c_str());
 

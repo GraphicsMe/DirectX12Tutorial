@@ -46,6 +46,7 @@ enum EShowMode
 	SM_Prefiltered,
 	SM_SphericalHarmonics,
 	SM_PreintegratedGF,
+	SM_PBR,
 };
 
 class Tutorial9 : public FGame
@@ -82,21 +83,33 @@ public:
 		tStart = std::chrono::high_resolution_clock::now();
 		m_Camera.Update(delta);
 
+		if (m_RotateMesh)
+		{
+			m_RotateY += delta * 0.0005f;
+			m_RotateY = fmodf(m_RotateY, MATH_2PI);
+			m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
+		}
+
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
 	}
 
 	void OnGUI(FCommandContext& CommandContext)
 	{
+		static bool ShowConfig = true;
+		if (!ShowConfig)
+			return;
+
 		ImguiManager::Get().NewFrame();
 
 		ImGui::SetNextWindowPos(ImVec2(1, 1));
-		
-		static bool ShowConfig = true;
+		ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
 		if (ImGui::Begin("Config", &ShowConfig, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			ImGui::ColorEdit3("Clear Color", &m_ClearColor.x);
 			ImGui::SliderFloat("Exposure", &m_Exposure, 0.f, 10.f, "%.1f");
+			
+			ImGui::Separator();
 
 			ImGui::BeginGroup();
 			ImGui::Text("Show Mode");
@@ -108,6 +121,7 @@ public:
 			ImGui::RadioButton("Prefiltered", &m_ShowMode, SM_Prefiltered);
 			ImGui::RadioButton("SphericalHarmonics", &m_ShowMode, SM_SphericalHarmonics);
 			ImGui::RadioButton("PreintegratedGF", &m_ShowMode, SM_PreintegratedGF);
+			ImGui::RadioButton("PBR Mesh", &m_ShowMode, SM_PBR);
 			ImGui::EndGroup();
 
 			if (m_ShowMode == SM_CubeMapCross)
@@ -122,14 +136,22 @@ public:
 			{
 				ImGui::SliderInt("SH Degree", &m_SHDegree, 1, 4);
 			}
+			else if (m_ShowMode == SM_PBR)
+			{
+				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
+				ImGui::SameLine();
+				ImGui::Text("%.3f", m_RotateY);
+			}
+
+			ImGui::Separator();
 
 			//static bool ShowDemo = false;
 			//ImGui::Checkbox("Show Demo", &ShowDemo);
 			//if (ShowDemo)
 			//	ImGui::ShowDemoWindow(&ShowDemo);
 
-			ImGui::End();
 		}
+		ImGui::End();
 
 		ImguiManager::Get().Render(CommandContext, RenderWindow::Get());
 	}
@@ -161,6 +183,9 @@ public:
 		case SM_PreintegratedGF:
 			ShowTexture2D(CommandContext, m_PreintegratedGF);
 			break;
+		case SM_PBR:
+			MeshPass(CommandContext);
+			break;
 		}
 
 		OnGUI(CommandContext);
@@ -175,8 +200,8 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.f, 0.f, -1.f), Vector3f(0.f, 0.f, 0.f), Vector3f(0.f, 1.f, 0.f));
-		m_Camera.SetMouseMoveSpeed(1e-4f);
+		m_Camera = FCamera(Vector3f(1.5f, 1.f, 0.f), Vector3f(0.f, 0.3f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
 		const float FovVertical = MATH_PI / 4.f;
@@ -185,9 +210,10 @@ private:
 
 	void SetupMesh()
 	{
-		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr
-		m_SkyBox = new FSkyBox();
-		m_CubeMapCross = new FCubeMapCross();
+		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
+		m_SkyBox = std::make_unique<FSkyBox>();
+		m_CubeMapCross = std::make_unique<FCubeMapCross>();
+		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true);
 	}
 
 	void SetupShaders()
@@ -202,6 +228,8 @@ private:
 		m_ShowTexture2DPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_ShowTexture2D", "ps_5_1");
 		m_GenIrradiancePS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenIrradiance", "ps_5_1");
 		m_GenPrefilterPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenPrefiltered", "ps_5_1");
+		m_MeshVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "VS_PBR", "vs_5_1");
+		m_MeshPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_PBR", "ps_5_1");
 
 		m_SphericalHarmonicsPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SphericalHarmonics", "ps_5_1");
 	}
@@ -220,10 +248,10 @@ private:
 		m_GenCubePSO.SetBlendState(FPipelineState::BlendDisable);
 		m_GenCubePSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
 		
-		std::vector<D3D12_INPUT_ELEMENT_DESC> MeshLayout;
-		m_SkyBox->GetMeshLayout(MeshLayout);
-		Assert(MeshLayout.size() > 0);
-		m_GenCubePSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		std::vector<D3D12_INPUT_ELEMENT_DESC> SkyBoxLayout;
+		m_SkyBox->GetMeshLayout(SkyBoxLayout);
+		Assert(SkyBoxLayout.size() > 0);
+		m_GenCubePSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
 
 		m_GenCubePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		DXGI_FORMAT CubeFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
@@ -245,7 +273,7 @@ private:
 		m_SkyPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 		m_SkyPSO.SetBlendState(FPipelineState::BlendDisable);
 		m_SkyPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		m_SkyPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_SkyPSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
 		m_SkyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_SkyPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
@@ -256,7 +284,7 @@ private:
 		m_GenIrradiancePSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 		m_GenIrradiancePSO.SetBlendState(FPipelineState::BlendDisable);
 		m_GenIrradiancePSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		m_GenIrradiancePSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_GenIrradiancePSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
 		m_GenIrradiancePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_GenIrradiancePSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
 		m_GenIrradiancePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
@@ -269,7 +297,7 @@ private:
 		m_GenPrefilterPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 		m_GenPrefilterPSO.SetBlendState(FPipelineState::BlendDisable);
 		m_GenPrefilterPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		m_GenPrefilterPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_GenPrefilterPSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
 		m_GenPrefilterPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_GenPrefilterPSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
 		m_GenPrefilterPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
@@ -332,6 +360,29 @@ private:
 		m_SphericalHarmonicsCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SphericalHarmonicsPS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.Finalize();
+
+		m_MeshSignature.Reset(3, 1);
+		m_MeshSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_MeshSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_MeshSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10); //pbr 7, irradiance, prefiltered, preintegratedGF
+		m_MeshSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_MeshSignature.Finalize(L"Mesh RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		std::vector<D3D12_INPUT_ELEMENT_DESC> MeshLayout;
+		m_Mesh->GetMeshLayout(MeshLayout);
+		Assert(MeshLayout.size() > 0);
+		m_MeshPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+
+		m_MeshPSO.SetRootSignature(m_MeshSignature);
+		m_MeshPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_MeshPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_MeshPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		m_MeshPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_MeshPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_MeshPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_MeshPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_MeshVS.Get()));
+		m_MeshPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_MeshPS.Get()));
+		m_MeshPSO.Finalize();
 	}
 
 	void GenerateCubeMap()
@@ -482,6 +533,46 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetCubeSRV());
 
 		m_SkyBox->Draw(GfxContext);
+	}
+
+	void MeshPass(FCommandContext& GfxContext)
+	{
+		// Set necessary state.
+		GfxContext.SetRootSignature(m_MeshSignature);
+		GfxContext.SetPipelineState(m_MeshPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		GfxContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
+
+		RenderWindow& renderWindow = RenderWindow::Get();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
+
+		// Indicate that the back buffer will be used as a render target.
+		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+
+		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
+		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
+
+		BackBuffer.SetClearColor(m_ClearColor);
+		GfxContext.ClearColor(BackBuffer);
+		GfxContext.ClearDepth(DepthBuffer);
+
+		m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
+		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+		m_PSConstants.Exposure = m_Exposure;
+		m_PSConstants.CameraPos = m_Camera.GetPosition();
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
+		GfxContext.SetDynamicDescriptor(2, 8, m_PrefilteredCube.GetCubeSRV());
+		GfxContext.SetDynamicDescriptor(2, 9, m_PreintegratedGF.GetSRV());
+
+		m_Mesh->Draw(GfxContext);
 	}
 
 	void ShowTexture2D(FCommandContext& GfxContext, FTexture& Texture2D)
@@ -654,7 +745,7 @@ private:
 				for (uint32_t i = 0; i < NumSamples; i++)
 				{
 					float E1 = (float)i / NumSamples;
-					float E2 = (double)ReverseBits(i) / (double)0x100000000LL;
+					float E2 = (float)ReverseBits(i) / (float)0x100000000LL;
 
 					{
 						float Phi = 2.0f * MATH_PI * E1;
@@ -705,7 +796,7 @@ private:
 		int			MaxMipLevel;
 		int			NumSamplesPerDir;
 		int			Degree;
-		Vector3f	Padding;
+		Vector3f	CameraPos;
 		Vector4f	Coeffs[16];
 	} m_PSConstants;
 
@@ -717,6 +808,7 @@ private:
 	FRootSignature m_SkySignature;
 	FRootSignature m_Show2DTextureSignature;
 	FRootSignature m_CubeMapCrossViewSignature;
+	FRootSignature m_MeshSignature;
 
 	FGraphicsPipelineState m_GenCubePSO;
 	FGraphicsPipelineState m_SkyPSO;
@@ -725,6 +817,7 @@ private:
 	FGraphicsPipelineState m_GenIrradiancePSO;
 	FGraphicsPipelineState m_GenPrefilterPSO;
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
+	FGraphicsPipelineState m_MeshPSO;
 
 	FTexture m_TextureLongLat, m_PreintegratedGF;
 	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
@@ -738,16 +831,19 @@ private:
 	ComPtr<ID3DBlob> m_LongLatToCubePS;
 	ComPtr<ID3DBlob> m_GenIrradiancePS;
 	ComPtr<ID3DBlob> m_GenPrefilterPS;
+	ComPtr<ID3DBlob> m_MeshPS, m_MeshVS;
 
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
-	FModel* m_SkyBox, *m_CubeMapCross;
+	std::unique_ptr<FModel> m_Mesh, m_SkyBox, m_CubeMapCross;
 
-	int m_ShowMode = SM_Prefiltered;
-	Vector3f m_ClearColor;
+	int m_ShowMode = SM_PBR;
+	Vector3f m_ClearColor = Vector3f(0.2f);
 	float m_Exposure = 1.f;
 	int m_MipLevel = 0;
 	int m_NumSamplesPerDir = 10;
+	bool m_RotateMesh = false;
+	float m_RotateY = 0.f;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 

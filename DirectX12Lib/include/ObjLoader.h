@@ -84,7 +84,7 @@ typedef std::map<std::string, ObjMaterial> MaterialLibType;
 class FObjLoader
 {
 public:
-	static MeshData* LoadObj(const std::string& FilePath);
+	static MeshData* LoadObj(const std::string& FilePath, bool FlipV = false);
 	
 private:
 	static bool LoadMaterialLib(MaterialLibType& MtlLib, const std::string& MtlFilePath);
@@ -105,7 +105,13 @@ private:
 		std::vector<Vector3f>& final_normals
 	);
 
-	void static CalcTangents(std::vector<float>& final_vertices, const std::vector<uint32_t>& final_indices, uint32_t VertexFloatCount);
+	void static CalcTangents(
+		const std::vector<Vector3f>& final_positions,
+		const std::vector<Vector2f>& final_texcoords,
+		const std::vector<Vector3f>& final_normals,
+		const std::vector<uint32_t>& final_indices,
+		std::vector<Vector4f>& final_tangents
+	);
 
 	static inline float ParseFloat(const char*& token);
 	static inline void ParseFloat2(const char*& token, float& x, float& y);

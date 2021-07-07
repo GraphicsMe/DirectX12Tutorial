@@ -15,7 +15,7 @@
 
 bool const ENABLE_TANGENT = true;
 
-MeshData* FObjLoader::LoadObj(const std::string& FilePath)
+MeshData* FObjLoader::LoadObj(const std::string& FilePath, bool FlipV)
 {
 	double StartTime = FTimer::GetSeconds();
 	std::cout << std::endl << "loading: " << FilePath << std::endl;
@@ -78,8 +78,10 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath)
 				if (y > 1)
 					y -= floor(y);
 				texcoords.push_back(x);
-				//texcoords.push_back(1 - y); //?
-				texcoords.push_back(y);
+				if (FlipV)
+					texcoords.push_back(1 - y);
+				else
+					texcoords.push_back(y);
 			}
 			else if (*(line_str + 1) == 'n')
 			{
@@ -169,9 +171,11 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath)
 	std::vector<Vector3f> final_positions;
 	std::vector<Vector2f> final_texcoords;
 	std::vector<Vector3f> final_normals;
+	std::vector<Vector4f> final_tangents;
 	final_positions.reserve(positions.size());
 	final_texcoords.reserve(texcoords.size());
 	final_normals.reserve(normals.size());
+	final_tangents.reserve(normals.size());
 	final_vertices.reserve(positions.size() + texcoords.size() + normals.size());
 	std::vector<uint32_t> final_indices;
 	final_indices.reserve(1024 * 1024);
@@ -223,13 +227,14 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath)
 
 	if (has_normal && has_texcoord && ENABLE_TANGENT)
 	{
-		CalcTangents(final_vertices, final_indices, VertexFloatCount);
+		CalcTangents(final_positions, final_texcoords, final_normals, final_indices, final_tangents);
 	}
 
 	MeshData* meshdata = new MeshData(FilePath);
 	meshdata->m_positions.swap(final_positions);
 	meshdata->m_texcoords.swap(final_texcoords);
 	meshdata->m_normals.swap(final_normals);
+	meshdata->m_tangents.swap(final_tangents);
 	meshdata->m_indices.swap(final_indices);
 	//Model->SetVertices(&final_vertices[0], final_vertices.size() / VertexFloatCount, sizeof(float) * VertexFloatCount);
 	//Model->SetIndices(&final_indices[0], final_indices.size());
@@ -339,14 +344,17 @@ uint32_t FObjLoader::CollectVertex(
 	}
 }
 
-void FObjLoader::CalcTangents(std::vector<float>& final_vertices, const std::vector<uint32_t>& final_indices, uint32_t VertexFloatCount)
+void FObjLoader::CalcTangents(
+	const std::vector<Vector3f>& final_positions,
+	const std::vector<Vector2f>& final_texcoords,
+	const std::vector<Vector3f>& final_normals,
+	const std::vector<uint32_t>& final_indices,
+	std::vector<Vector4f>& final_tangents)
 {
 	Assert(ENABLE_TANGENT);
-	Assert(VertexFloatCount == 12);
 	Assert(final_indices.size() % 3 == 0);
-	Assert(final_vertices.size() % VertexFloatCount == 0);
 	uint32_t TriangleCount = (uint32_t)final_indices.size() / 3;
-	uint32_t VertexCount = (uint32_t)final_vertices.size() / VertexFloatCount;
+	uint32_t VertexCount = (uint32_t)final_positions.size();
 
 	std::vector<Vector3f> tan1;
 	tan1.resize(VertexCount);
@@ -358,25 +366,27 @@ void FObjLoader::CalcTangents(std::vector<float>& final_vertices, const std::vec
 		uint32_t i2 = final_indices[3 * a + 1];
 		uint32_t i3 = final_indices[3 * a + 2];
 
-		Vector3f* v1 = (Vector3f*)&final_vertices[VertexFloatCount * i1];
-		Vector3f* v2 = (Vector3f*)&final_vertices[VertexFloatCount * i2];
-		Vector3f* v3 = (Vector3f*)&final_vertices[VertexFloatCount * i3];
-		Vector2f* w1 = (Vector2f*)&final_vertices[VertexFloatCount * i1 + 3];
-		Vector2f* w2 = (Vector2f*)&final_vertices[VertexFloatCount * i2 + 3];
-		Vector2f* w3 = (Vector2f*)&final_vertices[VertexFloatCount * i3 + 3];
+		const Vector3f& v1 = final_positions[i1];
+		const Vector3f& v2 = final_positions[i2];
+		const Vector3f& v3 = final_positions[i3];
+		const Vector2f& w1 = final_texcoords[i1];
+		const Vector2f& w2 = final_texcoords[i2];
+		const Vector2f& w3 = final_texcoords[i3];
 
-		float x1 = v2->x - v1->x;
-		float x2 = v3->x - v1->x;
-		float y1 = v2->y - v1->y;
-		float y2 = v3->y - v1->y;
-		float z1 = v2->z - v1->z;
-		float z2 = v3->z - v1->z;
-		float s1 = w2->x - w1->x;
-		float s2 = w3->x - w1->x;
-		float t1 = w2->y - w1->y;
-		float t2 = w3->y - w1->y;
+		float x1 = v2.x - v1.x;
+		float x2 = v3.x - v1.x;
+		float y1 = v2.y - v1.y;
+		float y2 = v3.y - v1.y;
+		float z1 = v2.z - v1.z;
+		float z2 = v3.z - v1.z;
+		float s1 = w2.x - w1.x;
+		float s2 = w3.x - w1.x;
+		float t1 = w2.y - w1.y;
+		float t2 = w3.y - w1.y;
 
-		float r = 1.0F / (s1 * t2 - s2 * t1);
+		float div = s1 * t2 - s2 * t1;
+		float r = div == 0.f ? 0.f : 1.f / div;
+
 		Vector3f sdir((t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r);
 		Vector3f tdir((s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r, (s1 * z2 - s2 * z1) * r);
 
@@ -390,13 +400,18 @@ void FObjLoader::CalcTangents(std::vector<float>& final_vertices, const std::vec
 	for (uint32_t a = 0; a < VertexCount; a++)
 	{
 		// position(3), tex(2), normal(3), tangent(3)
-		const Vector3f& n = *(Vector3f*)&final_vertices[VertexFloatCount * a + 5];
+		const Vector3f& n = final_normals[a];
 		const Vector3f& t = tan1[a];
 		// Gram-Schmidt orthogonalize.
-		Vector4f& tangent = *(Vector4f*)&final_vertices[VertexFloatCount * a + 8];
-		tangent = (t - n * n.Dot(t)).Normalize();
+		Vector4f tangent;
+		tangent = (t - n * n.Dot(t)).SafeNormalize();
 		// Calculate handedness.
 		tangent.w = (Cross(n, t).Dot(tan2[a]) < 0.0f) ? -1.0f : 1.0f;
+		final_tangents.push_back(tangent);
+		if (isnan(tangent.x) || isnan(tangent.y) || isnan(tangent.z))
+		{
+			std::cout << "degenerated tangent, vertex index: %d" << a << std::endl;
+		}
 	}
 }
 
@@ -662,6 +677,12 @@ MaterialData FObjLoader::CreateMaterialFromName(MaterialLibType& MtlLib, const s
 		ObjMaterial& objMat = MtlLib[MaterialName];
 		Material.Name = MaterialName;
 		Material.BaseColorPath = objMat.AlbedoPath;
+		Material.NormalPath = objMat.NormalPath;
+		Material.MetallicPath = objMat.MetallicPath;
+		Material.RoughnessPath = objMat.RoughnessPath;
+		Material.AoPath = objMat.AoPath;
+		Material.OpacityPath = objMat.OpacityPath;
+		Material.EmissivePath = objMat.EmissivePath;
 	}
 	else
 	{
