@@ -1,0 +1,17 @@
+newmtl harley
+	map_Kd textures/Bike_albedo.jpg
+	map_bump textures/Bike_normal.jpg
+	map_Pr textures/Bike_roughness.jpg
+	map_Pm textures/Bike_metallic.jpg
+	map_Ao textures/Bike_AO.jpg
+	map_Ke textures/Bike_emissive.jpg
+	map_Op textures/Bike_opacity.jpg
+	# shader SimpleShader.shader
+	
+
+newmtl ground
+	map_Kd textures/default.png
+	Pr 1
+	Pm 0
+	#Kd 0.5 0.5 0.5
+	Kd 0.25 0.25 0.25
