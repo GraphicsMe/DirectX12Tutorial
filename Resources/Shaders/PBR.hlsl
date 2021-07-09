@@ -16,6 +16,8 @@ cbuffer PSContant : register(b0)
 	int		NumSamplesPerDir;
 	int		Degree;
 	float3	CameraPos;
+	int		bSHDiffuse;
+	float3	pad;
 	float3	Coeffs[16];
 };
 
@@ -103,7 +105,18 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	float3 F = F_schlickR(NoV, F0, Roughness);
 
 	float3 kD = (1.0 - F) * (1.0 - Metallic);
-	float3 Irradiance = IrradianceCubeMap.SampleLevel(LinearSampler, N, 0).xyz;
+
+	float3 Irradiance = 0;
+	if (bSHDiffuse)
+	{
+		// SH Irradiance
+		Irradiance = GetSHIrradiance(N, 4, Coeffs);
+	}
+	else
+	{
+		Irradiance = IrradianceCubeMap.SampleLevel(LinearSampler, N, 0).xyz;
+	}
+
 	float3 Diffuse = Albedo * kD * Irradiance;
 
 	float Mip = ComputeReflectionCaptureMipFromRoughness(Roughness, MaxMipLevel-1);
@@ -116,5 +129,6 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	float3 Emissive = EmissiveMap.Sample(LinearSampler, In.Tex).xyz;
 	float3 FinalColor = Emissive + Diffuse + Specular;
 
-	return float4(ToneMapping(FinalColor * Exposure), Opacity);
+	return float4(FinalColor, 1);
+	//return float4(ToneMapping(FinalColor * Exposure), Opacity);
 }

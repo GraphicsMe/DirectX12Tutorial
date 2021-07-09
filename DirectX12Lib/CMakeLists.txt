@@ -35,6 +35,8 @@
 	include/CubeMapCross.h
 	include/ImguiManager.h
 	include/GenerateMips.h
+	include/TemporalEffects.h
+	include/BufferManager.h
 )
 
 set(SOURCES
@@ -71,6 +73,8 @@ set(SOURCES
 	src/CubeMapCross.cpp
 	src/ImguiManager.cpp
 	src/GenerateMips.cpp
+	src/TemporalEffects.cpp
+	src/BufferManager.cpp
 )
 
 set( IMGUI_HEADERS
@@ -114,6 +118,8 @@ set(SHADER_FILES
 	../Resources/shaders/ShaderUtils.hlsl
 	../Resources/shaders/GenerateMips.hlsl
 	../Resources/shaders/PBR.hlsl
+	../Resources/shaders/TemporalBlendCS.hlsl
+	../Resources/shaders/ResolveTAACS.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

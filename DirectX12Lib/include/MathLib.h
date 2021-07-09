@@ -393,3 +393,8 @@ inline uint32_t ReverseBits(uint32_t Bits)
 	Bits = ((Bits & 0x55555555) << 1) | ((Bits & 0xaaaaaaaa) >> 1);
 	return Bits;
 }
+
+template <typename T> __forceinline T DivideByMultiple(T value, size_t alignment)
+{
+	return (T)((value + alignment - 1) / alignment);
+}

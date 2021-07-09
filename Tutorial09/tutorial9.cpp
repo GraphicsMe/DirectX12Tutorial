@@ -23,6 +23,8 @@
 #include "GameInput.h"
 #include "ImguiManager.h"
 #include "GenerateMips.h"
+#include "TemporalEffects.h"
+#include "BufferManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -36,6 +38,8 @@ const int CUBE_MAP_SIZE = 1024;
 const int IRRADIANCE_SIZE = 256;
 const int PREFILTERED_SIZE = 256;
 const bool CUBEMAP_DEBUG_VIEW = true;
+
+using namespace BufferManager;
 
 enum EShowMode
 {
@@ -92,6 +96,31 @@ public:
 
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
+
+		// We use viewport offsets to jitter sample positions from frame to frame (for TAA.)
+		// D3D has a design quirk with fractional offsets such that the implicit scissor
+		// region of a viewport is floor(TopLeftXY) and floor(TopLeftXY + WidthHeight), so
+		// having a negative fractional top left, e.g. (-0.25, -0.25) would also shift the
+		// BottomRight corner up by a whole integer.  One solution is to pad your viewport
+		// dimensions with an extra pixel.  My solution is to only use positive fractional offsets,
+		// but that means that the average sample position is +0.5, which I use when I disable
+		// temporal AA.
+		TemporalEffects::GetJitterOffset(m_MainViewport.TopLeftX, m_MainViewport.TopLeftY);
+		//else
+		//{
+		//	m_MainViewport.TopLeftX = 0;
+		//	m_MainViewport.TopLeftY = 0;
+		//}
+
+		m_MainViewport.Width = (float)RenderWindow::Get().GetBackBuffer().GetWidth();
+		m_MainViewport.Height = (float)RenderWindow::Get().GetBackBuffer().GetHeight();
+		m_MainViewport.MinDepth = 0.0f;
+		m_MainViewport.MaxDepth = 1.0f;
+
+		m_MainScissor.left = 0;
+		m_MainScissor.top = 0;
+		m_MainScissor.right = (LONG)RenderWindow::Get().GetBackBuffer().GetWidth();
+		m_MainScissor.bottom = (LONG)RenderWindow::Get().GetBackBuffer().GetHeight();
 	}
 
 	void OnGUI(FCommandContext& CommandContext)
@@ -138,6 +167,11 @@ public:
 			}
 			else if (m_ShowMode == SM_PBR)
 			{
+				ImGui::Checkbox("StaticSceneTAA", &m_bStaticSceneTAA);
+
+				TemporalEffects::g_EnableTAA = m_bStaticSceneTAA;
+
+				ImGui::Checkbox("SHDiffuse", &m_bSHDiffuse);
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
 				ImGui::SameLine();
 				ImGui::Text("%.3f", m_RotateY);
@@ -185,6 +219,34 @@ public:
 			break;
 		case SM_PBR:
 			MeshPass(CommandContext);
+			// TAA
+			{
+				TemporalEffects::ResolveImage(CommandContext, g_SceneColorBuffer);
+			}
+			{
+				// Set necessary state.
+				CommandContext.SetRootSignature(m_PostProcessingSignature);
+				CommandContext.SetPipelineState(m_PostProcessingPSO);
+				CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
+
+				RenderWindow& renderWindow = RenderWindow::Get();
+				FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+
+				// Indicate that the back buffer will be used as a render target.
+				CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+				CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+				CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
+				
+				BackBuffer.SetClearColor(m_ClearColor);
+				CommandContext.ClearColor(BackBuffer);
+
+				CommandContext.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
+
+				// no need to set vertex buffer and index buffer
+				CommandContext.Draw(3);
+			}
 			break;
 		}
 
@@ -193,6 +255,7 @@ public:
 		CommandContext.TransitionResource(RenderWindow::Get().GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 		CommandContext.Finish(true);
 
+		TemporalEffects::Update();
 		RenderWindow::Get().Present();
 	}
 
@@ -210,7 +273,7 @@ private:
 
 	void SetupMesh()
 	{
-		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
+		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/delta_2_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true);
@@ -230,6 +293,9 @@ private:
 		m_GenPrefilterPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenPrefiltered", "ps_5_1");
 		m_MeshVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "VS_PBR", "vs_5_1");
 		m_MeshPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_PBR", "ps_5_1");
+
+		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
+		m_PostProcessingPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "PS_Main", "ps_5_1");
 
 		m_SphericalHarmonicsPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SphericalHarmonics", "ps_5_1");
 	}
@@ -379,10 +445,28 @@ private:
 		m_MeshPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		m_MeshPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_MeshPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_MeshPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_MeshPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), RenderWindow::Get().GetDepthFormat());
 		m_MeshPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_MeshVS.Get()));
 		m_MeshPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_MeshPS.Get()));
 		m_MeshPSO.Finalize();
+
+		// post Process
+		m_PostProcessingSignature.Reset(2, 1);
+		m_PostProcessingSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+		m_PostProcessingSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+		m_PostProcessingSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_PostProcessingSignature.Finalize(L"Post Process RootSignature");
+
+		m_PostProcessingPSO.SetRootSignature(m_PostProcessingSignature);
+		m_PostProcessingPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_PostProcessingPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_PostProcessingPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		// no need to set input layout
+		m_PostProcessingPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_PostProcessingPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), DXGI_FORMAT_UNKNOWN);
+		m_PostProcessingPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
+		m_PostProcessingPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PostProcessingPS.Get()));
+		m_PostProcessingPSO.Finalize();
 	}
 
 	void GenerateCubeMap()
@@ -541,23 +625,24 @@ private:
 		GfxContext.SetRootSignature(m_MeshSignature);
 		GfxContext.SetPipelineState(m_MeshPSO);
 		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		GfxContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
+		// jitter offset
+		GfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
-		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+
+		FColorBuffer& SceneBuffer = g_SceneColorBuffer;
 		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 
 		// Indicate that the back buffer will be used as a render target.
 		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(SceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GfxContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 
-		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
-		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
+		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV());
+		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV(), DepthBuffer.GetDSV());
 
-		BackBuffer.SetClearColor(m_ClearColor);
-		GfxContext.ClearColor(BackBuffer);
+		GfxContext.ClearColor(SceneBuffer);
 		GfxContext.ClearDepth(DepthBuffer);
 
 		m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
@@ -566,6 +651,13 @@ private:
 
 		m_PSConstants.Exposure = m_Exposure;
 		m_PSConstants.CameraPos = m_Camera.GetPosition();
+
+		for (int i = 0; i < m_SHCoeffs.size(); ++i)
+		{
+			m_PSConstants.Coeffs[i] = m_SHCoeffs[i];
+		}
+		m_PSConstants.bSHDiffuse = m_bSHDiffuse;
+
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
 		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
@@ -797,18 +889,24 @@ private:
 		int			NumSamplesPerDir;
 		int			Degree;
 		Vector3f	CameraPos;
+		int			bSHDiffuse;
+		Vector3f	pad;
 		Vector4f	Coeffs[16];
 	} m_PSConstants;
 
 	int	m_SHDegree = 4;
 	int m_SHSampleNum = 10000;
 	std::vector<Vector3f> m_SHCoeffs;
+	bool m_bSHDiffuse = false;
+
+	bool m_bStaticSceneTAA = false;
 
 	FRootSignature m_GenCubeSignature;
 	FRootSignature m_SkySignature;
 	FRootSignature m_Show2DTextureSignature;
 	FRootSignature m_CubeMapCrossViewSignature;
 	FRootSignature m_MeshSignature;
+	FRootSignature m_PostProcessingSignature;
 
 	FGraphicsPipelineState m_GenCubePSO;
 	FGraphicsPipelineState m_SkyPSO;
@@ -818,6 +916,7 @@ private:
 	FGraphicsPipelineState m_GenPrefilterPSO;
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 	FGraphicsPipelineState m_MeshPSO;
+	FGraphicsPipelineState m_PostProcessingPSO;
 
 	FTexture m_TextureLongLat, m_PreintegratedGF;
 	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
@@ -832,7 +931,10 @@ private:
 	ComPtr<ID3DBlob> m_GenIrradiancePS;
 	ComPtr<ID3DBlob> m_GenPrefilterPS;
 	ComPtr<ID3DBlob> m_MeshPS, m_MeshVS;
+	ComPtr<ID3DBlob> m_PostProcessingPS;
 
+	D3D12_VIEWPORT		m_MainViewport;
+	D3D12_RECT			m_MainScissor;
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
 	std::unique_ptr<FModel> m_Mesh, m_SkyBox, m_CubeMapCross;

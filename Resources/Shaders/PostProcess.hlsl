@@ -7,7 +7,7 @@ struct VertexOutput
 	float4 Pos	: SV_Position;
 };
 
-Texture2D ScatteringTexture	: register(t0);
+Texture2D SceneColorTexture : register(t0);
 SamplerState LinearSampler	: register(s0);
 
 VertexOutput VS_ScreenQuad(in uint VertID : SV_VertexID)
@@ -20,8 +20,12 @@ VertexOutput VS_ScreenQuad(in uint VertID : SV_VertexID)
 	return Output;
 }
 
+////-------------------------------------------------------
+//// Simple post processing shader 
+//// only tonemap and gamma
+////-------------------------------------------------------
 float4 PS_Main(in VertexOutput Input) : SV_Target0
 {
-	float3 Color = ScatteringTexture.Sample(LinearSampler, Input.Tex).xyz;
+	float3 Color = SceneColorTexture.Sample(LinearSampler, Input.Tex).xyz;
 	return float4(ToneMapping(Color), 1.0);
 }

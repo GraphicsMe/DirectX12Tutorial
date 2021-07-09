@@ -151,4 +151,6 @@ public:
 	void SetDynamicConstantBufferView(UINT RootIndex, size_t BufferSize, const void* BufferData);
 
 	void Dispatch(size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ);
+
+	void Dispatch2D(size_t ThreadCountX, size_t ThreadCountY, size_t GroupSizeX = 8, size_t GroupSizeY = 8);
 };

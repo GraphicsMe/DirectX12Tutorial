@@ -15,6 +15,8 @@
 #include "DescriptorAllocator.h"
 #include "PipelineState.h"
 #include "GenerateMips.h"
+#include "TemporalEffects.h"
+#include "BufferManager.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -168,14 +170,18 @@ bool D3D12RHI::Initialize()
 	// 4. create render window(swapchain)
 	RenderWindow::Get().Initialize();
 
+	BufferManager::InitializeRenderingBuffers(WindowWin32::Get().GetWidth(), WindowWin32::Get().GetHeight());
 	FGenerateMips::Initialize();
+	TemporalEffects::Initialize();
 
 	return true;
 }
 
 void D3D12RHI::Destroy()
 {
+	TemporalEffects::Destroy();
 	FGenerateMips::Destroy();
+	BufferManager::DestroyRenderingBuffers();
 	FCommandContext::DestroyAllContexts();
 	g_CommandListManager.Destroy();
 	FPipelineState::DestroyAll();
