@@ -37,6 +37,7 @@
 	include/GenerateMips.h
 	include/TemporalEffects.h
 	include/BufferManager.h
+	include/MotionBlur.h
 )
 
 set(SOURCES
@@ -75,6 +76,7 @@ set(SOURCES
 	src/GenerateMips.cpp
 	src/TemporalEffects.cpp
 	src/BufferManager.cpp
+	src/MotionBlur.cpp
 )
 
 set( IMGUI_HEADERS
@@ -120,6 +122,8 @@ set(SHADER_FILES
 	../Resources/shaders/PBR.hlsl
 	../Resources/shaders/TemporalBlendCS.hlsl
 	../Resources/shaders/ResolveTAACS.hlsl
+	../Resources/shaders/CameraVelocityCS.hlsl
+	../Resources/shaders/PixelPacking_Velocity.hlsli
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

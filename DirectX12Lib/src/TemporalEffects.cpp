@@ -1,12 +1,16 @@
 ﻿#include "TemporalEffects.h"
 #include "CommandContext.h"
-#include "RenderWindow.h"
+#include "BufferManager.h"
 #include "RootSignature.h"
 #include "PipelineState.h"
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
+#include "MotionBlur.h"
+#include "RenderWindow.h"
 
 using namespace TemporalEffects;
+using namespace BufferManager;
+using namespace MotionBlur;
 
 namespace TemporalEffects
 {
@@ -35,8 +39,8 @@ namespace TemporalEffects
 
 void TemporalEffects::Initialize(void)
 {
-	uint32_t bufferWidth = RenderWindow::Get().GetBackBuffer().GetWidth();
-	uint32_t bufferHeight = RenderWindow::Get().GetBackBuffer().GetWidth();
+	uint32_t bufferWidth = g_SceneColorBuffer.GetWidth();
+	uint32_t bufferHeight = g_SceneColorBuffer.GetHeight();
 
 	// Buffers
 	g_TemporalColor[0].Create(L"Temporal Color 0", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -158,6 +162,9 @@ void TemporalEffects::ResolveImage(FCommandContext& GraphicsContext,FColorBuffer
 
 void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& SceneColor)
 {
+	RenderWindow& renderWindow = RenderWindow::Get();
+	FDepthBuffer& SceneDepthBuffer = renderWindow.GetDepthBuffer();
+
 	uint32_t Src = s_FrameIndexMod2;
 	uint32_t Dst = Src ^ 1;
 	
@@ -173,8 +180,8 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 	};
 
 	ConstantBuffer cbv;
-	cbv.RcpBufferDim[0] = 1.0f / RenderWindow::Get().GetBackBuffer().GetWidth();
-	cbv.RcpBufferDim[1] = 1.0f / RenderWindow::Get().GetBackBuffer().GetHeight();
+	cbv.RcpBufferDim[0] = 1.0f / g_SceneColorBuffer.GetWidth();
+	cbv.RcpBufferDim[1] = 1.0f / g_SceneColorBuffer.GetHeight();
 	cbv.TemporalBlendFactor = s_FirstFrame ? 1 : 0.02f;
 	cbv.RcpSeedLimiter = 0;
 	cbv.CombinedJitter[0] = s_JitterDeltaX;
@@ -182,12 +189,16 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 
 	Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 	Context.TransitionResource(SceneColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	Context.TransitionResource(SceneDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	Context.TransitionResource(g_VelocityBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	Context.TransitionResource(g_TemporalColor[Src], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	Context.TransitionResource(g_TemporalColor[Dst], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	// srv
 	Context.SetDynamicDescriptor(1, 0, SceneColor.GetSRV());
 	Context.SetDynamicDescriptor(1, 1, g_TemporalColor[Src].GetSRV());
+	Context.SetDynamicDescriptor(1, 2, g_VelocityBuffer.GetSRV());
+	Context.SetDynamicDescriptor(1, 3, SceneDepthBuffer.GetDepthSRV());
 	// uav
 	Context.SetDynamicDescriptor(2, 0, g_TemporalColor[Dst].GetUAV());
 

@@ -25,6 +25,7 @@
 #include "GenerateMips.h"
 #include "TemporalEffects.h"
 #include "BufferManager.h"
+#include "MotionBlur.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -221,6 +222,7 @@ public:
 			MeshPass(CommandContext);
 			// TAA
 			{
+				MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);
 				TemporalEffects::ResolveImage(CommandContext, g_SceneColorBuffer);
 			}
 			{

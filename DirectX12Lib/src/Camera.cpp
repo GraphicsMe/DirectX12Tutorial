@@ -50,6 +50,9 @@ void FCamera::Update(float DeltaTime)
 	}
 
 	ProcessMouseMove(DeltaTime);
+
+	// update all
+	UpdateAllMatrix();
 }
 
 Vector4f FCamera::GetPosition() const
@@ -57,8 +60,24 @@ Vector4f FCamera::GetPosition() const
 	return Vector4f(Position, 1.f);
 }
 
+void FCamera::UpdateAllMatrix()
+{
+	// Record the Previous frame ViewProjMatrix
+	m_PreviousViewProjMatrix = m_ViewMat * m_ProjMat;
+
+	UpdateViewMatrix();
+
+	UpdateProjMatrix();
+
+	m_ViewProjMatrix = m_ViewMat * m_ProjMat;
+
+	// Update ReprojectMatrix
+	m_ReprojectMatrix = m_ViewProjMatrix.Inverse() * m_PreviousViewProjMatrix;
+}
+
 void FCamera::UpdateViewMatrix()
 {
+	// Update ViewMatrix 
 	Vector3f Focus = Position + Forward * CameraLength;
 	m_ViewMat = FMatrix::MatrixLookAtLH(Position, Focus, Up);
 }
@@ -75,7 +94,7 @@ void FCamera::MoveForward(float Value)
 		CameraLength -= Value;
 		Vector3f Delta = Forward * Value;
 		Position += Delta;
-		UpdateViewMatrix();
+		//UpdateViewMatrix();
 	}
 }
 
@@ -83,14 +102,14 @@ void FCamera::MoveRight(float Value)
 {
 	Vector3f Delta = Right * Value;
 	Position += Delta;
-	UpdateViewMatrix();
+	//UpdateViewMatrix();
 }
 
 void FCamera::MoveUp(float Value)
 {
 	Vector3f Delta = Up * Value;
 	Position += Delta;
-	UpdateViewMatrix();
+	//UpdateViewMatrix();
 }
 
 void FCamera::Orbit(float Yaw, float Pitch)
@@ -125,7 +144,7 @@ void FCamera::Orbit(float Yaw, float Pitch)
 	Up = Result.r1;
 	Forward = Result.r2;
 	Position = Focus - Forward * CameraLength; // Focus will not change
-	UpdateViewMatrix();
+	//UpdateViewMatrix();
 }
 
 void FCamera::Rotate(float Yaw, float Pitch)
@@ -137,7 +156,7 @@ void FCamera::Rotate(float Yaw, float Pitch)
 	Right = Result.r0;
 	Up = Result.r1;
 	Forward = Result.r2;
-	UpdateViewMatrix();
+	//UpdateViewMatrix();
 }
 
 void FCamera::SetVerticalFov(float VerticalFov)

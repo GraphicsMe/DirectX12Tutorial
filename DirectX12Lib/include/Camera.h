@@ -28,17 +28,34 @@ public:
 	void SetPerspectiveParams(float VerticalFov, float AspectHByW, float NearZ, float FarZ);
 	const FMatrix GetProjectionMatrix() const;
 
+	float GetNearClip() const { return m_NearZ; }
+	float GetFarClip() const { return m_FarZ; }
+
+	const FMatrix& GetViewProjMatrix() const { return m_ViewProjMatrix; }
+	const FMatrix& GetReprojectionMatrix() const { return m_ReprojectMatrix; }
+
 	void SetMouseMoveSpeed(float Speed) { m_MoveSpeed = Speed; }
 	void SetMouseZoomSpeed(float Speed) { m_ZoomSpeed = Speed; }
 	void SetMouseRotateSpeed(float Speed) { m_RotateSpeed = Speed; }
 
 private:
+	void UpdateAllMatrix();
 	void UpdateViewMatrix();
 	void UpdateProjMatrix();
 	void ProcessMouseMove(float DeltaTime);
 
 private:
-	FMatrix m_ViewMat, m_ProjMat;
+	// 
+	FMatrix m_ViewMat;
+	FMatrix m_ProjMat;
+	FMatrix m_ViewProjMatrix;
+
+	// The view-projection matrix from the previous frame
+	FMatrix m_PreviousViewProjMatrix;
+
+	// Projects a clip-space coordinate to the previous frame (useful for temporal effects).
+	FMatrix m_ReprojectMatrix;
+
 	float CameraLength;
 	Vector3f Right, Up, Forward, Position;
 
