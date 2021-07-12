@@ -71,7 +71,8 @@ cbuffer PSContant : register(b0)
 	int		MaxMipLevel;
 	int		NumSamplesPerDir;
 	int		Degree;
-	float3		Padding;
+	float3	pod1;
+	float4  pad2;
 	float3	Coeffs[16];
 };
 
