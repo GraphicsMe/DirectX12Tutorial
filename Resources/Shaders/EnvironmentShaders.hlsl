@@ -81,9 +81,7 @@ TextureCube CubeEnvironment : register(t0);
 float4 PS_SkyCube(VertexOutput In) : SV_Target
 {
 	// Local Direction don't need to normalized
-	float3 Color = CubeEnvironment.Sample(LinearSampler, In.LocalDirection).xyz;
-
-	return float4(ToneMapping(Color * Exposure), 1.0);
+	return CubeEnvironment.Sample(LinearSampler, In.LocalDirection);
 }
 
 

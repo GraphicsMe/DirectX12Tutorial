@@ -12,11 +12,11 @@ FModel::FModel()
 
 }
 
-FModel::FModel(const std::string& FileName, bool FlipV)
+FModel::FModel(const std::string& FileName, bool FlipV, bool NegateZ)
 	: m_FileName(FileName)
 	, m_Scale(1.f)
 {
-	m_MeshData = FObjLoader::LoadObj(FileName, FlipV);
+	m_MeshData = FObjLoader::LoadObj(FileName, FlipV, NegateZ);
 	InitializeResource();
 }
 

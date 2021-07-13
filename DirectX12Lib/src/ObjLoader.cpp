@@ -15,7 +15,7 @@
 
 bool const ENABLE_TANGENT = true;
 
-MeshData* FObjLoader::LoadObj(const std::string& FilePath, bool FlipV)
+MeshData* FObjLoader::LoadObj(const std::string& FilePath, bool FlipV, bool NegateZ)
 {
 	double StartTime = FTimer::GetSeconds();
 	std::cout << std::endl << "loading: " << FilePath << std::endl;
@@ -65,8 +65,10 @@ MeshData* FObjLoader::LoadObj(const std::string& FilePath, bool FlipV)
 				ParseFloat3(++line_str, x, y, z);
 				positions.push_back(x);
 				positions.push_back(y);
-				//positions.push_back(-z); //?
-				positions.push_back(z);
+				if (NegateZ)
+					positions.push_back(-z);
+				else
+					positions.push_back(z);
 			}
 			else if (*(line_str + 1) == 't')
 			{

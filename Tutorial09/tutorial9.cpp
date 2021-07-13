@@ -201,7 +201,8 @@ public:
 			ShowTexture2D(CommandContext, m_TextureLongLat);
 			break;
 		case SM_SkyBox:
-			SkyPass(CommandContext);
+			SkyPass(CommandContext, true);
+			PostProcess(CommandContext);
 			break;
 		case SM_CubeMapCross:
 			ShowCubeMapDebugView(CommandContext, m_CubeBuffer);
@@ -220,35 +221,13 @@ public:
 			break;
 		case SM_PBR:
 			MeshPass(CommandContext);
+			SkyPass(CommandContext, false);
 			// TAA
 			{
 				MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);
 				TemporalEffects::ResolveImage(CommandContext, g_SceneColorBuffer);
 			}
-			{
-				// Set necessary state.
-				CommandContext.SetRootSignature(m_PostProcessingSignature);
-				CommandContext.SetPipelineState(m_PostProcessingPSO);
-				CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
-
-				RenderWindow& renderWindow = RenderWindow::Get();
-				FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
-
-				// Indicate that the back buffer will be used as a render target.
-				CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-				CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-
-				CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
-				
-				BackBuffer.SetClearColor(m_ClearColor);
-				CommandContext.ClearColor(BackBuffer);
-
-				CommandContext.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
-
-				// no need to set vertex buffer and index buffer
-				CommandContext.Draw(3);
-			}
+			PostProcess(CommandContext);
 			break;
 		}
 
@@ -265,7 +244,7 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(1.5f, 1.f, 0.f), Vector3f(0.f, 0.3f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(1.5f, 0.6f, 0.3f), Vector3f(0.f, 0.3f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
@@ -278,7 +257,7 @@ private:
 		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
-		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true);
+		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true, false);
 	}
 
 	void SetupShaders()
@@ -340,10 +319,10 @@ private:
 		m_SkyPSO.SetRootSignature(m_SkySignature);
 		m_SkyPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 		m_SkyPSO.SetBlendState(FPipelineState::BlendDisable);
-		m_SkyPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		m_SkyPSO.SetDepthStencilState(FPipelineState::DepthStateReadOnly);
 		m_SkyPSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
 		m_SkyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_SkyPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_SkyPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), RenderWindow::Get().GetDepthFormat());
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
 		m_SkyPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkyPS.Get()));
 		m_SkyPSO.Finalize();
@@ -585,7 +564,7 @@ private:
 		}
 	}
 
-	void SkyPass(FCommandContext& GfxContext)
+	void SkyPass(FCommandContext& GfxContext, bool Clear)
 	{
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_SkySignature);
@@ -594,7 +573,7 @@ private:
 		GfxContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
 		RenderWindow& renderWindow = RenderWindow::Get();
-		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+		FColorBuffer& BackBuffer = g_SceneColorBuffer;
 		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 
 		// Indicate that the back buffer will be used as a render target.
@@ -605,9 +584,12 @@ private:
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 		GfxContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
 
-		BackBuffer.SetClearColor(m_ClearColor);
-		GfxContext.ClearColor(BackBuffer);
-		GfxContext.ClearDepth(DepthBuffer);
+		if (Clear)
+		{
+			//BackBuffer.SetClearColor(m_ClearColor);
+			GfxContext.ClearColor(BackBuffer);
+			GfxContext.ClearDepth(DepthBuffer);
+		}
 
 		m_VSConstants.ModelMatrix = FMatrix::TranslateMatrix(m_Camera.GetPosition()); // move with camera
 		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
@@ -667,6 +649,32 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 9, m_PreintegratedGF.GetSRV());
 
 		m_Mesh->Draw(GfxContext);
+	}
+
+	void PostProcess(FCommandContext& CommandContext)
+	{
+		// Set necessary state.
+		CommandContext.SetRootSignature(m_PostProcessingSignature);
+		CommandContext.SetPipelineState(m_PostProcessingPSO);
+		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
+
+		RenderWindow& renderWindow = RenderWindow::Get();
+		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
+
+		// Indicate that the back buffer will be used as a render target.
+		CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
+
+		BackBuffer.SetClearColor(m_ClearColor);
+		CommandContext.ClearColor(BackBuffer);
+
+		CommandContext.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
+
+		// no need to set vertex buffer and index buffer
+		CommandContext.Draw(3);
 	}
 
 	void ShowTexture2D(FCommandContext& GfxContext, FTexture& Texture2D)
@@ -901,7 +909,7 @@ private:
 	std::vector<Vector3f> m_SHCoeffs;
 	bool m_bSHDiffuse = false;
 
-	bool m_bStaticSceneTAA = false;
+	bool m_bStaticSceneTAA = true;
 
 	FRootSignature m_GenCubeSignature;
 	FRootSignature m_SkySignature;
