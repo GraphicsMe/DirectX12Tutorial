@@ -275,7 +275,7 @@ private:
 
 	void SetupMesh()
 	{
-		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/delta_2_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
+		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true);
@@ -496,7 +496,7 @@ private:
 			m_SkyBox->Draw(GfxContext);
 		}
 		GfxContext.Flush(true);
-		FGenerateMips::Generate(m_CubeBuffer, GfxContext);
+		FGenerateMips::GenerateForCube(m_CubeBuffer, GfxContext);
 		GfxContext.Finish(true);
 	}
 

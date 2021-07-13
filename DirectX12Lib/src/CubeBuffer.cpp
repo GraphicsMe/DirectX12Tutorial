@@ -78,6 +78,19 @@ D3D12_CPU_DESCRIPTOR_HANDLE FCubeBuffer::GetRTV(int Face, int Mip) const
 }
 
 
+D3D12_CPU_DESCRIPTOR_HANDLE FCubeBuffer::GetCubeSRV(int Mip) const
+{
+	uint32_t DescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	if (Mip < 0)
+	{
+		return m_CubeSRVHandle; // -1 means whole mipmap chain
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE Result = m_CubeSRVHandle;
+	Result.ptr += DescriptorSize * (Mip + 1);
+	return Result;
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE FCubeBuffer::GetFaceMipSRV(int Face, int Mip) const
 {
 	uint32_t DescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -98,6 +111,9 @@ uint32_t FCubeBuffer::GetSubresourceIndex(int Face, int Mip) const
 
 void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, uint32_t ArraySize, uint32_t NumMips /*= 1*/)
 {
+	uint32_t RTVDescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	uint32_t SRVDescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	Assert(ArraySize == 6);
 	D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
 	SRVDesc.Format = Format;
@@ -107,8 +123,17 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 	SRVDesc.TextureCube.MostDetailedMip = 0;
 	SRVDesc.TextureCube.ResourceMinLODClamp = 0.0f;
 
-	m_CubeSRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-	Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, m_CubeSRVHandle);
+	m_CubeSRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1 + NumMips);
+	D3D12_CPU_DESCRIPTOR_HANDLE CurCubeSRVHandle = m_CubeSRVHandle;
+	Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, CurCubeSRVHandle);
+	CurCubeSRVHandle.ptr += SRVDescriptorSize;
+	for (uint32_t Mip = 0; Mip < NumMips; ++Mip)
+	{
+		SRVDesc.TextureCube.MipLevels = 1;
+		SRVDesc.TextureCube.MostDetailedMip = Mip;
+		Device->CreateShaderResourceView(m_Resource.Get(), &SRVDesc, CurCubeSRVHandle);
+		CurCubeSRVHandle.ptr += SRVDescriptorSize;
+	}
 
 	D3D12_RENDER_TARGET_VIEW_DESC RTVDesc = {};
 	RTVDesc.Format = Format;
@@ -118,8 +143,6 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 	m_RTVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, ArraySize * NumMips);
 	m_FaceMipSRVHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, ArraySize * NumMips);
 
-	uint32_t RTVDescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	uint32_t SRVDescriptorSize = D3D12RHI::Get().GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTVHandle = m_RTVHandle;
 	D3D12_CPU_DESCRIPTOR_HANDLE CurrentSRVHandle = m_FaceMipSRVHandle;
 	for (uint32_t Face = 0; Face < ArraySize; ++Face)
@@ -145,13 +168,12 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 	}
 }
 
-
 void FCubeBuffer::SaveCubeMap(const std::wstring& FileName)
 {
 	ScratchImage image;
 	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
+	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_AllCurrentState[0], m_AllCurrentState[0]);
 	if (SUCCEEDED(hr))
 	{
 		hr = DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DDS_FLAGS_NONE, FileName.c_str());
@@ -288,7 +310,7 @@ std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 #if 1
 	DirectX::ScratchImage image;
 	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
-	hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_CurrentState, m_CurrentState);
+	hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_AllCurrentState[0], m_AllCurrentState[0]);
 #else
 	DirectX::ScratchImage image_posx;
 	DirectX::ScratchImage image_negx;

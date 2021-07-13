@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <vector>
 #include <d3d12.h>
 #include "Common.h"
 
@@ -10,15 +11,20 @@ class FD3D12Resource
 public:
 	FD3D12Resource()
 		: m_GpuAddress(0)
-		, m_CurrentState(D3D12_RESOURCE_STATE_COMMON)
 	{
 	}
 
 	FD3D12Resource(ID3D12Resource* Resource, D3D12_RESOURCE_STATES State)
 		: m_GpuAddress(0)
-		, m_CurrentState(State)
 	{
 		m_Resource.Attach(Resource);
+		
+	}
+
+	void InitializeState(D3D12_RESOURCE_STATES State)
+	{
+		D3D12_RESOURCE_DESC Desc = m_Resource->GetDesc();
+		m_AllCurrentState.resize(Desc.MipLevels * Desc.DepthOrArraySize, State);
 	}
 
 	virtual void Destroy()
@@ -33,6 +39,6 @@ public:
 
 protected:
 	ComPtr<ID3D12Resource> m_Resource;
-	D3D12_RESOURCE_STATES m_CurrentState;
+	std::vector<D3D12_RESOURCE_STATES> m_AllCurrentState;
 	D3D12_GPU_VIRTUAL_ADDRESS m_GpuAddress;
 };

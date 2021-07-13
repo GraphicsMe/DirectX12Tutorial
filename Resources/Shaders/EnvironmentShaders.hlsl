@@ -266,13 +266,14 @@ float3 PrefilterEnvMap(uint2 Random, float Roughness, float3 R)
 	float3 FilteredColor = 0;
 	float Weight = 0;
 
+	const float K = 2.0;
 	uint CubeSize = 1 << (MaxMipLevel - 1);
 	const float SolidAngleTexel = 4 * PI / (6 * CubeSize * CubeSize);
 
 	const uint NumSamples = Roughness < 0.1 ? 32 : 64;
 	for (uint i = 0; i < NumSamples; i++)
 	{
-		float2 E = Hammersley(i, NumSamples, Random);
+		float2 E = Hammersley(i, NumSamples, 0);
 		float3 H = TangentToWorld(ImportanceSampleGGX(E, Pow4(Roughness)).xyz, R);
 		float3 L = 2 * dot(R, H) * H - R;
 
@@ -285,7 +286,7 @@ float3 PrefilterEnvMap(uint2 Random, float Roughness, float3 R)
 			float PDF = D_GGX(Pow4(Roughness), NoH) * 0.25;
 			float SolidAngleSample = 1.0 / (NumSamples * PDF);
 			float MipBias = 1.0;
-			float Mip = clamp(0.5 * log2(SolidAngleSample / SolidAngleTexel) + MipBias, 0, MaxMipLevel-1);
+			float Mip = Roughness == 0 ? 0 : clamp(0.5 * log2(K * SolidAngleSample / SolidAngleTexel) + MipBias, 0, MaxMipLevel-1);
 
 			FilteredColor += CubeEnvironment.SampleLevel(LinearSampler, L, Mip).rgb * NoL;
 			Weight += NoL;

@@ -32,7 +32,7 @@ void FPixelBuffer::AssociateWithResource(ID3D12Device* Device, const std::wstrin
 
 	D3D12_RESOURCE_DESC Desc = Resource->GetDesc();
 	m_Resource.Attach(Resource);
-	m_CurrentState = State;
+	InitializeState(State);
 
 	m_Width = (uint32_t)Desc.Width;
 	m_Height = Desc.Height;
@@ -54,7 +54,8 @@ void FPixelBuffer::CreateTextureResource(ID3D12Device* Device, const std::wstrin
 	ThrowIfFailed(Device->CreateCommittedResource(&HeapProps, D3D12_HEAP_FLAG_NONE,
 		&ResourceDesc, D3D12_RESOURCE_STATE_COMMON, &ClearValue, IID_PPV_ARGS(&m_Resource)));
 
-	m_CurrentState = D3D12_RESOURCE_STATE_COMMON;
+	InitializeState(D3D12_RESOURCE_STATE_COMMON);
+
 	m_GpuAddress = 0;
 
 #if _DEBUG
