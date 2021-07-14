@@ -38,6 +38,7 @@
 	include/TemporalEffects.h
 	include/BufferManager.h
 	include/MotionBlur.h
+	include/PostProcessing.h
 )
 
 set(SOURCES
@@ -77,6 +78,7 @@ set(SOURCES
 	src/TemporalEffects.cpp
 	src/BufferManager.cpp
 	src/MotionBlur.cpp
+	src/PostProcessing.cpp
 )
 
 set( IMGUI_HEADERS

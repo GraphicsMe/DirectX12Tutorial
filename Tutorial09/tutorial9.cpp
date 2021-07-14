@@ -26,6 +26,7 @@
 #include "TemporalEffects.h"
 #include "BufferManager.h"
 #include "MotionBlur.h"
+#include "PostProcessing.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -45,7 +46,6 @@ using namespace BufferManager;
 enum EShowMode
 {
 	SM_LongLat,
-	SM_SkyBox,
 	SM_CubeMapCross,
 	SM_Irradiance,
 	SM_Prefiltered,
@@ -122,6 +122,8 @@ public:
 		m_MainScissor.top = 0;
 		m_MainScissor.right = (LONG)RenderWindow::Get().GetBackBuffer().GetWidth();
 		m_MainScissor.bottom = (LONG)RenderWindow::Get().GetBackBuffer().GetHeight();
+
+		TemporalEffects::Update();
 	}
 
 	void OnGUI(FCommandContext& CommandContext)
@@ -145,7 +147,6 @@ public:
 			ImGui::Text("Show Mode");
 			ImGui::Indent(20);
 			ImGui::RadioButton("Long-Lat View", &m_ShowMode, SM_LongLat);
-			ImGui::RadioButton("Cube Box", &m_ShowMode, SM_SkyBox);
 			ImGui::RadioButton("Cube Cross", &m_ShowMode, SM_CubeMapCross);
 			ImGui::RadioButton("Irradiance", &m_ShowMode, SM_Irradiance);
 			ImGui::RadioButton("Prefiltered", &m_ShowMode, SM_Prefiltered);
@@ -176,6 +177,8 @@ public:
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
 				ImGui::SameLine();
 				ImGui::Text("%.3f", m_RotateY);
+				ImGui::SliderFloat("Bloom Threashold", &PostProcessing::g_BloomThreshold, 0.f, 10.f);
+				ImGui::Checkbox("Enable Bloom", &PostProcessing::g_EnableBloom);
 			}
 
 			ImGui::Separator();
@@ -200,10 +203,6 @@ public:
 		case SM_LongLat:
 			ShowTexture2D(CommandContext, m_TextureLongLat);
 			break;
-		case SM_SkyBox:
-			SkyPass(CommandContext, true);
-			PostProcess(CommandContext);
-			break;
 		case SM_CubeMapCross:
 			ShowCubeMapDebugView(CommandContext, m_CubeBuffer);
 			break;
@@ -227,7 +226,8 @@ public:
 				MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);
 				TemporalEffects::ResolveImage(CommandContext, g_SceneColorBuffer);
 			}
-			PostProcess(CommandContext);
+			PostProcessing::Render(CommandContext);
+
 			break;
 		}
 
@@ -236,7 +236,6 @@ public:
 		CommandContext.TransitionResource(RenderWindow::Get().GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 		CommandContext.Finish(true);
 
-		TemporalEffects::Update();
 		RenderWindow::Get().Present();
 	}
 
@@ -274,9 +273,6 @@ private:
 		m_GenPrefilterPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_GenPrefiltered", "ps_5_1");
 		m_MeshVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "VS_PBR", "vs_5_1");
 		m_MeshPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_PBR", "ps_5_1");
-
-		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
-		m_PostProcessingPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "PS_Main", "ps_5_1");
 
 		m_SphericalHarmonicsPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SphericalHarmonics", "ps_5_1");
 	}
@@ -430,24 +426,6 @@ private:
 		m_MeshPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_MeshVS.Get()));
 		m_MeshPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_MeshPS.Get()));
 		m_MeshPSO.Finalize();
-
-		// post Process
-		m_PostProcessingSignature.Reset(2, 1);
-		m_PostProcessingSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-		m_PostProcessingSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
-		m_PostProcessingSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
-		m_PostProcessingSignature.Finalize(L"Post Process RootSignature");
-
-		m_PostProcessingPSO.SetRootSignature(m_PostProcessingSignature);
-		m_PostProcessingPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
-		m_PostProcessingPSO.SetBlendState(FPipelineState::BlendDisable);
-		m_PostProcessingPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		// no need to set input layout
-		m_PostProcessingPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_PostProcessingPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), DXGI_FORMAT_UNKNOWN);
-		m_PostProcessingPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
-		m_PostProcessingPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PostProcessingPS.Get()));
-		m_PostProcessingPSO.Finalize();
 	}
 
 	void GenerateCubeMap()
@@ -649,32 +627,6 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 9, m_PreintegratedGF.GetSRV());
 
 		m_Mesh->Draw(GfxContext);
-	}
-
-	void PostProcess(FCommandContext& CommandContext)
-	{
-		// Set necessary state.
-		CommandContext.SetRootSignature(m_PostProcessingSignature);
-		CommandContext.SetPipelineState(m_PostProcessingPSO);
-		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		CommandContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
-
-		RenderWindow& renderWindow = RenderWindow::Get();
-		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
-
-		// Indicate that the back buffer will be used as a render target.
-		CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-
-		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
-
-		BackBuffer.SetClearColor(m_ClearColor);
-		CommandContext.ClearColor(BackBuffer);
-
-		CommandContext.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
-
-		// no need to set vertex buffer and index buffer
-		CommandContext.Draw(3);
 	}
 
 	void ShowTexture2D(FCommandContext& GfxContext, FTexture& Texture2D)
@@ -916,7 +868,6 @@ private:
 	FRootSignature m_Show2DTextureSignature;
 	FRootSignature m_CubeMapCrossViewSignature;
 	FRootSignature m_MeshSignature;
-	FRootSignature m_PostProcessingSignature;
 
 	FGraphicsPipelineState m_GenCubePSO;
 	FGraphicsPipelineState m_SkyPSO;
@@ -926,13 +877,11 @@ private:
 	FGraphicsPipelineState m_GenPrefilterPSO;
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 	FGraphicsPipelineState m_MeshPSO;
-	FGraphicsPipelineState m_PostProcessingPSO;
 
 	FTexture m_TextureLongLat, m_PreintegratedGF;
 	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
 
 	ComPtr<ID3DBlob> m_LongLatToCubeVS;
-	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_SkyPS, m_SkyVS;
 	ComPtr<ID3DBlob> m_CubeMapCrossPS, m_CubeMapCrossVS;
 	ComPtr<ID3DBlob> m_SphericalHarmonicsPS;
@@ -941,7 +890,6 @@ private:
 	ComPtr<ID3DBlob> m_GenIrradiancePS;
 	ComPtr<ID3DBlob> m_GenPrefilterPS;
 	ComPtr<ID3DBlob> m_MeshPS, m_MeshVS;
-	ComPtr<ID3DBlob> m_PostProcessingPS;
 
 	D3D12_VIEWPORT		m_MainViewport;
 	D3D12_RECT			m_MainScissor;

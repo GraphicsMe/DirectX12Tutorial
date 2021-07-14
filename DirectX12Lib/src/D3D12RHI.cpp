@@ -18,6 +18,7 @@
 #include "TemporalEffects.h"
 #include "BufferManager.h"
 #include "MotionBlur.h"
+#include "PostProcessing.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -175,12 +176,14 @@ bool D3D12RHI::Initialize()
 	FGenerateMips::Initialize();
 	TemporalEffects::Initialize();
 	MotionBlur::Initialize();
+	PostProcessing::Initialize();
 
 	return true;
 }
 
 void D3D12RHI::Destroy()
 {
+	PostProcessing::Destroy();
 	MotionBlur::Destroy();
 	TemporalEffects::Destroy();
 	FGenerateMips::Destroy();

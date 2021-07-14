@@ -91,6 +91,7 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	float3 Albedo = BaseMap.Sample(LinearSampler, In.Tex).xyz;
 	float Metallic = MetallicMap.Sample(LinearSampler, In.Tex).x;
 	float Roughness = RoughnessMap.Sample(LinearSampler, In.Tex).x;
+	float AO = AOMap.Sample(LinearSampler, In.Tex).x;
 
 	float3x3 TBN = float3x3(normalize(In.T), normalize(In.B), normalize(In.N));
 	float3 tNormal = NormalMap.Sample(LinearSampler, In.Tex).xyz;
@@ -127,8 +128,7 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
 
 	float3 Emissive = EmissiveMap.Sample(LinearSampler, In.Tex).xyz;
-	float3 FinalColor = Emissive + Diffuse + Specular;
+	float3 FinalColor = Emissive + (Diffuse + Specular) * AO;
 
 	return float4(FinalColor, 1);
-	//return float4(ToneMapping(FinalColor * Exposure), Opacity);
 }

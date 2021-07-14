@@ -254,3 +254,8 @@ float3 GetSHIrradiance(float3 Normal,int Degree,float3 Coeffs[16])
 		Color += Coeffs[i] * basis[i];
 	return Color;
 }
+
+float Luminance(float3 Linear)
+{
+	return dot(Linear, float3(0.3, 0.59, 0.11));
+}
