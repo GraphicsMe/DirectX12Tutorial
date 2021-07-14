@@ -168,9 +168,9 @@ public:
 			}
 			else if (m_ShowMode == SM_PBR)
 			{
-				ImGui::Checkbox("StaticSceneTAA", &m_bStaticSceneTAA);
+				ImGui::Checkbox("TAA", &m_bTAA);
 
-				TemporalEffects::g_EnableTAA = m_bStaticSceneTAA;
+				TemporalEffects::g_EnableTAA = m_bTAA;
 
 				ImGui::Checkbox("SHDiffuse", &m_bSHDiffuse);
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
@@ -909,7 +909,7 @@ private:
 	std::vector<Vector3f> m_SHCoeffs;
 	bool m_bSHDiffuse = false;
 
-	bool m_bStaticSceneTAA = true;
+	bool m_bTAA = true;
 
 	FRootSignature m_GenCubeSignature;
 	FRootSignature m_SkySignature;

@@ -1,68 +1,121 @@
 #include "PixelPacking_Velocity.hlsli"
 
-RWTexture2D<float4> OutTemporal : register(u0);
-// SceneColor
-Texture2D<float3> InColor : register(t0);
-// TemporalBuffer
-Texture2D<float4> InTemporal : register(t1);
-// VelocityBuffer
+RWTexture2D<float4> OutTemporal             : register(u0);
+Texture2D<float3> InColor                   : register(t0);
+Texture2D<float4> InTemporal                : register(t1);
 Texture2D<packed_velocity_t> VelocityBuffer : register(t2);
-// Depth
-Texture2D<float> DepthBuffer : register(t3);
+Texture2D<float> DepthBuffer                : register(t3);
 
-SamplerState LinearSampler : register(s0);
-
-static const float BlendWeightLowerBound = 0.03f;
-static const float BlendWeightUpperBound = 0.12f;
-static const float BlendWeightVelocityScale = 100.0f * 60.0f;
+SamplerState LinearSampler                  : register(s0);
 
 cbuffer CB0 : register(b0)
 {
-    float2 RcpBufferDim;            // 1 / width, 1 / height
+    float2 RcpBufferDim;                    // 1 / width, 1 / height
     float TemporalBlendFactor;
     float RcpSpeedLimiter;
     float2 ViewportJitter;
 }
+
+//------------------------------------------------------- MACRO DEFINITION
+#define SPATIAL_WEIGHT_CATMULLROM 1
+
+//------------------------------------------------------- PARAMETERS
+static const float VarianceClipGamma = 1.0f;
+static const float Exposure = 10;
+static const float BlendWeightLowerBound = 0.04f;
+static const float BlendWeightUpperBound = 0.2f;
+static const float BlendWeightVelocityScale = 100.0f * 60.0f;
+
+static const int2 SampleOffsets[9] =
+{
+    int2(-1, -1),
+    int2(0, -1),
+    int2(1, -1),
+    int2(-1, 0),
+    int2(0, 0),
+    int2(1, 0),
+    int2(-1, 1),
+    int2(0, 1),
+    int2(1, 1),
+};
+
+//------------------------------------------------------- HELP FUNCTIONS
 
 float Luminance(in float3 color)
 {
     return dot(color, float3(0.25f, 0.50f, 0.25f));
 }
 
+// Faster but less accurate luma computation. 
+// Luma includes a scaling by 4.
+float Luma4(float3 Color)
+{
+    return Color.r;
+}
+
+// Optimized HDR weighting function.
+float HdrWeight4(float3 Color, float Exposure)
+{
+    return rcp(Luma4(Color) * Exposure + 4.0);
+}
+
 float3 ToneMap(float3 color)
 {
-    // luma weight的色调映射
+    // luma weight' tonemap
     return color / (1 + Luminance(color));
 }
 
 float3 UnToneMap(float3 color)
 {
-    // luma weight的反色调映射
+    // luma weight' untonemap
     return color / (1 - Luminance(color));
 }
 
-float3 RGB2YCoCgR(float3 rgbColor)
+float3 RGBToYCoCg(float3 RGB)
 {
-    float3 YCoCgRColor;
+    float Y = dot(RGB, float3(1, 2, 1));
+    float Co = dot(RGB, float3(2, 0, -2));
+    float Cg = dot(RGB, float3(-1, 2, -1));
 
-    YCoCgRColor.y = rgbColor.r - rgbColor.b;
-    float temp = rgbColor.b + YCoCgRColor.y / 2;
-    YCoCgRColor.z = rgbColor.g - temp;
-    YCoCgRColor.x = temp + YCoCgRColor.z / 2;
-
-    return YCoCgRColor;
+    float3 YCoCg = float3(Y, Co, Cg);
+    return YCoCg;
 }
 
-float3 YCoCgR2RGB(float3 YCoCgRColor)
+float3 YCoCgToRGB(float3 YCoCg)
 {
-    float3 rgbColor;
+    float Y = YCoCg.x * 0.25;
+    float Co = YCoCg.y * 0.25;
+    float Cg = YCoCg.z * 0.25;
 
-    float temp = YCoCgRColor.x - YCoCgRColor.z / 2;
-    rgbColor.g = YCoCgRColor.z + temp;
-    rgbColor.b = temp - YCoCgRColor.y / 2;
-    rgbColor.r = rgbColor.b + YCoCgRColor.y;
+    float R = Y + Co - Cg;
+    float G = Y + Cg;
+    float B = Y - Co - Cg;
 
-    return rgbColor;
+    float3 RGB = float3(R, G, B);
+    return RGB;
+}
+
+static float CatmullRom(float x)
+{
+    float ax = abs(x);
+    if (ax > 1.0f)
+        return ((-0.5f * ax + 2.5f) * ax - 4.0f) * ax + 2.0f;
+    else
+        return (1.5f * ax - 2.5f) * ax * ax + 1.0f;
+}
+
+float3 SampleHistory(float2 historyUV)
+{
+    float3 history;
+    history = InTemporal[historyUV].rgb;
+
+    // TODO: Sample the history using Catmull-Rom to reduce blur on motion.
+    // https://www.shadertoy.com/view/4tyGDD
+
+    history = ToneMap(history);
+    history = RGBToYCoCg(history);
+
+    return history;
 }
 
 float HistoryClip(float3 History, float3 Filtered, float3 NeighborMin, float3 NeighborMax)
@@ -83,7 +136,6 @@ float HistoryClip(float3 History, float3 Filtered, float3 NeighborMin, float3 Ne
 
 float3 ClampHistory(float3 NeighborMin, float3 NeighborMax, float3 HistoryColor, float3 Filtered)
 {
-
     float3 TargetColor = Filtered;
 
     float ClipBlend = HistoryClip(HistoryColor, TargetColor, NeighborMin, NeighborMax);
@@ -95,11 +147,17 @@ float3 ClampHistory(float3 NeighborMin, float3 NeighborMax, float3 HistoryColor,
     return HistoryColor;
 }
 
-#define DynamicCameraTAA 1
+float2 WeightedLerpFactors(float WeightA, float WeightB, float Blend)
+{
+    float BlendA = (1.0 - Blend) * WeightA;
+    float BlendB = Blend * WeightB;
+    float RcpBlend = rcp(BlendA + BlendB);
+    BlendA *= RcpBlend;
+    BlendB *= RcpBlend;
+    return float2(BlendA, BlendB);
+}
 
-
-
-
+//------------------------------------------------------- ENTRY POINT
 [numthreads(8, 8, 1)]
 void cs_main(
     uint3 DTid : SV_DispatchThreadID, 
@@ -115,23 +173,18 @@ void cs_main(
         return;
     }
 
-#if DynamicCameraTAA
-    // 当前像素的uv
     float2 uv = DTid.xy;
 
-    // 带抖动的uv，采样DepthBuffer和InColor需要使用带抖动的uv，才能消除抖动的影响
-    float2 jitteredUV = uv + ViewportJitter;
-
-    // 采样速度缓冲
+    // sample velocity
     float2 closestOffset = float2(0.0f, 0.0f);
     float closestDepth = 1.0f;
-    // 求出3x3范围内的最近深度对应的偏移量，深度越小，越可能为前景
+    // 3x3 closest depth
     for (int y = -1; y <= 1; ++y)
     {
         for (int x = -1; x <= 1; ++x)
         {
             float2 sampleOffset = float2(x, y);
-            float2 sampleUV = jitteredUV + sampleOffset;
+            float2 sampleUV = uv + sampleOffset;
 
             float NeighborhoodDepthSamp = DepthBuffer[sampleUV];
 
@@ -150,25 +203,56 @@ void cs_main(
     float2 historyUV = uv + velocity;
 
     // current frame color
-    float3 currColor = InColor[jitteredUV];
+    float3 currColor = InColor[uv];
     currColor = ToneMap(currColor);
-    currColor = RGB2YCoCgR(currColor);
+    currColor = RGBToYCoCg(currColor);
 
     // sample history color
-    float3 prevColor = InTemporal[historyUV].rgb;
-    prevColor = ToneMap(prevColor);
-    prevColor = RGB2YCoCgR(prevColor);
+    float3 prevColor = SampleHistory(historyUV);
+    
+    // SetupSampleWeight
+    float SampleWeights[9];
+    float TotalWeight = 0.0f;
+    for (int i = 0; i < 9; i++)
+    {
+        float PixelOffsetX = SampleOffsets[i].x;
+        float PixelOffsetY = SampleOffsets[i].y;
+
+#if SPATIAL_WEIGHT_CATMULLROM
+        SampleWeights[i] = CatmullRom(PixelOffsetX) * CatmullRom(PixelOffsetY);
+        TotalWeight += SampleWeights[i];
+#else
+        // Normal distribution, Sigma = 0.47
+        SampleWeights[i] = exp(-2.29f * (PixelOffsetX * PixelOffsetX + PixelOffsetY * PixelOffsetY));
+        TotalWeight += SampleWeights[i];
+#endif
+    }
+    for (int i = 0; i < 9; i++)
+    {
+        SampleWeights[i] /= TotalWeight;
+    }
 
     // sample neighborhoods
-    float2 InputSampleUV = jitteredUV;
-
+    uint N = 9;
+    float2 InputSampleUV = uv;
+    float3 m1 = 0.0f;
+    float3 m2 = 0.0f;
     float3 neighborMin = float3(9999999.0f, 9999999.0f, 9999999.0f);
     float3 neighborMax = float3(-99999999.0f, -99999999.0f, -99999999.0f);
 
+    // used for FilterColor
+    float3 neighborhood[9];
+    float NeighborsFinalWeight = 0;
+    float3 NeighborsColor = 0;
+    float3 FilteredColor = 0;
+    
     for (int y = -1; y <= 1; ++y)
     {
         for (int x = -1; x <= 1; ++x)
         {
+            // convert to [0,8]
+            int i = (y + 1) * 3 + x + 1;
+
             // offset
             float2 sampleOffset = float2(x, y);
             float2 sampleUV = InputSampleUV + sampleOffset;
@@ -178,42 +262,70 @@ void cs_main(
             NeighborhoodSamp = max(NeighborhoodSamp, 0.0f);
 
             NeighborhoodSamp = ToneMap(NeighborhoodSamp);
-            NeighborhoodSamp = RGB2YCoCgR(NeighborhoodSamp);
+            NeighborhoodSamp = RGBToYCoCg(NeighborhoodSamp);
+
+            // cache
+            neighborhood[i] = NeighborhoodSamp;
 
             // AAABB
             neighborMin = min(neighborMin, NeighborhoodSamp);
             neighborMax = max(neighborMax, NeighborhoodSamp);
+
+            m1 += NeighborhoodSamp;
+            m2 += NeighborhoodSamp * NeighborhoodSamp;
+
+            // 
+            float SampleSpatialWeight = SampleWeights[i];
+            float SampleHdrWeight = HdrWeight4(NeighborhoodSamp, Exposure);
+            // combine two weight
+            float SampleFinalWeight = SampleSpatialWeight * SampleHdrWeight;
+            
+            NeighborsColor += SampleFinalWeight * NeighborhoodSamp;
+            NeighborsFinalWeight += SampleFinalWeight;
         }
     }
+
+    // compute filteredColor
+    FilteredColor = NeighborsColor * rcp(NeighborsFinalWeight);
+
+    // shappen 
+    float3 highFreq = neighborhood[1] + neighborhood[3] + neighborhood[5] + neighborhood[7] - 4 * neighborhood[4];
+    FilteredColor += highFreq * 0.1f;
+
+    // variance AABB
+    float3 mu = m1 / N;
+    float3 sigma = sqrt(abs(m2 / N - mu * mu));
+    neighborMin = mu - VarianceClipGamma * sigma;
+    neighborMax = mu + VarianceClipGamma * sigma;
+
+    float LumaHistory = Luma4(prevColor);
 
     // simplest clip
     //prevColor = clamp(prevColor, neighborMin, neighborMax);
     
-    // Neighborhood Clamping
-    prevColor = ClampHistory(neighborMin, neighborMax, prevColor, (neighborMin + neighborMax) / 2.0f);
+    // neighborhood clamping
+    //prevColor = ClampHistory(neighborMin, neighborMax, prevColor, (neighborMin + neighborMax) / 2.0f);
 
-    // 当前像素的权重
-    float weightCurr = lerp(BlendWeightLowerBound, BlendWeightUpperBound, saturate(lenVelocity * BlendWeightVelocityScale));
-    float weightPrev = 1.0f - weightCurr;
+    // variance clip
+    prevColor = ClampHistory(neighborMin, neighborMax, prevColor, mu);
 
-    // rcp 求倒数
-    float RcpWeight = rcp(weightCurr + weightPrev);
-    float3 color = (currColor * weightCurr + prevColor * weightPrev) * RcpWeight;
+    // compute blend amount
+    float BlendFinal;
+    {
+        float LumaFiltered = Luma4(FilteredColor);
+        
+        BlendFinal = lerp(BlendWeightLowerBound, BlendWeightUpperBound, saturate(lenVelocity * BlendWeightVelocityScale));
+        
+        BlendFinal = max(BlendFinal, saturate(0.01 * LumaHistory / abs(LumaFiltered - LumaHistory)));
+    }
 
-    color = YCoCgR2RGB(color);
+    float FilterWeight = HdrWeight4(FilteredColor, Exposure);
+    float HistoryWeight = HdrWeight4(prevColor, Exposure);
+
+    float2 Weights = WeightedLerpFactors(HistoryWeight, FilterWeight, BlendFinal);
+    float3 color = Weights.x * prevColor + Weights.y * FilteredColor;
+
+    color = YCoCgToRGB(color);
     color = UnToneMap(color);
-
     OutTemporal[uv] = float4(color, 1);
-
-
-
-#else
-    
-    float2 uv = DTid.xy;
-    float3 currColor = InColor[uv].rgb;
-    float3 prevColor = InTemporal[uv].rgb;
-    OutTemporal[DTid.xy] = float4(currColor * TemporalBlendFactor + (1 - TemporalBlendFactor) * prevColor, 1);
-
-#endif
-
 }
