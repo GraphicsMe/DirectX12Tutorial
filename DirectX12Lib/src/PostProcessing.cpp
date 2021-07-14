@@ -15,10 +15,13 @@
 using namespace BufferManager;
 extern FCommandListManager g_CommandListManager;
 
+#define ASYNC_COMPUTE 0
+
 namespace PostProcessing
 {
 	bool g_EnableBloom = true;
-	float g_BloomThreshold = 5.f;
+
+	float g_BloomThreshold = 1.f;
 
 	FRootSignature m_CSSignature;
 	FRootSignature m_ToneMappWithBloomSignature;
@@ -126,10 +129,12 @@ void PostProcessing::Render(FCommandContext& CommandContext)
 void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 {
 	CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, true);
+#if ASYNC_COMPUTE
 	g_CommandListManager.GetComputeQueue().WaitForFenceValue(CommandContext.Flush());
-
 	FComputeContext& ComputeContext = FComputeContext::Begin(L"Post Effects");
-	//FComputeContext& ComputeContext = CommandContext.GetComputeContext();
+#else
+	FComputeContext& ComputeContext = CommandContext.GetComputeContext();
+#endif
 
 	// 1. extract bloom
 	ComputeContext.SetRootSignature(m_CSSignature);
@@ -159,8 +164,6 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 		ComputeContext.SetDynamicDescriptor(1, 0, g_BloomBuffers[i-1].GetSRV());
 		ComputeContext.SetDynamicDescriptor(2, 0, g_BloomBuffers[i].GetUAV());
 
-		//uint32_t Width = g_BloomBuffers[i-1].GetWidth();
-		//uint32_t Height = g_BloomBuffers[i-1].GetHeight();
 
 		uint32_t TargetWidth = g_BloomBuffers[i].GetWidth();
 		uint32_t TargetHeight = g_BloomBuffers[i].GetHeight();
@@ -182,9 +185,6 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 		ComputeContext.SetDynamicDescriptor(1, 0, g_BloomBuffers[i].GetSRV());
 		ComputeContext.SetDynamicDescriptor(2, 0, g_BloomBuffers[i-1].GetUAV());
 
-		//uint32_t Width = g_BloomBuffers[i].GetWidth();
-		//uint32_t Height = g_BloomBuffers[i].GetHeight();
-
 		uint32_t TargetWidth = g_BloomBuffers[i-1].GetWidth();
 		uint32_t TargetHeight = g_BloomBuffers[i-1].GetHeight();
 		m_Constants.HalfPixelSize = Vector2f(1.f / TargetWidth, 1.f / TargetHeight);
@@ -196,7 +196,9 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 		ComputeContext.TransitionResource(g_BloomBuffers[i - 1], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
 	}
 
+#if ASYNC_COMPUTE
 	ComputeContext.Finish(true);
+#endif
 }
 
 void PostProcessing::ToneMapping(FCommandContext& CommandContext)
