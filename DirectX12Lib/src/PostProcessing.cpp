@@ -44,8 +44,6 @@ namespace PostProcessing
 
 	__declspec(align(16)) struct
 	{
-		Vector2f HalfPixelSize;
-		Vector2f ScreenSize;
 		float BloomThreshold;
 	} m_Constants;
 }
@@ -80,7 +78,7 @@ void PostProcessing::Initialize()
 	for (int i = 0; i < _countof(g_BloomBuffers); ++i)
 	{
 		wchar_t Name[256];
-		wsprintf(Name, L"Bloom_%d", i);
+		wsprintf(Name, L"Bloom_%d_1/%d", i, 1 << i);
 		g_BloomBuffers[i].Create(Name, Width, Height, 1, DXGI_FORMAT_R11G11B10_FLOAT);
 
 		Width >>= 1;
@@ -139,17 +137,17 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 	// 1. extract bloom
 	ComputeContext.SetRootSignature(m_CSSignature);
 	ComputeContext.SetPipelineState(m_CSExtractBloomPSO);
-	m_Constants.BloomThreshold = g_BloomThreshold;
+	
 
 	ComputeContext.TransitionResource(g_BloomBuffers[0], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
 
 	ComputeContext.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
 	ComputeContext.SetDynamicDescriptor(2, 0, g_BloomBuffers[0].GetUAV());
 
-	uint32_t TargetWidth = g_BloomBuffers[0].GetWidth();
-	uint32_t TargetHeight = g_BloomBuffers[0].GetHeight();
+	m_Constants.BloomThreshold = g_BloomThreshold;
 	ComputeContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
-	ComputeContext.Dispatch2D(TargetWidth, TargetHeight);
+
+	ComputeContext.Dispatch2D(g_BloomBuffers[0].GetWidth(), g_BloomBuffers[0].GetHeight());
 
 	ComputeContext.TransitionResource(g_BloomBuffers[0], D3D12_RESOURCE_STATE_COMMON, true);
 
@@ -164,14 +162,7 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 		ComputeContext.SetDynamicDescriptor(1, 0, g_BloomBuffers[i-1].GetSRV());
 		ComputeContext.SetDynamicDescriptor(2, 0, g_BloomBuffers[i].GetUAV());
 
-
-		uint32_t TargetWidth = g_BloomBuffers[i].GetWidth();
-		uint32_t TargetHeight = g_BloomBuffers[i].GetHeight();
-		m_Constants.HalfPixelSize = Vector2f(1.f / TargetWidth, 1.f / TargetHeight);
-		m_Constants.ScreenSize = Vector2f((float)TargetWidth, (float)TargetHeight);
-		ComputeContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
-
-		ComputeContext.Dispatch2D(TargetWidth, TargetHeight);
+		ComputeContext.Dispatch2D(g_BloomBuffers[i].GetWidth(), g_BloomBuffers[i].GetHeight());
 	}
 
 	// 3. upsample
@@ -185,13 +176,7 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 		ComputeContext.SetDynamicDescriptor(1, 0, g_BloomBuffers[i].GetSRV());
 		ComputeContext.SetDynamicDescriptor(2, 0, g_BloomBuffers[i-1].GetUAV());
 
-		uint32_t TargetWidth = g_BloomBuffers[i-1].GetWidth();
-		uint32_t TargetHeight = g_BloomBuffers[i-1].GetHeight();
-		m_Constants.HalfPixelSize = Vector2f(1.f / TargetWidth, 1.f / TargetHeight);
-		m_Constants.ScreenSize = Vector2f((float)TargetWidth, (float)TargetHeight);
-		ComputeContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
-
-		ComputeContext.Dispatch2D(TargetWidth, TargetHeight);
+		ComputeContext.Dispatch2D(g_BloomBuffers[i - 1].GetWidth(), g_BloomBuffers[i - 1].GetHeight());
 
 		ComputeContext.TransitionResource(g_BloomBuffers[i - 1], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
 	}

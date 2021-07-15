@@ -40,17 +40,26 @@ float4 PS_ToneMapAndBloom(in VertexOutput Input) : SV_Target0
 
 cbuffer Contants : register(b0)
 {
-	float2 HalfPixelSize;
-	float2 ScreenSize;
 	float BloomThreshold;
 };
 
 RWTexture2D<float3> BloomResult : register(u0);
 
+void GetSampleUV(uint2 ScreenCoord, inout float2 UV, inout float2 HalfPixelSize)
+{
+	float2 ScreenSize;
+	BloomResult.GetDimensions(ScreenSize.x, ScreenSize.y);
+	float2 InvScreenSize = rcp(ScreenSize);
+	HalfPixelSize = 0.5 * InvScreenSize;
+	UV = ScreenCoord * InvScreenSize + HalfPixelSize;
+}
+
 [numthreads(8, 8, 1)]
 void CS_ExtractBloom(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
-	float2 UV = DispatchThreadID.xy / ScreenSize.xy;
+	float2 HalfPixelSize, UV;
+	GetSampleUV(DispatchThreadID.xy, UV, HalfPixelSize);
+
 	float3 Color = SceneColorTexture.SampleLevel(LinearSampler, UV, 0).xyz;
 	// clamp to avoid artifacts from exceeding fp16 through framebuffer blending of multiple very bright lights
 	Color.rgb = min(float3(256 * 256, 256 * 256, 256 * 256), Color.rgb);
@@ -65,7 +74,9 @@ void CS_ExtractBloom(uint3 DispatchThreadID : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void CS_DownSample(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
-	float2 UV = DispatchThreadID.xy / ScreenSize.xy;
+	float2 HalfPixelSize, UV;
+	GetSampleUV(DispatchThreadID.xy, UV, HalfPixelSize);
+
 	float3 Result = SceneColorTexture.SampleLevel(LinearSampler, UV, 0).xyz * 4.0;
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV - HalfPixelSize, 0).xyz;
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + HalfPixelSize, 0).xyz;
@@ -77,7 +88,9 @@ void CS_DownSample(uint3 DispatchThreadID : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void CS_UpSample(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
-	float2 UV = DispatchThreadID.xy / ScreenSize.xy;
+	float2 HalfPixelSize, UV;
+	GetSampleUV(DispatchThreadID.xy, UV, HalfPixelSize);
+
 	float3 Result = 0;
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x * 2.0, 0.0), 0).xyz;				//left
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x * 2.0, 0.0), 0).xyz;				//right
