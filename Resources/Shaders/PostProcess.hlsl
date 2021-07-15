@@ -31,17 +31,19 @@ float4 PS_Main(in VertexOutput Input) : SV_Target0
 	return float4(ToneMapping(Color), 1.0);
 }
 
+cbuffer Contants : register(b0)
+{
+	float BloomIntensity;
+	float BloomThreshold;
+};
+
+
 float4 PS_ToneMapAndBloom(in VertexOutput Input) : SV_Target0
 {
 	float3 Color = SceneColorTexture.Sample(LinearSampler, Input.Tex).xyz;
 	float3 Bloom = BloomTexture.Sample(LinearSampler, Input.Tex).xyz;
-	return float4(ToneMapping(Color + Bloom), 1.0);
+	return float4(ToneMapping(Color + Bloom * BloomIntensity), 1.0);
 }
-
-cbuffer Contants : register(b0)
-{
-	float BloomThreshold;
-};
 
 RWTexture2D<float3> BloomResult : register(u0);
 

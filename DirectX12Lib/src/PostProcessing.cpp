@@ -21,6 +21,7 @@ namespace PostProcessing
 {
 	bool g_EnableBloom = true;
 
+	float g_BloomIntensity = 1.f;
 	float g_BloomThreshold = 1.f;
 
 	FRootSignature m_CSSignature;
@@ -44,6 +45,7 @@ namespace PostProcessing
 
 	__declspec(align(16)) struct
 	{
+		float BloomIntensity;
 		float BloomThreshold;
 	} m_Constants;
 }
@@ -86,8 +88,9 @@ void PostProcessing::Initialize()
 	}
 
 	// post Process
-	m_ToneMappWithBloomSignature.Reset(1, 1);
-	m_ToneMappWithBloomSignature[0].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2);
+	m_ToneMappWithBloomSignature.Reset(2, 1);
+	m_ToneMappWithBloomSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+	m_ToneMappWithBloomSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2);
 	m_ToneMappWithBloomSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 	m_ToneMappWithBloomSignature.Finalize(L"ToneMapp-Bloom");
 
@@ -144,6 +147,7 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 	ComputeContext.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
 	ComputeContext.SetDynamicDescriptor(2, 0, g_BloomBuffers[0].GetUAV());
 
+	m_Constants.BloomIntensity = g_BloomIntensity;
 	m_Constants.BloomThreshold = g_BloomThreshold;
 	ComputeContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
 
@@ -210,11 +214,15 @@ void PostProcessing::ToneMapping(FCommandContext& CommandContext)
 	//BackBuffer.SetClearColor(m_ClearColor);
 	CommandContext.ClearColor(BackBuffer);
 
-	CommandContext.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
+	m_Constants.BloomIntensity = g_BloomIntensity;
+	m_Constants.BloomThreshold = g_BloomThreshold;
+	CommandContext.SetDynamicConstantBufferView(0, sizeof(m_Constants), &m_Constants);
+
+	CommandContext.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
 	if (g_EnableBloom)
-		CommandContext.SetDynamicDescriptor(0, 1, g_BloomBuffers[0].GetSRV());
+		CommandContext.SetDynamicDescriptor(1, 1, g_BloomBuffers[0].GetSRV());
 	else
-		CommandContext.SetDynamicDescriptor(0, 1, m_BlackTexture.GetSRV());
+		CommandContext.SetDynamicDescriptor(1, 1, m_BlackTexture.GetSRV());
 	// no need to set vertex buffer and index buffer
 	CommandContext.Draw(3);
 

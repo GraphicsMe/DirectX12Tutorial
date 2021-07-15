@@ -178,8 +178,14 @@ public:
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
 				ImGui::SameLine();
 				ImGui::Text("%.3f", m_RotateY);
-				ImGui::SliderFloat("Bloom Threashold", &PostProcessing::g_BloomThreshold, 0.f, 10.f);
 				ImGui::Checkbox("Enable Bloom", &PostProcessing::g_EnableBloom);
+				
+				if (PostProcessing::g_EnableBloom)
+				{
+					ImGui::Indent(20);
+					ImGui::SliderFloat("Bloom Intensity", &PostProcessing::g_BloomIntensity, 0.f, 5.f);
+					ImGui::SliderFloat("Bloom Threshold", &PostProcessing::g_BloomThreshold, 0.f, 10.f);
+				}
 			}
 
 			ImGui::Separator();
@@ -873,7 +879,7 @@ private:
 	int	m_SHDegree = 4;
 	int m_SHSampleNum = 10000;
 	std::vector<Vector3f> m_SHCoeffs;
-	bool m_bSHDiffuse = false;
+	bool m_bSHDiffuse = true;
 
 	bool m_bTAA = true;
 
