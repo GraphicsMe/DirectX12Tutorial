@@ -111,6 +111,11 @@ void FModel::SetPosition(float x, float y, float z)
 	UpdateModelMatrix();
 }
 
+void FModel::Update()
+{
+	m_PreviousModelMatrix = m_ModelMatrix;
+}
+
 void FModel::UpdateModelMatrix()
 {
 	m_ModelMatrix = FMatrix::ScaleMatrix(m_Scale) * m_RotationMatrix * FMatrix::TranslateMatrix(m_Position);

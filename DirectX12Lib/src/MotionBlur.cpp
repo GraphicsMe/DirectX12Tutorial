@@ -29,8 +29,8 @@ void MotionBlur::Initialize(void)
 	uint32_t bufferWidth = g_SceneColorBuffer.GetWidth();
 	uint32_t bufferHeight = g_SceneColorBuffer.GetHeight();
 
-	g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R32_UINT);
-	//g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16_FLOAT);
+	//g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R32_UINT);
+	g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16_FLOAT);
 
 	// RootSignatre
 	s_RootSignature.Reset(3, 0);
@@ -46,6 +46,12 @@ void MotionBlur::Initialize(void)
 	s_CameraVelocityPSO.SetRootSignature(s_RootSignature);
 	s_CameraVelocityPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(s_CameraVelocityShader.Get()));
 	s_CameraVelocityPSO.Finalize();
+}
+
+void ClearVelocityBuffer(FCommandContext& Context)
+{
+	Context.TransitionResource(g_VelocityBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	Context.ClearColor(g_VelocityBuffer);
 }
 
 void MotionBlur::GenerateCameraVelocityBuffer(FCommandContext& Context, const FCamera& camera)

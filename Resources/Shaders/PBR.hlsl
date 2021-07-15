@@ -1,11 +1,15 @@
 #pragma pack_matrix(row_major)
 
 #include "ShaderUtils.hlsl"
+#include "PixelPacking_Velocity.hlsli"
 
 cbuffer VSContant : register(b0)
 {
 	float4x4 ModelMatrix;
 	float4x4 ViewProjMatrix;
+	float4x4 PreviousModelMatrix;
+	float4x4 PreviousViewProjMatrix;
+	float2	 ViewportSize;
 };
 
 cbuffer PSContant : register(b0)
@@ -35,6 +39,8 @@ Texture2D PreintegratedGF 	: register(t9);
 
 SamplerState LinearSampler	: register(s0);
 
+//RWTexture2D<packed_velocity_t> VelocityBuffer : register(u0);
+RWTexture2D<float2> VelocityBuffer            : register(u0);
 
 struct VertexInput
 {
@@ -52,6 +58,8 @@ struct PixelInput
 	float3 B		: TEXCOORD2;
 	float3 N		: TEXCOORD3;
 	float3 WorldPos	: TEXCOORD4;
+	float3 PreviousScreenPos : TEXCOORD5;
+	float4 CurrentScreenPos  : TEXCOORD6;
 };
 
 PixelInput VS_PBR(VertexInput In)
@@ -59,9 +67,24 @@ PixelInput VS_PBR(VertexInput In)
 	PixelInput Out;
 	Out.Tex = In.Tex;
 
+	float4 PreviousWorldPos = mul(float4(In.Position, 1.0), PreviousModelMatrix); 
+	float4 ClipPos = mul(PreviousWorldPos, PreviousViewProjMatrix);
+	ClipPos /= ClipPos.w;
+	Out.PreviousScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
+	Out.PreviousScreenPos.y = 1 - Out.PreviousScreenPos.y;
+	Out.PreviousScreenPos.xy *= ViewportSize;
+	Out.PreviousScreenPos.z = ClipPos.z;
+
 	float4 WorldPos = mul(float4(In.Position, 1.0), ModelMatrix);
+	ClipPos = mul(WorldPos, ViewProjMatrix);
+	ClipPos /= ClipPos.w;
+	Out.CurrentScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
+	Out.CurrentScreenPos.y = 1 - Out.CurrentScreenPos.y;
+	Out.CurrentScreenPos.xy *= ViewportSize;
+	Out.CurrentScreenPos.z = ClipPos.z;
+
 	Out.WorldPos = WorldPos.xyz;
-	Out.Position = mul(WorldPos, ViewProjMatrix);
+	Out.Position = ClipPos;
 
 	Out.N = mul(In.Normal, (float3x3)ModelMatrix);
 	Out.T = mul(In.Tangent.xyz, (float3x3)ModelMatrix);
@@ -85,6 +108,9 @@ float3 F_schlickR(float cosTheta, float3 F0, float roughness)
 
 float4 PS_PBR(PixelInput In) : SV_Target
 {
+	// write velocity
+	VelocityBuffer[In.Position.xy] = (In.PreviousScreenPos.xy - In.CurrentScreenPos.xy);
+
 	float Opacity = OpacityMap.Sample(LinearSampler, In.Tex).r;
 	clip(Opacity < 0.1f ? -1 : 1);
 

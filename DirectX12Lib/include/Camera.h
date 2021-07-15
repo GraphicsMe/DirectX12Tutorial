@@ -32,6 +32,7 @@ public:
 	float GetFarClip() const { return m_FarZ; }
 
 	const FMatrix& GetViewProjMatrix() const { return m_ViewProjMatrix; }
+	const FMatrix& GetPreviousViewProjMatrix() const { return m_PreviousViewProjMatrix; }
 	const FMatrix& GetReprojectionMatrix() const { return m_ReprojectMatrix; }
 
 	void SetMouseMoveSpeed(float Speed) { m_MoveSpeed = Speed; }

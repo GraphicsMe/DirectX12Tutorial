@@ -88,6 +88,7 @@ public:
 		tStart = std::chrono::high_resolution_clock::now();
 		m_Camera.Update(delta);
 
+		m_Mesh->Update();
 		if (m_RotateMesh)
 		{
 			m_RotateY += delta * 0.0005f;
@@ -223,7 +224,7 @@ public:
 			SkyPass(CommandContext, false);
 			// TAA
 			{
-				MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);
+				//MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);
 				TemporalEffects::ResolveImage(CommandContext, g_SceneColorBuffer);
 			}
 			PostProcessing::Render(CommandContext);
@@ -404,10 +405,11 @@ private:
 		m_SphericalHarmonicsCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SphericalHarmonicsPS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.Finalize();
 
-		m_MeshSignature.Reset(3, 1);
+		m_MeshSignature.Reset(4, 1);
 		m_MeshSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_MeshSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_MeshSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10); //pbr 7, irradiance, prefiltered, preintegratedGF
+		m_MeshSignature[3].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  //velocity 
 		m_MeshSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_MeshSignature.Finalize(L"Mesh RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -583,6 +585,9 @@ private:
 
 	void MeshPass(FCommandContext& GfxContext)
 	{
+		GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+		GfxContext.ClearColor(MotionBlur::g_VelocityBuffer);
+
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_MeshSignature);
 		GfxContext.SetPipelineState(m_MeshPSO);
@@ -598,6 +603,7 @@ private:
 		// Indicate that the back buffer will be used as a render target.
 		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		GfxContext.TransitionResource(SceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GfxContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 
@@ -609,6 +615,10 @@ private:
 
 		m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
 		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
+		m_VSConstants.PreviousModelMatrix = m_Mesh->GetPreviousModelMatrix();
+		m_VSConstants.PreviousViewProjMatrix = m_Camera.GetPreviousViewProjMatrix();
+		m_VSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
+
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
 		m_PSConstants.Exposure = m_Exposure;
@@ -625,6 +635,7 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
 		GfxContext.SetDynamicDescriptor(2, 8, m_PrefilteredCube.GetCubeSRV());
 		GfxContext.SetDynamicDescriptor(2, 9, m_PreintegratedGF.GetSRV());
+		GfxContext.SetDynamicDescriptor(3, 0, MotionBlur::g_VelocityBuffer.GetUAV());
 
 		m_Mesh->Draw(GfxContext);
 	}
@@ -841,6 +852,9 @@ private:
 	{
 		FMatrix ModelMatrix;
 		FMatrix ViewProjMatrix;
+		FMatrix PreviousModelMatrix;
+		FMatrix PreviousViewProjMatrix;
+		Vector2f ViewportSize;
 	} m_VSConstants;
 
 	__declspec(align(16)) struct

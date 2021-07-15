@@ -13,6 +13,8 @@ namespace MotionBlur
 
 	void Initialize(void);
 
+	void ClearVelocityBuffer(FCommandContext& Context);
+
 	void GenerateCameraVelocityBuffer(FCommandContext& Context, const FCamera& camera);
 
 	void GenerateCameraVelocityBuffer(FCommandContext& BaseContext, const FMatrix& reprojectionMatrix, float nearClip, float farClip);

@@ -29,6 +29,8 @@ public:
 	void SetPosition(const Vector3f& Position);
 	void SetPosition(float x, float y, float z);
 	const FMatrix GetModelMatrix() { return m_ModelMatrix;}
+	const FMatrix GetPreviousModelMatrix() { return m_PreviousModelMatrix; }
+	void Update();
 
 	const FBoundingBox& GetBoundingBox() const { return m_BoundingBox; }
 
@@ -42,6 +44,7 @@ protected:
 	FMatrix m_RotationMatrix;
 	Vector3f m_Position;
 	FMatrix m_ModelMatrix;
+	FMatrix m_PreviousModelMatrix;
 
 	MeshData* m_MeshData;
 	std::string m_FileName;

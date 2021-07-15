@@ -7,7 +7,7 @@
 class FColorBuffer : public FPixelBuffer
 {
 public:
-	FColorBuffer(const Vector4f& Color = Vector4f(0.2f))
+	FColorBuffer(const Vector4f& Color = Vector4f(0.0f))
 		: m_ClearColor(Color)
 		, m_NumMipMaps(0)
 		, m_SampleCount(1)

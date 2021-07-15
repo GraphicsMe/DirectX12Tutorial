@@ -6,6 +6,7 @@
 
 Texture2D<float> DepthBuffer : register(t0);
 RWTexture2D<packed_velocity_t> VelocityBuffer : register(u0);
+//RWTexture2D<float2> VelocityBuffer : register(u0);
 
 cbuffer CBuffer : register(b0)
 {
@@ -32,5 +33,6 @@ void cs_main( uint3 DTid : SV_DispatchThreadID )
     // PrevHPos.xy 前一帧的屏幕空间像素坐标
     // PrevHPos.z 前一帧的深度
     VelocityBuffer[st] = PackVelocity(PrevHPos.xyz - float3(CurPixel, Depth));
+	//VelocityBuffer[st] = float2(PrevHPos.xy - CurPixel);
 }
 

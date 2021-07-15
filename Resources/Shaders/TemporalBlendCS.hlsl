@@ -3,7 +3,9 @@
 RWTexture2D<float4> OutTemporal             : register(u0);
 Texture2D<float3> InColor                   : register(t0);
 Texture2D<float4> InTemporal                : register(t1);
-Texture2D<packed_velocity_t> VelocityBuffer : register(t2);
+//Texture2D<packed_velocity_t> VelocityBuffer : register(t2);
+Texture2D<float2> VelocityBuffer            : register(t2);
+
 Texture2D<float> DepthBuffer                : register(t3);
 
 SamplerState LinearSampler                  : register(s0);
@@ -24,7 +26,7 @@ static const float VarianceClipGamma = 1.0f;
 static const float Exposure = 10;
 static const float BlendWeightLowerBound = 0.04f;
 static const float BlendWeightUpperBound = 0.2f;
-static const float BlendWeightVelocityScale = 100.0f * 60.0f;
+static const float BlendWeightVelocityScale = 100.0f * 80.0f;
 
 static const int2 SampleOffsets[9] =
 {
@@ -196,7 +198,8 @@ void cs_main(
         }
     }
 
-    float2 velocity = UnpackVelocity(VelocityBuffer[uv + closestOffset]).xy;
+    //float2 velocity = UnpackVelocity(VelocityBuffer[uv + closestOffset]).xy;
+    float2 velocity = VelocityBuffer[uv + closestOffset].xy;
     // convert to 0-1
     float lenVelocity = length(velocity * RcpBufferDim); 
 
@@ -315,8 +318,7 @@ void cs_main(
         float LumaFiltered = Luma4(FilteredColor);
         
         BlendFinal = lerp(BlendWeightLowerBound, BlendWeightUpperBound, saturate(lenVelocity * BlendWeightVelocityScale));
-        
-        BlendFinal = max(BlendFinal, saturate(0.01 * LumaHistory / abs(LumaFiltered - LumaHistory)));
+        //BlendFinal = max(BlendFinal, saturate(0.001 * LumaHistory / abs(LumaFiltered - LumaHistory)));
     }
 
     float FilterWeight = HdrWeight4(FilteredColor, Exposure);
