@@ -8,5 +8,5 @@ RWTexture2D<float3> OutColor : register(u0);
 void cs_main( uint3 DTid : SV_DispatchThreadID )
 {
     float4 Color = TemporalColor[DTid.xy];
-    OutColor[DTid.xy] = Color;
+    OutColor[DTid.xy] = float4(Color.xyz, 1);
 }

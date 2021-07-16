@@ -84,20 +84,47 @@ void TemporalEffects::Update(void)
 	// 对抖动进行更新
 	if (g_EnableTAA)
 	{
-		static const float Halton23[8][2] =
-		{
-			{ 0.0f / 8.0f, 0.0f / 9.0f }, { 4.0f / 8.0f, 3.0f / 9.0f },
-			{ 2.0f / 8.0f, 6.0f / 9.0f }, { 6.0f / 8.0f, 1.0f / 9.0f },
-			{ 1.0f / 8.0f, 4.0f / 9.0f }, { 5.0f / 8.0f, 7.0f / 9.0f },
-			{ 3.0f / 8.0f, 2.0f / 9.0f }, { 7.0f / 8.0f, 5.0f / 9.0f }
-		};
+		const float* Offset = nullptr;
+		float Scale = 1.f;
 
-		const float* Offset = Halton23[s_FrameIndex % 8];
+		bool EnableMSFTTAA = false;
+		if (EnableMSFTTAA)
+		{
+			static const float Halton23[8][2] =
+			{
+				{ 0.0f / 8.0f, 0.0f / 9.0f }, { 4.0f / 8.0f, 3.0f / 9.0f },
+				{ 2.0f / 8.0f, 6.0f / 9.0f }, { 6.0f / 8.0f, 1.0f / 9.0f },
+				{ 1.0f / 8.0f, 4.0f / 9.0f }, { 5.0f / 8.0f, 7.0f / 9.0f },
+				{ 3.0f / 8.0f, 2.0f / 9.0f }, { 7.0f / 8.0f, 5.0f / 9.0f }
+			};
+			Offset = Halton23[s_FrameIndex % 8];
+		}
+		else
+		{
+			// following work of Vaidyanathan et all: https://software.intel.com/content/www/us/en/develop/articles/coarse-pixel-shading-with-temporal-supersampling.html
+			static const float Halton23_16[16][2] = { 
+				{ 0.0f, 0.0f }, { 0.5f, 0.333333f }, { 0.25f, 0.666667f }, { 0.75f, 0.111111f }, 
+				{ 0.125f, 0.444444f }, { 0.625f, 0.777778f }, { 0.375f ,0.222222f }, { 0.875f ,0.555556f },
+				{ 0.0625f, 0.888889f }, { 0.562500,0.037037 }, { 0.3125f, 0.37037f }, { 0.8125f, 0.703704f }, 
+				{ 0.1875f,0.148148f }, { 0.6875f, 0.481481f }, { 0.4375f ,0.814815f }, { 0.9375f ,0.259259f }
+			};
+
+			static const float BlueNoise_16[16][2] = { 
+				{ 1.5f, 0.59375f }, { 1.21875f, 1.375f }, { 1.6875f, 1.90625f }, { 0.375f, 0.84375f },
+				{ 1.125f, 1.875f }, { 0.71875f, 1.65625f }, { 1.9375f ,0.71875f }, { 0.65625f ,0.125f }, 
+				{ 0.90625f, 0.9375f }, { 1.65625f, 1.4375f }, { 0.5f, 1.28125f }, { 0.21875f, 0.0625f },
+				{ 1.843750,0.312500 }, { 1.09375f, 0.5625f }, { 0.0625f, 1.21875f }, { 0.28125f, 1.65625f },
+			};
+
+			Scale = 1.f;
+			Offset = Halton23_16[s_FrameIndex % 16];
+		}
 
 		s_JitterDeltaX = s_JitterX - Offset[0];
 		s_JitterDeltaY = s_JitterY - Offset[1];
 		s_JitterX = Offset[0];
 		s_JitterY = Offset[1];
+
 	}
 	else
 	{
@@ -173,17 +200,19 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 
 	__declspec(align(16)) struct ConstantBuffer
 	{
-		float RcpBufferDim[2];
-		float TemporalBlendFactor;
-		float RcpSeedLimiter;
-		float CombinedJitter[2];
+		Vector4f	Resolution;//width, height, 1/width, 1/height
+		float		TemporalBlendFactor;
+		float		CombinedJitter[2];
 	};
 
+	const float width = static_cast<float>(g_SceneColorBuffer.GetWidth());
+	const float height = static_cast<float>(g_SceneColorBuffer.GetHeight());
+	const float rcpWidth = 1.f / width;
+	const float rcpHeight = 1.f / height;
+
 	ConstantBuffer cbv;
-	cbv.RcpBufferDim[0] = 1.0f / g_SceneColorBuffer.GetWidth();
-	cbv.RcpBufferDim[1] = 1.0f / g_SceneColorBuffer.GetHeight();
+	cbv.Resolution = Vector4f(width, height, rcpWidth, rcpHeight);
 	cbv.TemporalBlendFactor = s_FirstFrame ? 1 : 0.02f;
-	cbv.RcpSeedLimiter = 0;
 	cbv.CombinedJitter[0] = s_JitterDeltaX;
 	cbv.CombinedJitter[1] = s_JitterDeltaY;
 

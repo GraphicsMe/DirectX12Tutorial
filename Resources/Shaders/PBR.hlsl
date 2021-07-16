@@ -109,7 +109,7 @@ float3 F_schlickR(float cosTheta, float3 F0, float roughness)
 float4 PS_PBR(PixelInput In) : SV_Target
 {
 	// write velocity
-	VelocityBuffer[In.Position.xy] = (In.PreviousScreenPos.xy - In.CurrentScreenPos.xy);
+	VelocityBuffer[In.Position.xy] = In.PreviousScreenPos.xy - In.CurrentScreenPos.xy;
 
 	float Opacity = OpacityMap.Sample(LinearSampler, In.Tex).r;
 	clip(Opacity < 0.1f ? -1 : 1);
