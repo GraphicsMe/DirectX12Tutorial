@@ -201,8 +201,8 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 	__declspec(align(16)) struct ConstantBuffer
 	{
 		Vector4f	Resolution;//width, height, 1/width, 1/height
-		float		TemporalBlendFactor;
 		float		CombinedJitter[2];
+		int			FrameIndex;
 	};
 
 	const float width = static_cast<float>(g_SceneColorBuffer.GetWidth());
@@ -212,9 +212,9 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 
 	ConstantBuffer cbv;
 	cbv.Resolution = Vector4f(width, height, rcpWidth, rcpHeight);
-	cbv.TemporalBlendFactor = s_FirstFrame ? 1 : 0.02f;
 	cbv.CombinedJitter[0] = s_JitterDeltaX;
 	cbv.CombinedJitter[1] = s_JitterDeltaY;
+	cbv.FrameIndex = s_FirstFrame ? 1 : s_FrameIndex;
 
 	Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 	Context.TransitionResource(SceneColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

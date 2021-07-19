@@ -63,10 +63,10 @@ public:
 
 	void OnStartup()
 	{
-		SetupCameraLight();
 		SetupMesh();
 		SetupShaders();
 		SetupPipelineState();
+		SetupCameraLight();
 
 		GenerateCubeMap();
 		GenerateIrradianceMap();
@@ -91,10 +91,10 @@ public:
 		m_Mesh->Update();
 		if (m_RotateMesh)
 		{
-			m_RotateY += delta * 0.0005f;
+			m_RotateY += delta * 0.0005f * 2;
 			m_RotateY = fmodf(m_RotateY, MATH_2PI);
-			m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 		}
+		m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
@@ -179,6 +179,7 @@ public:
 				ImGui::SameLine();
 				ImGui::Text("%.3f", m_RotateY);
 				ImGui::Checkbox("Enable Bloom", &PostProcessing::g_EnableBloom);
+				ImGui::SliderFloat("Rotate Y", &m_RotateY, 0, MATH_2PI);
 				
 				if (PostProcessing::g_EnableBloom)
 				{
@@ -635,6 +636,7 @@ private:
 			m_PSConstants.Coeffs[i] = m_SHCoeffs[i];
 		}
 		m_PSConstants.bSHDiffuse = m_bSHDiffuse;
+		m_PSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
@@ -872,7 +874,8 @@ private:
 		int			Degree;
 		Vector3f	CameraPos;
 		int			bSHDiffuse;
-		Vector3f	pad;
+		Vector2f    ViewportSize;
+		float		pad;
 		Vector4f	Coeffs[16];
 	} m_PSConstants;
 

@@ -59,7 +59,7 @@ struct PixelInput
 	float3 N		: TEXCOORD3;
 	float3 WorldPos	: TEXCOORD4;
 	float3 PreviousScreenPos : TEXCOORD5;
-	float4 CurrentScreenPos  : TEXCOORD6;
+	float3 CurrentScreenPos  : TEXCOORD6;
 };
 
 PixelInput VS_PBR(VertexInput In)
@@ -77,14 +77,18 @@ PixelInput VS_PBR(VertexInput In)
 
 	float4 WorldPos = mul(float4(In.Position, 1.0), ModelMatrix);
 	ClipPos = mul(WorldPos, ViewProjMatrix);
+
+	Out.WorldPos = WorldPos.xyz;
+	Out.Position = ClipPos;
+
 	ClipPos /= ClipPos.w;
 	Out.CurrentScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
 	Out.CurrentScreenPos.y = 1 - Out.CurrentScreenPos.y;
 	Out.CurrentScreenPos.xy *= ViewportSize;
 	Out.CurrentScreenPos.z = ClipPos.z;
 
-	Out.WorldPos = WorldPos.xyz;
-	Out.Position = ClipPos;
+	//Out.WorldPos = WorldPos.xyz;
+	//Out.Position = mul(float4(Out.WorldPos, 1), ViewProjMatrix);
 
 	Out.N = mul(In.Normal, (float3x3)ModelMatrix);
 	Out.T = mul(In.Tangent.xyz, (float3x3)ModelMatrix);

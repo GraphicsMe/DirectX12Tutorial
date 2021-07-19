@@ -13,8 +13,8 @@ SamplerState MinMagLinearMipPointClamp      : register(s0);
 cbuffer CB0 : register(b0)
 {
     float4  Resolution;                     // width, height, 1/width, 1/height
-    float   TemporalBlendFactor;
     float2  ViewportJitter;
+    int     FrameIndex;
 }
 
 //------------------------------------------------------- MACRO DEFINITION
@@ -117,19 +117,22 @@ float3 GetCurrentColour(float2 screenST)
 {
     float2 uv = GetUV(screenST);
     float3 colour = InColor.SampleLevel(MinMagLinearMipPointClamp, uv, 0);
+    //float3 colour = InColor[screenST];
     colour = ToneMap(colour);
     colour = RGBToYCoCg(colour);
     return colour;
 }
 
-float4 SampleHistory(float2 inHistoryST)
+float3 SampleHistory(float2 inHistoryST)
 {
-    const float2 historyScreenUV = GetUV(inHistoryST);
-    float4 history = InTemporal.SampleLevel(MinMagLinearMipPointClamp, historyScreenUV, 0);
+    float2 historyScreenUV = GetUV(inHistoryST);
     // TODO: Sample the history using Catmull-Rom to reduce blur on motion.
     // https://www.shadertoy.com/view/4tyGDD
-    history.rgb = ToneMap(history.rgb);
-    history.rgb = RGBToYCoCg(history.rgb);
+
+    float3 history = InTemporal.SampleLevel(MinMagLinearMipPointClamp, historyScreenUV, 0).rgb;
+    //float3 history = InTemporal[inHistoryST].rgb;
+    history = ToneMap(history);
+    history = RGBToYCoCg(history);
     return history;
 }
 
@@ -140,7 +143,9 @@ float HistoryClip(float3 History, float3 Filtered, float3 NeighborMin, float3 Ne
 
     float3 RayOrigin = History;
     float3 RayDir = Filtered - History;
-    RayDir = abs(RayDir) < (1.0 / 65536.0) ? (1.0 / 65536.0) : RayDir;
+    RayDir.x = abs(RayDir.x) < (1.0 / 65536.0) ? (1.0 / 65536.0) : RayDir.x;
+    RayDir.y = abs(RayDir.y) < (1.0 / 65536.0) ? (1.0 / 65536.0) : RayDir.y;
+    RayDir.z = abs(RayDir.z) < (1.0 / 65536.0) ? (1.0 / 65536.0) : RayDir.z;
     float3 InvRayDir = rcp(RayDir);
 
     float3 MinIntersect = (BoxMin - RayOrigin) * InvRayDir;
@@ -212,6 +217,7 @@ float2 GetVelocity(float2 uv)
         }
     }
     velocity = VelocityBuffer[uv + closestOffset].xy;
+
 #endif 
     return velocity;
 }
@@ -219,14 +225,19 @@ float2 GetVelocity(float2 uv)
 //------------------------------------------------------- ENTRY POINT
 [numthreads(8, 8, 1)]
 void cs_main(
-    uint3 DTid : SV_DispatchThreadID, 
-    uint GI : SV_GroupIndex, 
-    uint3 GTid : SV_GroupThreadID, 
+    uint3 DTid : SV_DispatchThreadID,
+    uint GI : SV_GroupIndex,
+    uint3 GTid : SV_GroupThreadID,
     uint3 Gid : SV_GroupID)
 {
+    float2 uv = GetUV(DTid.xy);
+    if (uv.x >= 1.0f || uv.y >= 1.0f)
+    {
+        return;
+    }
+
     // first frame use currentColor
-    const float alpha = TemporalBlendFactor;
-    if (alpha >= 1.0f)
+    if (FrameIndex <= 1.0f)
     {
         OutTemporal[DTid.xy] = float4(InColor[DTid.xy], 1);
         return;
@@ -235,18 +246,26 @@ void cs_main(
     // screenPos
     const uint2 screenST = DTid.xy;
 
-    const float2 velocity = GetVelocity(screenST);
+    float2 velocity = GetVelocity(screenST);
     // calculate confidence factor based on the velocity of current pixel, everything moving faster than FRAME_VELOCITY_IN_PIXELS_DIFF frame-to-frame will be marked as no-history
     const float velocityConfidenceFactor = saturate(1.f - length(velocity) / FRAME_VELOCITY_IN_PIXELS_DIFF);
 
     const float2 historyScreenST = screenST + velocity;
+    const float2 historyScreenUV = GetUV(historyScreenST);
+    const float uvWeight = (historyScreenUV >= float2(0.f, 0.f) && historyScreenUV <= float2(1.f, 1.f)) ? 1.0f : 0.f;
+    const bool hasValidHistory = (velocityConfidenceFactor * uvWeight) > 0.f;
+
+    if (hasValidHistory == false)
+    {
+        OutTemporal[DTid.xy] = float4(InColor[DTid.xy], 1);
+        return;
+    }
 
     // current frame color
     float3 currColor = GetCurrentColour(screenST);
 
     // sample history color
-    float4 history = SampleHistory(historyScreenST);
-    float3 prevColor = history.xyz;
+    float3 prevColor = SampleHistory(historyScreenST);
     
     // SetupSampleWeight
     float SampleWeights[9];
@@ -309,6 +328,7 @@ void cs_main(
 
             float SampleSpatialWeight = SampleWeights[i];
             float SampleHdrWeight = HdrWeight4(NeighborhoodSamp, Exposure);
+
             // combine two weight
             float SampleFinalWeight = SampleSpatialWeight * SampleHdrWeight;
             
@@ -318,28 +338,25 @@ void cs_main(
     }
 
     // compute filteredColor
-    FilteredColor = NeighborsColor * rcp(NeighborsFinalWeight);
+    FilteredColor = NeighborsColor * rcp(max(NeighborsFinalWeight, 0.0001));
 
     // shappen 
     float3 highFreq = neighborhood[1] + neighborhood[3] + neighborhood[5] + neighborhood[7] - 4 * neighborhood[4];
     FilteredColor += highFreq * 0.1f;
 
-    // variance AABB
+   float LumaHistory = Luma4(prevColor);
+    // simplest clip
+    //prevColor = clamp(prevColor, neighborMin, neighborMax);
+
+    // neighborhood clamping
+    //prevColor = ClampHistory(neighborMin, neighborMax, prevColor, (neighborMin + neighborMax) / 2.0f);
+
+    // variance clip
     float3 mu = m1 / N;
     float3 sigma = sqrt(abs(m2 / N - mu * mu));
     float VarianceClipGamma = lerp(MIN_VARIANCE_GAMMA, MAX_VARIANCE_GAMMA, velocityConfidenceFactor);
     neighborMin = mu - VarianceClipGamma * sigma;
     neighborMax = mu + VarianceClipGamma * sigma;
-
-    float LumaHistory = Luma4(prevColor);
-
-    // simplest clip
-    //prevColor = clamp(prevColor, neighborMin, neighborMax);
-    
-    // neighborhood clamping
-    //prevColor = ClampHistory(neighborMin, neighborMax, prevColor, (neighborMin + neighborMax) / 2.0f);
-
-    // variance clip
     prevColor = ClampHistory(neighborMin, neighborMax, prevColor, mu);
 
     // compute blend amount 
@@ -347,7 +364,7 @@ void cs_main(
     {
         float LumaFiltered = Luma4(FilteredColor);
         BlendFinal = lerp(BlendWeightLowerBound, BlendWeightUpperBound, saturate(1 - velocityConfidenceFactor));
-        BlendFinal = max(BlendFinal, saturate(0.01 * LumaHistory / abs(LumaFiltered - LumaHistory)));
+        //BlendFinal = max(BlendFinal, saturate(0.01 * LumaHistory / abs(LumaFiltered - LumaHistory)));
     }
 
     float FilterWeight = HdrWeight4(FilteredColor, Exposure);
@@ -355,7 +372,6 @@ void cs_main(
 
     float2 Weights = WeightedLerpFactors(HistoryWeight, FilterWeight, BlendFinal);
     float3 color = Weights.x * prevColor + Weights.y * FilteredColor;
-
 
     color = YCoCgToRGB(color);
     color = UnToneMap(color);
