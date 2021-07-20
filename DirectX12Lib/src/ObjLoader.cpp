@@ -387,6 +387,8 @@ void FObjLoader::CalcTangents(
 		float t2 = w3.y - w1.y;
 
 		float div = s1 * t2 - s2 * t1;
+		if (div == 0.f)
+			continue;
 		float r = div == 0.f ? 0.f : 1.f / div;
 
 		Vector3f sdir((t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r);
@@ -406,13 +408,14 @@ void FObjLoader::CalcTangents(
 		const Vector3f& t = tan1[a];
 		// Gram-Schmidt orthogonalize.
 		Vector4f tangent;
-		tangent = (t - n * n.Dot(t)).SafeNormalize();
+		tangent = (t - n * n.Dot(t)).Normalize();
 		// Calculate handedness.
 		tangent.w = (Cross(n, t).Dot(tan2[a]) < 0.0f) ? -1.0f : 1.0f;
 		final_tangents.push_back(tangent);
 		if (isnan(tangent.x) || isnan(tangent.y) || isnan(tangent.z))
 		{
-			std::cout << "degenerated tangent, vertex index: %d" << a << std::endl;
+			final_tangents.back() = n;
+			std::cout << "degenerated tangent, vertex index: " << a << std::endl;
 		}
 	}
 }

@@ -15,13 +15,16 @@ cbuffer VSContant : register(b0)
 cbuffer PSContant : register(b0)
 {
 	float	Exposure;
-	int		MipLevel;
-	int		MaxMipLevel;
-	int		NumSamplesPerDir;
-	int		Degree;
 	float3	CameraPos;
+
+	float3	BaseColor;
+	float	Metallic;
+	
+	float	Roughness;
+	int		MaxMipLevel;
 	int		bSHDiffuse;
-	float3	pad;
+	int		Degree;
+	
 	float3	Coeffs[16];
 };
 
@@ -98,6 +101,63 @@ PixelInput VS_PBR(VertexInput In)
 	return Out;
 }
 
+PixelInput VS_PBR_Floor(in uint VertID : SV_VertexID)
+{
+	float3 Positions[6] = {
+		float3(-1.0, 0.0, 1.0),   //0
+		float3(1.0,  0.0, 1.0),   //1
+		float3(-1.0, 0.0, -1.0),  //3
+		float3(1.0,  0.0, 1.0),	  //1
+		float3(1.0,  0.0, -1.0),  //2
+		float3(-1.0, 0.0, -1.0),  //3
+	};
+	float2 Texs[6] = {
+		float2(0.0, 0.0),   //0
+		float2(1.0, 0.0),   //1
+		float2(0.0, 1.0),   //3
+		float2(1.0, 0.0),   //1
+		float2(1.0, 1.0),   //2
+		float2(0.0, 1.0),   //3
+	};
+
+	float3 InPosition = Positions[VertID];
+	float3 InNormal = float3(0.0, 1.0, 0.0);
+	float3 InTangent = float3(0.0, 0.0, 1.0);
+
+	PixelInput Out;
+	Out.Tex = Texs[VertID];
+
+	float4 PreviousWorldPos = mul(float4(InPosition, 1.0), PreviousModelMatrix);
+	float4 ClipPos = mul(PreviousWorldPos, PreviousViewProjMatrix);
+	ClipPos /= ClipPos.w;
+	Out.PreviousScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
+	Out.PreviousScreenPos.y = 1 - Out.PreviousScreenPos.y;
+	Out.PreviousScreenPos.xy *= ViewportSize;
+	Out.PreviousScreenPos.z = ClipPos.z;
+
+	float4 WorldPos = mul(float4(InPosition, 1.0), ModelMatrix);
+	ClipPos = mul(WorldPos, ViewProjMatrix);
+
+	Out.WorldPos = WorldPos.xyz;
+	Out.Position = ClipPos;
+
+	ClipPos /= ClipPos.w;
+	Out.CurrentScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
+	Out.CurrentScreenPos.y = 1 - Out.CurrentScreenPos.y;
+	Out.CurrentScreenPos.xy *= ViewportSize;
+	Out.CurrentScreenPos.z = ClipPos.z;
+
+	//Out.WorldPos = WorldPos.xyz;
+	//Out.Position = mul(float4(Out.WorldPos, 1), ViewProjMatrix);
+
+	Out.N = mul(InNormal, (float3x3)ModelMatrix);
+	Out.T = mul(InTangent.xyz, (float3x3)ModelMatrix);
+	Out.B = cross(InNormal, InTangent.xyz);
+	Out.B = mul(Out.B, (float3x3)ModelMatrix);
+
+	return Out;
+}
+
 float4 visualizeVec(float3 v)
 {
 	float3 vv = (v + 1) / 2;
@@ -109,6 +169,53 @@ float3 F_schlickR(float cosTheta, float3 F0, float roughness)
 {
 	return F0 + (max(1.0 - roughness, F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
+
+
+float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO, float3 Emissive)
+{
+	float3 R = reflect(-V, N); //incident ray, surface normal
+
+	float NoV = saturate(dot(N, V));
+	float3 F0 = lerp(0.04, Albedo.rgb, Metallic);
+	float3 F = F_schlickR(NoV, F0, Roughness);
+
+	float3 kD = (1.0 - F) * (1.0 - Metallic);
+
+	float3 Irradiance = 0;
+	if (bSHDiffuse)
+	{
+		// SH Irradiance
+		Irradiance = GetSHIrradiance(N, Degree, Coeffs);
+	}
+	else
+	{
+		Irradiance = IrradianceCubeMap.SampleLevel(LinearSampler, N, 0).xyz;
+	}
+
+	float3 Diffuse = Albedo * kD * Irradiance;
+
+	float Mip = ComputeReflectionCaptureMipFromRoughness(Roughness, MaxMipLevel - 1);
+	float2 BRDF = PreintegratedGF.Sample(LinearSampler, float2(NoV, Roughness)).rg;
+
+	float3 PrefilteredColor = PrefilteredCubeMap.SampleLevel(LinearSampler, R, Mip).rgb;
+	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
+
+	return Emissive + (Diffuse + Specular) * AO;
+}
+
+
+float4 PS_PBR_Floor(PixelInput In) : SV_Target
+{
+	float3 Color = BaseMap.Sample(LinearSampler, In.Tex).xyz;
+	float Alpha = OpacityMap.Sample(LinearSampler, In.Tex).r;
+
+	float3 N = normalize(In.N);
+	float3 V = normalize(CameraPos - In.WorldPos);
+
+	float3 IBL = CalcIBL(N, V, BaseColor, Metallic, Roughness, 1, 0);
+	return float4(IBL, 1);
+}
+
 
 float4 PS_PBR(PixelInput In) : SV_Target
 {
@@ -122,6 +229,7 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	float Metallic = MetallicMap.Sample(LinearSampler, In.Tex).x;
 	float Roughness = RoughnessMap.Sample(LinearSampler, In.Tex).x;
 	float AO = AOMap.Sample(LinearSampler, In.Tex).x;
+	float3 Emissive = EmissiveMap.Sample(LinearSampler, In.Tex).xyz;
 
 	float3x3 TBN = float3x3(normalize(In.T), normalize(In.B), normalize(In.N));
 	float3 tNormal = NormalMap.Sample(LinearSampler, In.Tex).xyz;
@@ -129,36 +237,7 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	float3 N = mul(tNormal, TBN);
 
 	float3 V = normalize(CameraPos - In.WorldPos);
-	float3 R = reflect(-V, N); //incident ray, surface normal
+	float3 IBL = CalcIBL(N, V, Albedo, Metallic, Roughness, AO, Emissive);
 
-	float NoV = saturate(dot(N, V));
-	float3 F0 = lerp(0.04, Albedo.rgb, Metallic);
-	float3 F = F_schlickR(NoV, F0, Roughness);
-
-	float3 kD = (1.0 - F) * (1.0 - Metallic);
-
-	float3 Irradiance = 0;
-	if (bSHDiffuse)
-	{
-		// SH Irradiance
-		Irradiance = GetSHIrradiance(N, 4, Coeffs);
-	}
-	else
-	{
-		Irradiance = IrradianceCubeMap.SampleLevel(LinearSampler, N, 0).xyz;
-	}
-
-	float3 Diffuse = Albedo * kD * Irradiance;
-
-	float Mip = ComputeReflectionCaptureMipFromRoughness(Roughness, MaxMipLevel-1);
-	float2 BRDF = PreintegratedGF.Sample(LinearSampler, float2(NoV, Roughness)).rg;
-
-	
-	float3 PrefilteredColor = PrefilteredCubeMap.SampleLevel(LinearSampler, R, Mip).rgb;
-	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
-
-	float3 Emissive = EmissiveMap.Sample(LinearSampler, In.Tex).xyz;
-	float3 FinalColor = Emissive + (Diffuse + Specular) * AO;
-
-	return float4(FinalColor, 1);
+	return float4(IBL, 1);
 }

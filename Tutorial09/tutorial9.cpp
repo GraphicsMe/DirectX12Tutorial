@@ -177,15 +177,24 @@ public:
 				ImGui::Checkbox("SHDiffuse", &m_bSHDiffuse);
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
 				ImGui::SameLine();
-				ImGui::Text("%.3f", m_RotateY);
+				ImGui::SliderFloat("RotateY", &m_RotateY, 0, MATH_2PI);
 				ImGui::Checkbox("Enable Bloom", &PostProcessing::g_EnableBloom);
-				ImGui::SliderFloat("Rotate Y", &m_RotateY, 0, MATH_2PI);
 				
 				if (PostProcessing::g_EnableBloom)
 				{
 					ImGui::Indent(20);
 					ImGui::SliderFloat("Bloom Intensity", &PostProcessing::g_BloomIntensity, 0.f, 5.f);
 					ImGui::SliderFloat("Bloom Threshold", &PostProcessing::g_BloomThreshold, 0.f, 10.f);
+				}
+
+				// floor
+				{
+					ImGui::Indent(-20);
+					ImGui::Text("Floor PBR Parameters");
+					ImGui::Indent(20);
+					ImGui::ColorEdit3("Base Color", m_FloorColor.data);
+					ImGui::SliderFloat("Metallic", &m_FloorMetallic, 0.f, 1.f);
+					ImGui::SliderFloat("Roughness", &m_FloorRoughness, 0.f, 1.f);
 				}
 			}
 
@@ -227,8 +236,8 @@ public:
 			ShowTexture2D(CommandContext, m_PreintegratedGF);
 			break;
 		case SM_PBR:
-			MeshPass(CommandContext);
-			SkyPass(CommandContext, false);
+			SkyPass(CommandContext, true);
+			MeshPass(CommandContext, false);
 			// TAA
 			{
 				//MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);
@@ -265,6 +274,9 @@ private:
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true, false);
+	
+		m_FloorAlpha.LoadFromFile(L"../Resources/Models/harley/textures/Floor_Alpha.jpg", false);
+		m_FloorAlbedo.LoadFromFile(L"../Resources/Models/harley/textures/default.png", true);
 	}
 
 	void SetupShaders()
@@ -283,6 +295,9 @@ private:
 		m_MeshPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_PBR", "ps_5_1");
 
 		m_SphericalHarmonicsPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/EnvironmentShaders.hlsl", "PS_SphericalHarmonics", "ps_5_1");
+
+		m_PBRFloorVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "VS_PBR_Floor", "vs_5_1");
+		m_PBRFloorPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_PBR_Floor", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -435,6 +450,17 @@ private:
 		m_MeshPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_MeshVS.Get()));
 		m_MeshPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_MeshPS.Get()));
 		m_MeshPSO.Finalize();
+
+		m_FloorPSO.SetRootSignature(m_MeshSignature);
+		m_FloorPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_FloorPSO.SetBlendState(FPipelineState::BlendTraditional);
+		m_FloorPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		// no need to set input layout
+		m_FloorPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_FloorPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), RenderWindow::Get().GetDepthFormat());
+		m_FloorPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorVS.Get()));
+		m_FloorPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorPS.Get()));
+		m_FloorPSO.Finalize();
 	}
 
 	void GenerateCubeMap()
@@ -590,7 +616,7 @@ private:
 		m_SkyBox->Draw(GfxContext);
 	}
 
-	void MeshPass(FCommandContext& GfxContext)
+	void MeshPass(FCommandContext& GfxContext, bool Clear)
 	{
 		GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 		GfxContext.ClearColor(MotionBlur::g_VelocityBuffer);
@@ -617,8 +643,11 @@ private:
 		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV());
 		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV(), DepthBuffer.GetDSV());
 
-		GfxContext.ClearColor(SceneBuffer);
-		GfxContext.ClearDepth(DepthBuffer);
+		if (Clear)
+		{
+			GfxContext.ClearColor(SceneBuffer);
+			GfxContext.ClearDepth(DepthBuffer);
+		}
 
 		m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
 		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
@@ -628,17 +657,34 @@ private:
 
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
-		m_PSConstants.Exposure = m_Exposure;
-		m_PSConstants.CameraPos = m_Camera.GetPosition();
+		__declspec(align(16)) struct
+		{
+			float		Exposure;
+			Vector3f	CameraPos;
+			Vector3f	BaseColor;
+			float		Metallic;
+			float		Roughness;
+			int			MaxMipLevel;
+			int			bSHDiffuse;
+			int			Degree;
+			Vector4f	Coeffs[16];
+		} PBR_Constants;
 
+		PBR_Constants.Exposure = m_Exposure;
+		PBR_Constants.MaxMipLevel = m_PrefilteredCube.GetNumMips();
+		PBR_Constants.CameraPos = m_Camera.GetPosition();
+		PBR_Constants.BaseColor = m_FloorColor;
+		PBR_Constants.Metallic = m_FloorMetallic;
+		PBR_Constants.Roughness = m_FloorRoughness;
+
+		PBR_Constants.bSHDiffuse = m_bSHDiffuse;
+		PBR_Constants.Degree = m_SHDegree;
 		for (int i = 0; i < m_SHCoeffs.size(); ++i)
 		{
-			m_PSConstants.Coeffs[i] = m_SHCoeffs[i];
+			PBR_Constants.Coeffs[i] = m_SHCoeffs[i];
 		}
-		m_PSConstants.bSHDiffuse = m_bSHDiffuse;
-		m_PSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
 
-		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(PBR_Constants), &PBR_Constants);
 
 		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
 		GfxContext.SetDynamicDescriptor(2, 8, m_PrefilteredCube.GetCubeSRV());
@@ -646,6 +692,16 @@ private:
 		GfxContext.SetDynamicDescriptor(3, 0, MotionBlur::g_VelocityBuffer.GetUAV());
 
 		m_Mesh->Draw(GfxContext);
+
+		GfxContext.SetPipelineState(m_FloorPSO);
+
+		// draw floor
+		m_VSConstants.ModelMatrix = FMatrix::ScaleMatrix(10.f);
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 0, m_FloorAlbedo.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 1, m_FloorAlpha.GetSRV());
+		GfxContext.Draw(6);
 	}
 
 	void ShowTexture2D(FCommandContext& GfxContext, FTexture& Texture2D)
@@ -900,7 +956,9 @@ private:
 	FGraphicsPipelineState m_GenPrefilterPSO;
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 	FGraphicsPipelineState m_MeshPSO;
+	FGraphicsPipelineState m_FloorPSO;
 
+	FTexture m_FloorAlbedo, m_FloorAlpha;
 	FTexture m_TextureLongLat, m_PreintegratedGF;
 	FCubeBuffer m_CubeBuffer, m_IrradianceCube, m_PrefilteredCube;
 
@@ -913,6 +971,7 @@ private:
 	ComPtr<ID3DBlob> m_GenIrradiancePS;
 	ComPtr<ID3DBlob> m_GenPrefilterPS;
 	ComPtr<ID3DBlob> m_MeshPS, m_MeshVS;
+	ComPtr<ID3DBlob> m_PBRFloorVS, m_PBRFloorPS;
 
 	D3D12_VIEWPORT		m_MainViewport;
 	D3D12_RECT			m_MainScissor;
@@ -927,6 +986,10 @@ private:
 	int m_NumSamplesPerDir = 10;
 	bool m_RotateMesh = false;
 	float m_RotateY = 0.f;
+	// floor PBR parameters
+	Vector3f m_FloorColor = Vector3f(0.3f);
+	float m_FloorMetallic = 0.f;
+	float m_FloorRoughness = 1.f;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 

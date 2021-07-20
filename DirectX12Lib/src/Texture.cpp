@@ -55,7 +55,7 @@ void FTexture::LoadFromFile(const std::wstring& FileName, bool IsSRGB)
 	HRESULT hr;
 	if (FileName.rfind(L".dds") != std::string::npos)
 	{
-		hr = DirectX::LoadFromDDSFile(FileName.c_str(), DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image);
+		hr = DirectX::LoadFromDDSFile(FileName.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
 	}
 	else if (FileName.rfind(L".tga") != std::string::npos)
 	{

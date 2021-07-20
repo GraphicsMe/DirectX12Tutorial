@@ -46,7 +46,6 @@ void FCommandQueue::Destroy()
 	}
 
 	Flush();
-	m_CommandListQueue.empty();
 	//Assert(m_ReadyAllocators.empty());
 	for (uint32_t i = 0; i < m_AllocatorPool.size(); ++i)
 	{

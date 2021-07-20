@@ -1,4 +1,4 @@
-cmake -G "Visual Studio 15 2017" -A x64 -B build
+cmake -G "Visual Studio 16 2019" -A x64 -B build
 
 IF %ERRORLEVEL% NEQ 0 (
     PAUSE
