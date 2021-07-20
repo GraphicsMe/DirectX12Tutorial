@@ -696,7 +696,7 @@ private:
 		GfxContext.SetPipelineState(m_FloorPSO);
 
 		// draw floor
-		m_VSConstants.ModelMatrix = FMatrix::ScaleMatrix(10.f);
+		m_VSConstants.ModelMatrix = FMatrix::ScaleMatrix(5.f);
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
 		GfxContext.SetDynamicDescriptor(2, 0, m_FloorAlbedo.GetSRV());

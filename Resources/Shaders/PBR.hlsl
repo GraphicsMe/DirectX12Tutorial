@@ -211,9 +211,8 @@ float4 PS_PBR_Floor(PixelInput In) : SV_Target
 
 	float3 N = normalize(In.N);
 	float3 V = normalize(CameraPos - In.WorldPos);
-
 	float3 IBL = CalcIBL(N, V, BaseColor, Metallic, Roughness, 1, 0);
-	return float4(IBL, 1);
+	return float4(IBL, Alpha);
 }
 
 
