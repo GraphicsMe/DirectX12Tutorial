@@ -19,6 +19,7 @@
 #include "BufferManager.h"
 #include "MotionBlur.h"
 #include "PostProcessing.h"
+#include "DepthOfField.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -176,6 +177,7 @@ bool D3D12RHI::Initialize()
 	FGenerateMips::Initialize();
 	TemporalEffects::Initialize();
 	MotionBlur::Initialize();
+	DepthOfField::Initialize();
 	PostProcessing::Initialize();
 
 	return true;
@@ -185,6 +187,7 @@ void D3D12RHI::Destroy()
 {
 	PostProcessing::Destroy();
 	MotionBlur::Destroy();
+	DepthOfField::Destroy();
 	TemporalEffects::Destroy();
 	FGenerateMips::Destroy();
 	BufferManager::DestroyRenderingBuffers();

@@ -39,6 +39,7 @@
 	include/BufferManager.h
 	include/MotionBlur.h
 	include/PostProcessing.h
+	include/DepthOfField.h
 )
 
 set(SOURCES
@@ -79,6 +80,7 @@ set(SOURCES
 	src/BufferManager.cpp
 	src/MotionBlur.cpp
 	src/PostProcessing.cpp
+	src/DepthOfField.cpp
 )
 
 set( IMGUI_HEADERS
@@ -126,6 +128,12 @@ set(SHADER_FILES
 	../Resources/shaders/ResolveTAACS.hlsl
 	../Resources/shaders/CameraVelocityCS.hlsl
 	../Resources/shaders/PixelPacking_Velocity.hlsli
+	../Resources/shaders/DepthOfField_CoC.hlsl
+	../Resources/shaders/DepthOfField_Prefilter.hlsl
+	../Resources/shaders/DepthOfField_BokehFilter.hlsl
+	../Resources/shaders/DepthOfField_Postfilter.hlsl
+	../Resources/shaders/DepthOfField_Combine.hlsl
+	../Resources/shaders/DiskKernels.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

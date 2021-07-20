@@ -27,6 +27,7 @@
 #include "BufferManager.h"
 #include "MotionBlur.h"
 #include "PostProcessing.h"
+#include "DepthOfField.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -170,14 +171,14 @@ public:
 			}
 			else if (m_ShowMode == SM_PBR)
 			{
-				ImGui::Checkbox("TAA", &m_bTAA);
-
-				TemporalEffects::g_EnableTAA = m_bTAA;
+				ImGui::Checkbox("TAA", &TemporalEffects::g_EnableTAA);
 
 				ImGui::Checkbox("SHDiffuse", &m_bSHDiffuse);
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
+				ImGui::SliderFloat("Rotate Y", &m_RotateY, 0, MATH_2PI);
 				ImGui::SameLine();
 				ImGui::SliderFloat("RotateY", &m_RotateY, 0, MATH_2PI);
+
 				ImGui::Checkbox("Enable Bloom", &PostProcessing::g_EnableBloom);
 				
 				if (PostProcessing::g_EnableBloom)
@@ -185,6 +186,17 @@ public:
 					ImGui::Indent(20);
 					ImGui::SliderFloat("Bloom Intensity", &PostProcessing::g_BloomIntensity, 0.f, 5.f);
 					ImGui::SliderFloat("Bloom Threshold", &PostProcessing::g_BloomThreshold, 0.f, 10.f);
+					ImGui::Indent(-20);
+				}
+
+				ImGui::Checkbox("Enable DOF", &DepthOfField::g_EnableDepthOfField);
+				if (DepthOfField::g_EnableDepthOfField)
+				{
+					ImGui::Indent(20);
+					ImGui::SliderFloat("FoucusDistance", &DepthOfField::g_FoucusDistance, 0.f, 10.f);
+					ImGui::SliderFloat("FoucusRange", &DepthOfField::g_FoucusRange, 0.f, 5.f);
+					ImGui::SliderFloat("BokehRadius", &DepthOfField::g_BokehRadius, 1.f, 10.f);
+					ImGui::Indent(-20);
 				}
 
 				// floor
@@ -238,6 +250,10 @@ public:
 		case SM_PBR:
 			SkyPass(CommandContext, true);
 			MeshPass(CommandContext, false);
+			// DOF
+			{
+				DepthOfField::Render(CommandContext, m_Camera.GetNearClip(), m_Camera.GetFarClip());
+			}
 			// TAA
 			{
 				//MotionBlur::GenerateCameraVelocityBuffer(CommandContext, m_Camera);

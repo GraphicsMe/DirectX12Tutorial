@@ -46,6 +46,11 @@ float4 Pow4(float4 x)
 	return xx * xx;
 }
 
+float Max3(float a, float b, float c)
+{
+	return max(a, max(b, c));
+}
+
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 float3 ACESFilm(float3 color)
 {
@@ -258,4 +263,11 @@ float3 GetSHIrradiance(float3 Normal,int Degree,float3 Coeffs[16])
 float Luminance(float3 Linear)
 {
 	return dot(Linear, float3(0.3, 0.59, 0.11));
+}
+
+// convert view space linear depth
+float LinearEyeDepth(float depth,float near,float far)
+{
+	float z = depth;
+	return (near * far) / (far - z * (far - near));
 }

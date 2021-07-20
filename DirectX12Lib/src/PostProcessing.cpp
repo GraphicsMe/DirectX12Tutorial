@@ -19,7 +19,7 @@ extern FCommandListManager g_CommandListManager;
 
 namespace PostProcessing
 {
-	bool g_EnableBloom = true;
+	bool g_EnableBloom = false;
 
 	float g_BloomIntensity = 1.f;
 	float g_BloomThreshold = 1.f;

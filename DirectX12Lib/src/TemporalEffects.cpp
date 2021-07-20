@@ -14,7 +14,7 @@ using namespace MotionBlur;
 
 namespace TemporalEffects
 {
-	bool					g_EnableTAA = true;
+	bool					g_EnableTAA = false;
 	bool					s_FirstFrame = false;
 
 	uint32_t				s_FrameIndex = 0;
