@@ -175,7 +175,6 @@ public:
 
 				ImGui::Checkbox("SHDiffuse", &m_bSHDiffuse);
 				ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
-				ImGui::SliderFloat("Rotate Y", &m_RotateY, 0, MATH_2PI);
 				ImGui::SameLine();
 				ImGui::SliderFloat("RotateY", &m_RotateY, 0, MATH_2PI);
 
@@ -199,14 +198,14 @@ public:
 					ImGui::Indent(-20);
 				}
 
+				ImGui::Text("Floor PBR Parameters");
 				// floor
 				{
-					ImGui::Indent(-20);
-					ImGui::Text("Floor PBR Parameters");
 					ImGui::Indent(20);
 					ImGui::ColorEdit3("Base Color", m_FloorColor.data);
 					ImGui::SliderFloat("Metallic", &m_FloorMetallic, 0.f, 1.f);
 					ImGui::SliderFloat("Roughness", &m_FloorRoughness, 0.f, 1.f);
+					ImGui::Indent(-20);
 				}
 			}
 
