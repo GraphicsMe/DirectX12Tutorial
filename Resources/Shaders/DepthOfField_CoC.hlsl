@@ -16,6 +16,7 @@ cbuffer CB0 : register(b0)
     float2  pad;
     float2  ClipSpaceNearFar;
     float   BokehRadius;
+    float   RcpBokehRadius;
 };
 
 //------------------------------------------------------- MACRO DEFINITION
@@ -64,7 +65,6 @@ void cs_FragCoC
     float coc = (SceneDepth - FoucusDistance) / FoucusRange;
 
     // clamp to (-1,1) and multiple BokehRadius
-    // 负数表示聚焦点前
     coc = clamp(coc, -1, 1) * BokehRadius;
     CoCBuffer[ScreenST] = coc;
 

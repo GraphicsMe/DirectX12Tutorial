@@ -1,6 +1,8 @@
 
 //#define KERNEL_SMALL
-#define KERNEL_MEDIUM
+//#define KERNEL_MEDIUM
+#define KERNEL_LARGE
+//#define KERNEL_VERYLARGE
 #include "DiskKernels.hlsl"
 
 RWTexture2D<float4> BokehColor			: register(u0);
@@ -24,13 +26,6 @@ void GetSampleUV(uint2 ScreenCoord, inout float2 UV, inout float2 PixelSize)
     UV = ScreenCoord * InvScreenSize + 0.5 * InvScreenSize;
 }
 
-// 权重值
-float Weigh(float coc, float radius)
-{
-    //return coc >= radius;
-    return saturate((coc - radius + 2) / 2);
-}
-
 //------------------------------------------------------- ENTRY POINT
 // Bokeh filter with disk-shaped kernels
 
@@ -40,55 +35,48 @@ void cs_FragBokehFilter(uint3 DTid : SV_DispatchThreadID)
     float2 PixelSize, UV;
     GetSampleUV(DTid.xy, UV, PixelSize);
 
-#if 0
-    float3 color = 0;
-    float weight = 0;
+    float4 center = PrefilterColor.SampleLevel(LinearSampler, UV, 0);
+
+    float4 bgAcc = 0.0; // Background: far field bokeh
+    float4 fgAcc = 0.0; // Foreground: near field bokeh
     for (int k = 0; k < kSampleCount; ++k)
     {
         float2 offset = kDiskKernel[k] * BokehRadius;
-        // 到采样点的距离
-        float radius = length(offset);
+        float dist = length(offset);
         offset *= PixelSize;
-        float4 s = PrefilterColor.SampleLevel(LinearSampler, UV + offset, 0);
-        // 比较采样点的Coc是否覆盖了着色点，给予一个权重
-        float sw = Weigh(abs(s.a), radius);
-        color += s.rgb * sw;
-        weight += sw;
-    }
-    color *= 1.0 / weight;
-    BokehColor[DTid.xy] = float4(color, 1);
-#endif
+        float4 samp = PrefilterColor.SampleLevel(LinearSampler, UV + offset, 0);
 
-    // processing pixel
-    float4 current = PrefilterColor.SampleLevel(LinearSampler, UV, 0);
+        // BG: Compare CoC of the current sample and the center sample and select smaller one.
+        float bgCoC = max(min(center.a, samp.a), 0.0);
 
-    float3 bgColor = 0, fgColor = 0;
-    float bgWeight = 0, fgWeight = 0;
-    for (int k = 0; k < kSampleCount; ++k)
-    {
-        float2 offset = kDiskKernel[k] * BokehRadius;
-        // 到采样点的距离
-        float radius = length(offset);
-        offset *= PixelSize;
-        float4 sample = PrefilterColor.SampleLevel(LinearSampler, UV + offset, 0);
+        // Compare the CoC to the sample distance. Add a small margin to smooth out.
+        const float margin = PixelSize.y * 2;
+        float bgWeight = saturate((bgCoC - dist + margin) / margin);
+        // Foregound's coc is negative
+        float fgWeight = saturate((-samp.a - dist + margin) / margin);
 
-        float bgw = Weigh(max(0, sample.a), radius);
-        bgColor += sample.rgb * bgw;
-        bgWeight += bgw;
+        // Cut influence from focused areas because they're darkened by CoC premultiplying. This is only needed for near field.
+        // 减少聚焦区域的影响，它们因CoC预乘而变暗。这仅适用于近场。
+        fgWeight *= step(PixelSize.y, -samp.a);
 
-        float fgw = Weigh(-sample.a, radius);
-        fgColor += sample.rgb * fgw;
-        fgWeight += fgw;
+        // Accumulation
+        bgAcc += half4(samp.rgb, 1.0) * bgWeight;
+        fgAcc += half4(samp.rgb, 1.0) * fgWeight;
     }
 
-    // 防止为0
-    bgColor *= 1 / (bgWeight + (bgWeight == 0));
-    fgColor *= 1 / (fgWeight + (fgWeight == 0));
+    // Get the weighted average.
+    bgAcc.rgb /= bgAcc.a + (bgAcc.a == 0.0); // zero-div guard
+    fgAcc.rgb /= fgAcc.a + (fgAcc.a == 0.0);
 
-    // 重组前景 & 后景
-    //float bgfg = min(1, fgWeight);
-    float bgfg = min(1, fgWeight * 3.14159265359 / kSampleCount);
+    // FG: Normalize the total of the weights.
+    // 归一化前散景权重
+    fgAcc.a *= 3.14159265359 / kSampleCount;
 
-    half3 color = lerp(bgColor, fgColor, bgfg);
-    BokehColor[DTid.xy] = float4(color, bgfg);
+    // Alpha premultiplying
+    // alpha存储的是前散景的权重
+    float alpha = saturate(fgAcc.a);
+    // 前散景和后散景融合
+    float3 rgb = lerp(bgAcc.rgb, fgAcc.rgb, alpha);
+
+    BokehColor[DTid.xy] = float4(rgb, alpha);
 }

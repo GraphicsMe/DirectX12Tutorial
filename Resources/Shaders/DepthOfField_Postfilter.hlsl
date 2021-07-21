@@ -46,5 +46,5 @@ void cs_FragPostfilter(uint3 DTid : SV_DispatchThreadID)
     acc += BokehColor.SampleLevel(LinearSampler, uv2, 0);
     acc += BokehColor.SampleLevel(LinearSampler, uv3, 0);
 
-    PostfilterColor[DTid.xy] = acc;
+    PostfilterColor[DTid.xy] = acc / 4.0f;
 }

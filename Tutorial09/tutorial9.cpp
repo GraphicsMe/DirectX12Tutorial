@@ -179,7 +179,6 @@ public:
 				ImGui::SliderFloat("RotateY", &m_RotateY, 0, MATH_2PI);
 
 				ImGui::Checkbox("Enable Bloom", &PostProcessing::g_EnableBloom);
-				
 				if (PostProcessing::g_EnableBloom)
 				{
 					ImGui::Indent(20);

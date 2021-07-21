@@ -1,7 +1,7 @@
+#include "ShaderUtils.hlsl"
 
-
-RWTexture2D<float4> CombineColor		: register(u0);
-Texture2D<float4>	TempSceneColor		: register(t0);
+RWTexture2D<float3> CombineColor		: register(u0);
+Texture2D<float3>	TempSceneColor		: register(t0);
 Texture2D<float>	CoCBuffer		    : register(t1);
 Texture2D<float4>	FilterColor		    : register(t2);
 
@@ -31,14 +31,18 @@ void cs_FragCombine(uint3 DTid : SV_DispatchThreadID)
     float2 PixelSize, UV;
     GetSampleUV(DTid.xy, UV, PixelSize);
 
-    // simple blend
     float3 source = TempSceneColor.SampleLevel(LinearSampler, UV, 0);
+    // 采样当前片段的CoC值
     float coc = CoCBuffer.SampleLevel(LinearSampler, UV, 0);
+    // 采样散景
     float4 dof = FilterColor.SampleLevel(LinearSampler, UV, 0);
 
-    float dofStrength = smoothstep(0.1, 1, abs(coc));
-    float3 color = lerp(source.rgb, dof.rgb, dofStrength);
-    //float3 color = lerp(source.rgb, dof.rgb, dofStrength + dof.a - dofStrength * dof.a);
+    // Convert CoC to far field alpha value.
+    // 对CoC正值进行插值，用于获取后散景
+    float ffa = smoothstep(PixelSize.y * 2.0, PixelSize.y * 4.0, coc);
 
-    CombineColor[DTid.xy] = float4(color, 1);
+    // 非线性插值
+    float3 color = lerp(source, dof.rgb, ffa + dof.a - ffa * dof.a);
+
+    CombineColor[DTid.xy] = color;
 }

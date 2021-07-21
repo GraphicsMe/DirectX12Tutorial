@@ -175,6 +175,7 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 			Vector2f	pad;
 			Vector2f	ClipSpaceNearFar;
 			float		BokehRadius;
+			float		RcpBokehRadius;
 			//Vector2f	ViewportJitter;
 			//Vector4f	Resolution;	//width, height, 1/width, 1/height
 		};
@@ -190,6 +191,7 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 		cbv.ClipSpaceNearFar[0] = NearClipDist;
 		cbv.ClipSpaceNearFar[1] = FarClipDist;
 		cbv.BokehRadius = g_BokehRadius;
+		cbv.RcpBokehRadius = 1.0f / g_BokehRadius;
 		//cbv.Resolution = Vector4f(width, height, rcpWidth, rcpHeight);
 
 		Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);

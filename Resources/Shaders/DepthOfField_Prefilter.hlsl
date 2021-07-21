@@ -53,8 +53,6 @@ void cs_FragPrefilter(uint3 DTid : SV_DispatchThreadID)
 
     // average coc
     // float coc = (coc0 + coc1 + coc2 + coc3) * 0.25;
-
-    // we need most max 
     float cocMin = min(min(min(coc0, coc1), coc2), coc3);
     float cocMax = max(max(max(coc0, coc1), coc2), coc3);
     float coc = cocMax >= -cocMin ? cocMax : cocMin;
