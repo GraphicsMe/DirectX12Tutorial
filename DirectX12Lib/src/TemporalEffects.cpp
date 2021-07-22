@@ -227,7 +227,7 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 	Context.SetDynamicDescriptor(1, 0, SceneColor.GetSRV());
 	Context.SetDynamicDescriptor(1, 1, g_TemporalColor[Src].GetSRV());
 	Context.SetDynamicDescriptor(1, 2, g_VelocityBuffer.GetSRV());
-	Context.SetDynamicDescriptor(1, 3, SceneDepthBuffer.GetDepthSRV());
+	Context.SetDynamicDescriptor(1, 3, SceneDepthBuffer.GetSRV());
 	// uav
 	Context.SetDynamicDescriptor(2, 0, g_TemporalColor[Dst].GetUAV());
 

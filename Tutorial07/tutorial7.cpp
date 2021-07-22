@@ -271,7 +271,7 @@ private:
 		
 		CommandContext.TransitionResource(m_VSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-		CommandContext.SetDynamicDescriptor(0, 0, m_ShadowBuffer.GetDepthSRV());
+		CommandContext.SetDynamicDescriptor(0, 0, m_ShadowBuffer.GetSRV());
 		CommandContext.SetDynamicDescriptor(1, 0, m_VSMBuffer.GetUAV());
 
 		uint32_t GroupCount = (SHADOW_BUFFER_SIZE + 15) / 16;
@@ -355,7 +355,7 @@ private:
 		}
 		else
 		{
-			CommandContext.SetDynamicDescriptor(2, 1, m_ShadowBuffer.GetDepthSRV());
+			CommandContext.SetDynamicDescriptor(2, 1, m_ShadowBuffer.GetSRV());
 		}
 
 		RenderObjects(CommandContext, m_Camera.GetViewMatrix(), m_Camera.GetProjectionMatrix());

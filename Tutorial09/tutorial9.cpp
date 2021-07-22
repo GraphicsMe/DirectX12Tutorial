@@ -246,8 +246,9 @@ public:
 			ShowTexture2D(CommandContext, m_PreintegratedGF);
 			break;
 		case SM_PBR:
-			SkyPass(CommandContext, true);
-			MeshPass(CommandContext, false);
+			//SkyPass(CommandContext, true);
+			BasePass(CommandContext, true);
+			IBLPass(CommandContext);
 			// DOF
 			{
 				DepthOfField::Render(CommandContext, m_Camera.GetNearClip(), m_Camera.GetFarClip());
@@ -312,6 +313,9 @@ private:
 
 		m_PBRFloorVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "VS_PBR_Floor", "vs_5_1");
 		m_PBRFloorPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_PBR_Floor", "ps_5_1");
+
+		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
+		m_IBLPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_IBL", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -355,7 +359,7 @@ private:
 		m_SkyPSO.SetDepthStencilState(FPipelineState::DepthStateReadOnly);
 		m_SkyPSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
 		m_SkyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_SkyPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), RenderWindow::Get().GetDepthFormat());
+		m_SkyPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), g_SceneDepthZ.GetFormat());
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
 		m_SkyPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkyPS.Get()));
 		m_SkyPSO.Finalize();
@@ -400,7 +404,7 @@ private:
 		m_Show2DTexturePSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
 		// no need to set mesh layout
 		m_Show2DTexturePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_Show2DTexturePSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_Show2DTexturePSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), g_SceneDepthZ.GetFormat());
 		m_Show2DTexturePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ShowTexture2DVS.Get()));
 		m_Show2DTexturePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_ShowTexture2DPS.Get()));
 		m_Show2DTexturePSO.Finalize();
@@ -423,7 +427,7 @@ private:
 		m_CubeMapCrossViewPSO.SetInputLayout((UINT)DebugMeshLayout.size(), &DebugMeshLayout[0]);
 
 		m_CubeMapCrossViewPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_CubeMapCrossViewPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_CubeMapCrossViewPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), g_SceneDepthZ.GetFormat());
 		m_CubeMapCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
 		m_CubeMapCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossPS.Get()));
 		m_CubeMapCrossViewPSO.Finalize();
@@ -436,16 +440,15 @@ private:
 		m_SphericalHarmonicsCrossViewPSO.SetInputLayout((UINT)DebugMeshLayout.size(), &DebugMeshLayout[0]);
 
 		m_SphericalHarmonicsCrossViewPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_SphericalHarmonicsCrossViewPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_SphericalHarmonicsCrossViewPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), g_SceneDepthZ.GetFormat());
 		m_SphericalHarmonicsCrossViewPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_CubeMapCrossVS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SphericalHarmonicsPS.Get()));
 		m_SphericalHarmonicsCrossViewPSO.Finalize();
 
-		m_MeshSignature.Reset(4, 1);
+		m_MeshSignature.Reset(3, 1);
 		m_MeshSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_MeshSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_MeshSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10); //pbr 7, irradiance, prefiltered, preintegratedGF
-		m_MeshSignature[3].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);  //velocity 
 		m_MeshSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_MeshSignature.Finalize(L"Mesh RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -460,7 +463,10 @@ private:
 		m_MeshPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		m_MeshPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_MeshPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_MeshPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), RenderWindow::Get().GetDepthFormat());
+		DXGI_FORMAT RTFormats[] = {
+			g_SceneColorBuffer.GetFormat(), g_GBufferA.GetFormat(), g_GBufferB.GetFormat(), g_GBufferC.GetFormat(), MotionBlur::g_VelocityBuffer.GetFormat(),
+		};
+		m_MeshPSO.SetRenderTargetFormats(5, RTFormats, g_SceneDepthZ.GetFormat());
 		m_MeshPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_MeshVS.Get()));
 		m_MeshPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_MeshPS.Get()));
 		m_MeshPSO.Finalize();
@@ -471,10 +477,44 @@ private:
 		m_FloorPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		// no need to set input layout
 		m_FloorPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_FloorPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), RenderWindow::Get().GetDepthFormat());
+		m_FloorPSO.SetRenderTargetFormats(5, RTFormats, g_SceneDepthZ.GetFormat());
 		m_FloorPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorVS.Get()));
 		m_FloorPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorPS.Get()));
 		m_FloorPSO.Finalize();
+
+		m_FloorPSO.SetRootSignature(m_MeshSignature);
+		m_FloorPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_FloorPSO.SetBlendState(FPipelineState::BlendTraditional);
+		m_FloorPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		// no need to set input layout
+		m_FloorPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_FloorPSO.SetRenderTargetFormats(5, RTFormats, g_SceneDepthZ.GetFormat());
+		m_FloorPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorVS.Get()));
+		m_FloorPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorPS.Get()));
+		m_FloorPSO.Finalize();
+
+		m_IBLSignature.Reset(3, 1);
+		m_IBLSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_IBLSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_IBLSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10); //scenecolor, normal, metallSpecularRoughness, AlbedoAO, velocity, irradiance, prefiltered, preintegratedGF
+		m_IBLSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_IBLSignature.Finalize(L"IBL RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		m_IBLPSO.SetRootSignature(m_IBLSignature);
+		m_IBLPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		D3D12_BLEND_DESC BlendAdd = FPipelineState::BlendTraditional;
+		BlendAdd.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		BlendAdd.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		BlendAdd.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		BlendAdd.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
+		m_IBLPSO.SetBlendState(BlendAdd);
+		m_IBLPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		// no need to set input layout
+		m_IBLPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_IBLPSO.SetRenderTargetFormat(g_SceneColorBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
+		m_IBLPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
+		m_IBLPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_IBLPS.Get()));
+		m_IBLPSO.Finalize();
 	}
 
 	void GenerateCubeMap()
@@ -599,9 +639,8 @@ private:
 		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		GfxContext.SetViewportAndScissor(0, 0, m_GameDesc.Width, m_GameDesc.Height);
 
-		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = g_SceneColorBuffer;
-		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
+		FDepthBuffer& DepthBuffer = g_SceneDepthZ;
 
 		// Indicate that the back buffer will be used as a render target.
 		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -630,11 +669,8 @@ private:
 		m_SkyBox->Draw(GfxContext);
 	}
 
-	void MeshPass(FCommandContext& GfxContext, bool Clear)
+	void BasePass(FCommandContext& GfxContext, bool Clear)
 	{
-		GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-		GfxContext.ClearColor(MotionBlur::g_VelocityBuffer);
-
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_MeshSignature);
 		GfxContext.SetPipelineState(m_MeshPSO);
@@ -642,24 +678,31 @@ private:
 		// jitter offset
 		GfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
 
-		RenderWindow& renderWindow = RenderWindow::Get();
-
 		FColorBuffer& SceneBuffer = g_SceneColorBuffer;
-		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
+		FDepthBuffer& DepthBuffer = g_SceneDepthZ;
 
 		// Indicate that the back buffer will be used as a render target.
 		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		GfxContext.TransitionResource(SceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		GfxContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+		GfxContext.TransitionResource(g_GBufferA, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(g_GBufferB, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(g_GBufferC, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 
-		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV());
-		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV(), DepthBuffer.GetDSV());
+		D3D12_CPU_DESCRIPTOR_HANDLE RTVs[] = {
+			SceneBuffer.GetRTV(), g_GBufferA.GetRTV(), g_GBufferB.GetRTV(), g_GBufferC.GetRTV(), MotionBlur::g_VelocityBuffer.GetRTV(),
+		};
+		GfxContext.SetRenderTargets(4, RTVs, g_SceneDepthZ.GetDSV());
 
 		if (Clear)
 		{
 			GfxContext.ClearColor(SceneBuffer);
+			GfxContext.ClearColor(g_GBufferA);
+			GfxContext.ClearColor(g_GBufferB);
+			GfxContext.ClearColor(g_GBufferC);
+			GfxContext.ClearColor(MotionBlur::g_VelocityBuffer);
 			GfxContext.ClearDepth(DepthBuffer);
 		}
 
@@ -703,7 +746,6 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
 		GfxContext.SetDynamicDescriptor(2, 8, m_PrefilteredCube.GetCubeSRV());
 		GfxContext.SetDynamicDescriptor(2, 9, m_PreintegratedGF.GetSRV());
-		GfxContext.SetDynamicDescriptor(3, 0, MotionBlur::g_VelocityBuffer.GetUAV());
 
 		m_Mesh->Draw(GfxContext);
 
@@ -716,6 +758,78 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 0, m_FloorAlbedo.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 1, m_FloorAlpha.GetSRV());
 		GfxContext.Draw(6);
+	}
+
+	void IBLPass(FCommandContext& GfxContext)
+	{
+		// Set necessary state.
+		GfxContext.SetRootSignature(m_IBLSignature);
+		GfxContext.SetPipelineState(m_IBLPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// jitter offset
+		GfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
+
+		FColorBuffer& SceneBuffer = g_SceneColorBuffer;
+
+		// Indicate that the back buffer will be used as a render target.
+		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(SceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(g_GBufferA, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(g_GBufferB, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(g_GBufferC, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, true);
+
+		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV());
+
+		m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
+		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
+		m_VSConstants.PreviousModelMatrix = m_Mesh->GetPreviousModelMatrix();
+		m_VSConstants.PreviousViewProjMatrix = m_Camera.GetPreviousViewProjMatrix();
+		m_VSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
+
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
+
+		__declspec(align(16)) struct
+		{
+			float		Exposure;
+			Vector3f	CameraPos;
+			Vector3f	BaseColor;
+			float		Metallic;
+			float		Roughness;
+			int			MaxMipLevel;
+			int			bSHDiffuse;
+			int			Degree;
+			FMatrix		InvViewProj;
+			Vector4f	Coeffs[16];
+		} PBR_Constants;
+
+		PBR_Constants.Exposure = m_Exposure;
+		PBR_Constants.MaxMipLevel = m_PrefilteredCube.GetNumMips();
+		PBR_Constants.CameraPos = m_Camera.GetPosition();
+		PBR_Constants.BaseColor = m_FloorColor;
+		PBR_Constants.Metallic = m_FloorMetallic;
+		PBR_Constants.Roughness = m_FloorRoughness;
+		PBR_Constants.InvViewProj = m_Camera.GetViewProjMatrix().Inverse();
+
+		PBR_Constants.bSHDiffuse = m_bSHDiffuse;
+		PBR_Constants.Degree = m_SHDegree;
+		for (int i = 0; i < m_SHCoeffs.size(); ++i)
+		{
+			PBR_Constants.Coeffs[i] = m_SHCoeffs[i];
+		}
+
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(PBR_Constants), &PBR_Constants);
+		GfxContext.SetDynamicDescriptor(2, 0, g_GBufferA.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 1, g_GBufferB.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 2, g_GBufferC.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 3, g_SceneDepthZ.GetSRV());
+
+		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
+		GfxContext.SetDynamicDescriptor(2, 8, m_PrefilteredCube.GetCubeSRV());
+		GfxContext.SetDynamicDescriptor(2, 9, m_PreintegratedGF.GetSRV());
+
+		GfxContext.Draw(3);
 	}
 
 	void ShowTexture2D(FCommandContext& GfxContext, FTexture& Texture2D)
@@ -961,6 +1075,7 @@ private:
 	FRootSignature m_Show2DTextureSignature;
 	FRootSignature m_CubeMapCrossViewSignature;
 	FRootSignature m_MeshSignature;
+	FRootSignature m_IBLSignature;
 
 	FGraphicsPipelineState m_GenCubePSO;
 	FGraphicsPipelineState m_SkyPSO;
@@ -971,6 +1086,7 @@ private:
 	FGraphicsPipelineState m_SphericalHarmonicsCrossViewPSO;
 	FGraphicsPipelineState m_MeshPSO;
 	FGraphicsPipelineState m_FloorPSO;
+	FGraphicsPipelineState m_IBLPSO;
 
 	FTexture m_FloorAlbedo, m_FloorAlpha;
 	FTexture m_TextureLongLat, m_PreintegratedGF;
@@ -986,6 +1102,7 @@ private:
 	ComPtr<ID3DBlob> m_GenPrefilterPS;
 	ComPtr<ID3DBlob> m_MeshPS, m_MeshVS;
 	ComPtr<ID3DBlob> m_PBRFloorVS, m_PBRFloorPS;
+	ComPtr<ID3DBlob> m_ScreenQuadVS, m_IBLPS;
 
 	D3D12_VIEWPORT		m_MainViewport;
 	D3D12_RECT			m_MainScissor;

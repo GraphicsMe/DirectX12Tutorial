@@ -203,7 +203,7 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 
 		// srv
 		Context.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
-		Context.SetDynamicDescriptor(1, 1, SceneDepthBuffer.GetDepthSRV());
+		Context.SetDynamicDescriptor(1, 1, SceneDepthBuffer.GetSRV());
 		// uav
 		Context.SetDynamicDescriptor(2, 0, g_CoCBuffer.GetUAV());
 		Context.SetDynamicDescriptor(2, 1, g_TempSceneColor.GetUAV());

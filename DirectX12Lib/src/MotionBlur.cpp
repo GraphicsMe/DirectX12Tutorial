@@ -98,7 +98,7 @@ void MotionBlur::GenerateCameraVelocityBuffer(FCommandContext& BaseContext, cons
 	Context.TransitionResource(g_VelocityBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	// srv
-	Context.SetDynamicDescriptor(1, 0, SceneDepthBuffer.GetDepthSRV());
+	Context.SetDynamicDescriptor(1, 0, SceneDepthBuffer.GetSRV());
 	// uav
 	Context.SetDynamicDescriptor(2, 0, g_VelocityBuffer.GetUAV());
 

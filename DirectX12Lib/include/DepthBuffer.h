@@ -14,7 +14,7 @@ public:
 
 	void Create(const std::wstring& Name, uint32_t Width, uint32_t Height, DXGI_FORMAT Format);
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetDSV() const { return m_hDSV; }
-	const D3D12_CPU_DESCRIPTOR_HANDLE& GetDepthSRV() const { return m_hDepthSRV; }
+	const D3D12_CPU_DESCRIPTOR_HANDLE& GetSRV() const { return m_hDepthSRV; }
 
 	float GetClearDepth() const { return m_ClearDepth; }
 	uint8_t GetClearStencil() const { return m_ClearStencil; }

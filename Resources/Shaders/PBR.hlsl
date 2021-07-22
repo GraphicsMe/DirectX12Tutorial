@@ -24,6 +24,8 @@ cbuffer PSContant : register(b0)
 	int		MaxMipLevel;
 	int		bSHDiffuse;
 	int		Degree;
+
+	float4x4 InvViewProj;
 	
 	float3	Coeffs[16];
 };
@@ -42,8 +44,6 @@ Texture2D PreintegratedGF 	: register(t9);
 
 SamplerState LinearSampler	: register(s0);
 
-//RWTexture2D<packed_velocity_t> VelocityBuffer : register(u0);
-RWTexture2D<float2> VelocityBuffer            : register(u0);
 
 struct VertexInput
 {
@@ -63,6 +63,15 @@ struct PixelInput
 	float3 WorldPos	: TEXCOORD4;
 	float3 PreviousScreenPos : TEXCOORD5;
 	float3 CurrentScreenPos  : TEXCOORD6;
+};
+
+struct PixelOutput
+{
+	float4 Target0 : SV_Target0;
+	float4 Target1 : SV_Target1;
+	float4 Target2 : SV_Target2;
+	float4 Target3 : SV_Target3;
+	float2 Target4 : SV_Target4;
 };
 
 PixelInput VS_PBR(VertexInput In)
@@ -171,7 +180,7 @@ float3 F_schlickR(float cosTheta, float3 F0, float roughness)
 }
 
 
-float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO, float3 Emissive)
+float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO)
 {
 	float3 R = reflect(-V, N); //incident ray, surface normal
 
@@ -200,27 +209,26 @@ float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 	float3 PrefilteredColor = PrefilteredCubeMap.SampleLevel(LinearSampler, R, Mip).rgb;
 	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
 
-	return Emissive + (Diffuse + Specular) * AO;
+	return (Diffuse + Specular) * AO;
 }
 
 
-float4 PS_PBR_Floor(PixelInput In) : SV_Target
+void PS_PBR_Floor(PixelInput In, out PixelOutput Out)
 {
 	float3 Color = BaseMap.Sample(LinearSampler, In.Tex).xyz;
 	float Alpha = OpacityMap.Sample(LinearSampler, In.Tex).r;
 
 	float3 N = normalize(In.N);
-	float3 V = normalize(CameraPos - In.WorldPos);
-	float3 IBL = CalcIBL(N, V, BaseColor, Metallic, Roughness, 1, 0);
-	return float4(IBL, Alpha);
+	
+	Out.Target0 = float4(0.0, 0.0, 0.0, 1.0);
+	Out.Target1 = float4(0.5 * N + 0.5, 1.0);
+	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
+	Out.Target3 = float4(BaseColor, 1.0);
 }
 
 
-float4 PS_PBR(PixelInput In) : SV_Target
+void PS_PBR(PixelInput In, out PixelOutput Out)
 {
-	// write velocity
-	VelocityBuffer[In.Position.xy] = In.PreviousScreenPos.xy - In.CurrentScreenPos.xy;
-
 	float Opacity = OpacityMap.Sample(LinearSampler, In.Tex).r;
 	clip(Opacity < 0.1f ? -1 : 1);
 
@@ -235,8 +243,40 @@ float4 PS_PBR(PixelInput In) : SV_Target
 	tNormal = 2 * tNormal - 1.0; // [0,1] -> [-1, 1]
 	float3 N = mul(tNormal, TBN);
 
-	float3 V = normalize(CameraPos - In.WorldPos);
-	float3 IBL = CalcIBL(N, V, Albedo, Metallic, Roughness, AO, Emissive);
+	Out.Target0 = float4(Emissive, 1.0);
+	Out.Target1 = float4(0.5*N+0.5, 1.0);
+	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
+	Out.Target3 = float4(Albedo, AO);
+	Out.Target4 = In.PreviousScreenPos.xy - In.CurrentScreenPos.xy;
+}
 
-	return float4(IBL, 1);
+Texture2D GBufferA		: register(t0); // normal
+Texture2D GBufferB		: register(t1); // metallSpecularRoughness
+Texture2D GBufferC		: register(t2); // AlbedoAO
+Texture2D SceneDepthZ	: register(t3); // Depth
+
+float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
+{
+	float3 N = GBufferA.Sample(LinearSampler, Tex).xyz;
+	N = 2.0 * N - 1.0;
+
+	float3 PBRParameters = GBufferB.Sample(LinearSampler, Tex).xyz;
+	float Metallic = PBRParameters.x;
+	float Roughness = PBRParameters.z;
+
+	float4 AlbedoAo = GBufferC.Sample(LinearSampler, Tex);
+	float AO = AlbedoAo.w;
+
+	float Depth = SceneDepthZ.Sample(LinearSampler, Tex).x;
+	float2 ScreenCoord = Tex;
+	ScreenCoord.y = 1.0 - ScreenCoord.y;
+	ScreenCoord = ScreenCoord * 2.0 - 1.0;
+	float4 NDCPos = float4(ScreenCoord, Depth, 1.0f);
+	float4 WorldPos = mul(NDCPos, InvViewProj);
+	WorldPos /= WorldPos.w;
+
+	float3 V = normalize(CameraPos - WorldPos.xyz);
+	float3 IBL = CalcIBL(N, V, AlbedoAo.xyz, Metallic, Roughness, AO);
+
+	return float4(IBL, 1.0);
 }

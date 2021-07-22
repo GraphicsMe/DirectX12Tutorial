@@ -31,12 +31,14 @@ void FPipelineState::Initialize()
 	D3D12_BLEND_DESC alphaBlend = {};
 	alphaBlend.IndependentBlendEnable = FALSE;
 	alphaBlend.RenderTarget[0].BlendEnable = FALSE;
+	alphaBlend.RenderTarget[0].LogicOpEnable = FALSE;
 	alphaBlend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	alphaBlend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 	alphaBlend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	alphaBlend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	alphaBlend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
 	alphaBlend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	alphaBlend.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
 	alphaBlend.RenderTarget[0].RenderTargetWriteMask = 0;
 	BlendNoColorWrite = alphaBlend;
 
