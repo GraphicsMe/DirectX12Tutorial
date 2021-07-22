@@ -31,8 +31,6 @@ void RenderWindow::Initialize()
 		ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&BackBuffer)));
 		m_BackBuffers[i].CreateFromSwapChain(L"BackBuffer", BackBuffer.Detach());
 	}
-
-	m_DepthBuffer.Create(L"DepthBuffer", Window.GetWidth(), Window.GetHeight(), DXGI_FORMAT_D32_FLOAT);
 }
 
 void RenderWindow::Destroy()
@@ -70,27 +68,12 @@ FColorBuffer& RenderWindow::GetBackBuffer()
 	return m_BackBuffers[m_frameIndex];
 }
 
-FDepthBuffer & RenderWindow::GetDepthBuffer()
-{
-	return m_DepthBuffer;
-}
-
 D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetCurrentBackBufferView()
 {
 	return m_BackBuffers[m_frameIndex].GetRTV();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE RenderWindow::GetDepthStencilHandle()
-{
-	return m_DepthBuffer.GetDSV();
-}
-
 const DXGI_FORMAT& RenderWindow::GetColorFormat() const
 {
 	return m_BackBuffers[0].GetFormat();
-}
-
-const DXGI_FORMAT& RenderWindow::GetDepthFormat() const
-{
-	return m_DepthBuffer.GetFormat();
 }

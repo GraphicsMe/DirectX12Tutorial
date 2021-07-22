@@ -8,6 +8,7 @@
 #include "D3D12RHI.h"
 #include "SamplerManager.h"
 #include "DirectXTex.h"
+#include "BufferManager.h"
 
 
 // Include compiled shaders for ImGui.
@@ -104,7 +105,7 @@ void ImguiManager::Initialize()
 	m_ImGUIPSO.SetInputLayout(3, &inputLayout[0]);
 	m_ImGUIPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	RenderWindow& RenderTarget = RenderWindow::Get();
-	m_ImGUIPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+	m_ImGUIPSO.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), BufferManager::g_SceneDepthZ.GetFormat());
 	m_ImGUIPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ImGUIVS.Get()));
 	m_ImGUIPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_ImGUIPS.Get()));
 	m_ImGUIPSO.Finalize();

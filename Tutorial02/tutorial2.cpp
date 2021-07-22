@@ -47,7 +47,7 @@ public:
 	{
 		ImguiManager::Get().NewFrame();
 
-		ImGui::Begin("Background Color");
+		ImGui::Begin("Background Color", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 		ImGui::ColorEdit3("Color", &m_ClearColor.x);
 		ImGui::End();
 
@@ -140,7 +140,7 @@ private:
 		m_PipelineState.SetDepthStencilState(FPipelineState::DepthStateDisabled);
 		m_PipelineState.SetInputLayout(_countof(inputElementDescs), inputElementDescs);
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), DXGI_FORMAT_UNKNOWN);
 		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
 		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_pixelShader.Get()));
 		m_PipelineState.Finalize();
@@ -157,16 +157,13 @@ private:
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		auto BackBuffer = renderWindow.GetBackBuffer();
-		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
-		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		// Record commands.
 		BackBuffer.SetClearColor(m_ClearColor);
 		CommandContext.ClearColor(BackBuffer);
-		CommandContext.ClearDepth(DepthBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		CommandContext.SetVertexBuffer(0, m_VertexBuffer.VertexBufferView());
 		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());

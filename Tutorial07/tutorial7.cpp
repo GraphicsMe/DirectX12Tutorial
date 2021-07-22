@@ -18,12 +18,15 @@
 #include "ShadowBuffer.h"
 #include "Light.h"
 #include "GameInput.h"
+#include "BufferManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <chrono>
 #include <iostream>
 
+
+using namespace BufferManager;
 
 extern FCommandListManager g_CommandListManager;
 
@@ -163,7 +166,7 @@ private:
 		m_RootSignature.Reset(3, 2);
 		m_RootSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
 		m_RootSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
-		m_RootSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_RootSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.InitStaticSampler(1, ShadowSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
 		m_RootSignature.Finalize(L"RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -179,7 +182,7 @@ private:
 		m_PipelineState.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), g_SceneDepthZ.GetFormat());
 		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
 		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(GetPixelShaderByMode(m_ShadowMode)));
 		m_PipelineState.Finalize();
@@ -328,10 +331,9 @@ private:
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
-		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+		CommandContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 		if (m_ShadowMode == SM_VSM)
 		{
 			CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -340,11 +342,11 @@ private:
 		{
 			CommandContext.TransitionResource(m_ShadowBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		}
-		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
+		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), g_SceneDepthZ.GetDSV());
 
 		// Record commands.
 		CommandContext.ClearColor(BackBuffer);
-		CommandContext.ClearDepth(DepthBuffer);
+		CommandContext.ClearDepth(g_SceneDepthZ);
 
 		m_PSConstant.LightDirection = m_DirectionLight.GetDirection();
 		CommandContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstant), &m_PSConstant);

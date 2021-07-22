@@ -6,7 +6,7 @@
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
 #include "MotionBlur.h"
-#include "RenderWindow.h"
+
 
 using namespace TemporalEffects;
 using namespace BufferManager;
@@ -189,9 +189,6 @@ void TemporalEffects::ResolveImage(FCommandContext& GraphicsContext,FColorBuffer
 
 void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& SceneColor)
 {
-	RenderWindow& renderWindow = RenderWindow::Get();
-	FDepthBuffer& SceneDepthBuffer = renderWindow.GetDepthBuffer();
-
 	uint32_t Src = s_FrameIndexMod2;
 	uint32_t Dst = Src ^ 1;
 	
@@ -218,7 +215,7 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 
 	Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 	Context.TransitionResource(SceneColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-	Context.TransitionResource(SceneDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	Context.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	Context.TransitionResource(g_VelocityBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	Context.TransitionResource(g_TemporalColor[Src], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	Context.TransitionResource(g_TemporalColor[Dst], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -227,7 +224,7 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 	Context.SetDynamicDescriptor(1, 0, SceneColor.GetSRV());
 	Context.SetDynamicDescriptor(1, 1, g_TemporalColor[Src].GetSRV());
 	Context.SetDynamicDescriptor(1, 2, g_VelocityBuffer.GetSRV());
-	Context.SetDynamicDescriptor(1, 3, SceneDepthBuffer.GetSRV());
+	Context.SetDynamicDescriptor(1, 3, g_SceneDepthZ.GetSRV());
 	// uav
 	Context.SetDynamicDescriptor(2, 0, g_TemporalColor[Dst].GetUAV());
 

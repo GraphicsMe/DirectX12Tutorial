@@ -6,7 +6,7 @@
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
 #include "TemporalEffects.h"
-#include "RenderWindow.h"
+
 
 using namespace BufferManager;
 using namespace TemporalEffects;
@@ -158,9 +158,6 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 		//BaseContext.ClearColor(g_CoCBuffer);
 	}
 
-	RenderWindow& renderWindow = RenderWindow::Get();
-	FDepthBuffer& SceneDepthBuffer = renderWindow.GetDepthBuffer();
-
 	FComputeContext& Context = BaseContext.GetComputeContext();
 
 	// CoC
@@ -197,13 +194,13 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 		Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 
 		Context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		Context.TransitionResource(SceneDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		Context.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		Context.TransitionResource(g_CoCBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		Context.TransitionResource(g_TempSceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 		// srv
 		Context.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
-		Context.SetDynamicDescriptor(1, 1, SceneDepthBuffer.GetSRV());
+		Context.SetDynamicDescriptor(1, 1, g_SceneDepthZ.GetSRV());
 		// uav
 		Context.SetDynamicDescriptor(2, 0, g_CoCBuffer.GetUAV());
 		Context.SetDynamicDescriptor(2, 1, g_TempSceneColor.GetUAV());

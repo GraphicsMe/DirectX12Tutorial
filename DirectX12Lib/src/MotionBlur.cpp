@@ -6,7 +6,6 @@
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
 #include "Camera.h"
-#include "RenderWindow.h"
 
 using namespace MotionBlur;
 using namespace BufferManager;
@@ -87,18 +86,15 @@ void MotionBlur::GenerateCameraVelocityBuffer(FCommandContext& BaseContext, cons
 
 	FMatrix CurToPrevXForm = preMult * reprojectionMatrix * postMult;
 
-	RenderWindow& renderWindow = RenderWindow::Get();
-	FDepthBuffer& SceneDepthBuffer = renderWindow.GetDepthBuffer();
-
 	Context.SetRootSignature(s_RootSignature);
 	Context.SetPipelineState(s_CameraVelocityPSO);
 
 	Context.SetDynamicConstantBufferView(0, sizeof(CurToPrevXForm), &CurToPrevXForm);
-	Context.TransitionResource(SceneDepthBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+	Context.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 	Context.TransitionResource(g_VelocityBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	// srv
-	Context.SetDynamicDescriptor(1, 0, SceneDepthBuffer.GetSRV());
+	Context.SetDynamicDescriptor(1, 0, g_SceneDepthZ.GetSRV());
 	// uav
 	Context.SetDynamicDescriptor(2, 0, g_VelocityBuffer.GetUAV());
 

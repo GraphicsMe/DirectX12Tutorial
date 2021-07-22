@@ -22,7 +22,6 @@ public:
 	// swap chain & present
 	UINT Present();
 	FColorBuffer& GetBackBuffer();
-	FDepthBuffer& GetDepthBuffer();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilHandle();
 
@@ -40,6 +39,5 @@ private:
 
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	FColorBuffer m_BackBuffers[BUFFER_COUNT];
-	FDepthBuffer m_DepthBuffer;
 };
 

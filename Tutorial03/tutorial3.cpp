@@ -12,11 +12,14 @@
 #include "RootSignature.h"
 #include "GpuBuffer.h"
 #include "PipelineState.h"
+#include "BufferManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <chrono>
 #include <iostream>
+
+using namespace BufferManager;
 
 extern FCommandListManager g_CommandListManager;
 
@@ -151,7 +154,7 @@ private:
 		m_PipelineState.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
 		m_PipelineState.SetInputLayout(_countof(inputElementDescs), inputElementDescs);
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), RenderWindow::Get().GetDepthFormat());
+		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), g_SceneDepthZ.GetFormat());
 		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_vertexShader.Get()));
 		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_pixelShader.Get()));
 		m_PipelineState.Finalize();
@@ -168,15 +171,14 @@ private:
 
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
-		FDepthBuffer& DepthBuffer = renderWindow.GetDepthBuffer();
 		// Indicate that the back buffer will be used as a render target.
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		CommandContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
-		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), DepthBuffer.GetDSV());
+		CommandContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), g_SceneDepthZ.GetDSV());
 
 		// Record commands.
 		CommandContext.ClearColor(BackBuffer);
-		CommandContext.ClearDepth(DepthBuffer);
+		CommandContext.ClearDepth(g_SceneDepthZ);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		CommandContext.SetVertexBuffer(0, m_VertexBuffer.VertexBufferView());
 		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
