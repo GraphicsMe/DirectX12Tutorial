@@ -13,7 +13,8 @@ cbuffer CB0 : register(b0)
 {
     float   FoucusDistance;
     float   FoucusRange;
-    float2  pad;
+    float   FocalLength;
+    float   Aperture;
     float2  ClipSpaceNearFar;
     float   BokehRadius;
     float   RcpBokehRadius;
@@ -23,7 +24,6 @@ cbuffer CB0 : register(b0)
 
 
 //------------------------------------------------------- HELP FUNCTIONS
-// @return 0..1 0=in focus, 1:max blurry
 float ComputeCircleOfConfusion(const float FocalLength, const float FoucusDistance, const float Aperture, const float SceneDepth)
 {
     // depth of the pixel in m unit
@@ -41,7 +41,7 @@ float ComputeCircleOfConfusion(const float FocalLength, const float FoucusDistan
 
     float MaxBgdCoC = A * F * rcp(P - F);
     float CoCRadius = (1 - P / max(D, 1e-4)) * MaxBgdCoC;
-    return saturate(abs(CoCRadius));
+    return CoCRadius;
 }
 
 //------------------------------------------------------- ENTRY POINT
@@ -59,15 +59,13 @@ void cs_FragCoC
     // convert to LinearEyeDepth
     float SceneDepth = LinearEyeDepth(Depth, ClipSpaceNearFar.x, ClipSpaceNearFar.y);
     
-    //float CoCRadius = ComputeCircleOfConfusion(FocalLength, FoucusDistance, Aperture, SceneDepth);
+    //float coc = ComputeCircleOfConfusion(FocalLength, FoucusDistance, Aperture, SceneDepth);
 
     // compute simple coc 
     float coc = (SceneDepth - FoucusDistance) / FoucusRange;
-
-    // clamp to (-1,1) and multiple BokehRadius
-    coc = clamp(coc, -1, 1) * BokehRadius;
-    CoCBuffer[ScreenST] = coc;
-
+    coc = clamp(-1, 1, coc);
+    CoCBuffer[ScreenST] = saturate(coc * 0.5f + 0.5f);
+   
     // copy to temp scene color
     TempSceneColor[ScreenST] = SceneColor[ScreenST];
 }

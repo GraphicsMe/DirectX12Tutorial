@@ -7,7 +7,6 @@ SamplerState LinearSampler : register(s0);
 
 cbuffer CB0 : register(b0)
 {
-    float  BokehRadius;
 };
 
 //------------------------------------------------------- HELP FUNCTIONS

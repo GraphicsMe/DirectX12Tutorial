@@ -34,6 +34,8 @@ void cs_FragCombine(uint3 DTid : SV_DispatchThreadID)
     float3 source = TempSceneColor.SampleLevel(LinearSampler, UV, 0);
     // 采样当前片段的CoC值
     float coc = CoCBuffer.SampleLevel(LinearSampler, UV, 0);
+    coc = (coc - 0.5) * 2.0 * BokehRadius;
+
     // 采样散景
     float4 dof = FilterColor.SampleLevel(LinearSampler, UV, 0);
 

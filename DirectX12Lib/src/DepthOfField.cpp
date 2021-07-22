@@ -23,17 +23,17 @@ namespace DepthOfField
 	* 聚焦位置
 	* 单位米
 	*/
-	float	g_FoucusDistance = 1.0f;
+	float	g_FoucusDistance = 1.55f;
 	/*
 	* 聚焦位置
 	* 单位米
 	*/
-	float   g_FoucusRange = 3.0f;
+	float   g_FoucusRange = .62f;
 
 	/*
 	* 散景模糊半径
 	*/
-	float   g_BokehRadius = 4.0f;
+	float   g_BokehRadius = 10.0f;
 
 	/*
 	* 光圈大小
@@ -172,12 +172,11 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 		{
 			float		FoucusDistance;
 			float		FoucusRange;
-			Vector2f	pad;
+			float		FocalLength;
+			float		Aperture;
 			Vector2f	ClipSpaceNearFar;
 			float		BokehRadius;
 			float		RcpBokehRadius;
-			//Vector2f	ViewportJitter;
-			//Vector4f	Resolution;	//width, height, 1/width, 1/height
 		};
 
 		const float width = static_cast<float>(g_CoCBuffer.GetWidth());
@@ -188,11 +187,12 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 		DoFCoCConstantBuffer cbv;
 		cbv.FoucusDistance = g_FoucusDistance;
 		cbv.FoucusRange = g_FoucusRange;
+		cbv.FocalLength = g_FocalLength;
+		cbv.Aperture = g_Aperture;
 		cbv.ClipSpaceNearFar[0] = NearClipDist;
 		cbv.ClipSpaceNearFar[1] = FarClipDist;
 		cbv.BokehRadius = g_BokehRadius;
 		cbv.RcpBokehRadius = 1.0f / g_BokehRadius;
-		//cbv.Resolution = Vector4f(width, height, rcpWidth, rcpHeight);
 
 		Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 
@@ -218,12 +218,11 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 
 		__declspec(align(16)) struct DoFPrefilterConstantBuffer
 		{
-			Vector4f	Resolution;	//width, height, 1/width, 1/height
+			Vector4f	BokehRadius;
 		};
 
 		DoFPrefilterConstantBuffer cbv;
-		cbv.Resolution.x = g_PrefilterColor.GetWidth();
-		cbv.Resolution.y = g_PrefilterColor.GetHeight();
+		cbv.BokehRadius = g_BokehRadius;
 		Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 
 		Context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -272,7 +271,6 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 
 		__declspec(align(16)) struct DoFPostfilterConstantBuffer
 		{
-			Vector4f	Resolution;	//width, height, 1/width, 1/height
 		};
 
 		DoFPostfilterConstantBuffer cbv;
@@ -297,10 +295,11 @@ void DepthOfField::Render(FCommandContext& BaseContext, float NearClipDist, floa
 
 		__declspec(align(16)) struct DoFDOFCombineConstantBuffer
 		{
-			Vector4f	Resolution;	//width, height, 1/width, 1/height
+			float	BokehRadius;
 		};
 
 		DoFDOFCombineConstantBuffer cbv;
+		cbv.BokehRadius = g_BokehRadius;
 		Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);
 
 		Context.TransitionResource(g_TempSceneColor, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

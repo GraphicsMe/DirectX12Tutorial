@@ -8,7 +8,7 @@ SamplerState LinearSampler : register(s0);
 
 cbuffer CB0 : register(b0)
 {
-    float4  Resolution;
+    float   BokehRadius;
 };
 
 //------------------------------------------------------- HELP FUNCTIONS
@@ -46,16 +46,11 @@ void cs_FragPrefilter(uint3 DTid : SV_DispatchThreadID)
     float3 result = (c0 + c1 + c2 + c3) * 0.25;
 
     // Sample CoCs
-    float coc0 = CoCBuffer.SampleLevel(LinearSampler, uv0, 0).r;
-    float coc1 = CoCBuffer.SampleLevel(LinearSampler, uv1, 0).r;
-    float coc2 = CoCBuffer.SampleLevel(LinearSampler, uv2, 0).r;
-    float coc3 = CoCBuffer.SampleLevel(LinearSampler, uv3, 0).r;
-
-    // average coc
-    // float coc = (coc0 + coc1 + coc2 + coc3) * 0.25;
-    float cocMin = min(min(min(coc0, coc1), coc2), coc3);
-    float cocMax = max(max(max(coc0, coc1), coc2), coc3);
-    float coc = cocMax >= -cocMin ? cocMax : cocMin;
+    // convert [0,1] to [-1,1]
+    float coc0 = CoCBuffer.SampleLevel(LinearSampler, uv0, 0).r * 2 - 1;
+    float coc1 = CoCBuffer.SampleLevel(LinearSampler, uv1, 0).r * 2 - 1;
+    float coc2 = CoCBuffer.SampleLevel(LinearSampler, uv2, 0).r * 2 - 1;
+    float coc3 = CoCBuffer.SampleLevel(LinearSampler, uv3, 0).r * 2 - 1;
 
     // Apply CoC and luma weights to reduce bleeding and flickering
     float w0 = abs(coc0) / (Max3(c0.r, c0.g, c0.b) + 1.0);
@@ -66,6 +61,13 @@ void cs_FragPrefilter(uint3 DTid : SV_DispatchThreadID)
     // Weighted average of the color samples
     half3 avg = c0 * w0 + c1 * w1 + c2 * w2 + c3 * w3;
     avg /= max(w0 + w1 + w2 + w3, 1e-4);
+
+    // Select the largest CoC value
+    float cocMin = min(min(min(coc0, coc1), coc2), coc3);
+    float cocMax = max(max(max(coc0, coc1), coc2), coc3);
+    float coc = (-cocMin >= cocMax ? cocMin : cocMax) * BokehRadius;
+
+    // Premultiply CoC again
     avg *= smoothstep(0, HalfPixelSize.y * 4, abs(coc));
 
     // alpha通道存储了coc值
