@@ -54,3 +54,8 @@ add_executable(Tutorial09 Tutorial09/tutorial9.cpp)
 target_link_libraries(Tutorial09 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial09 PROPERTIES
 	PROJECT_LABEL "Tutorial09 - IBL Maps Generator")
+	
+add_executable(Tutorial10 Tutorial10/tutoria10.cpp)
+target_link_libraries(Tutorial10 LINK_PUBLIC DirectX12Lib)
+set_target_properties(Tutorial10 PROPERTIES
+	PROJECT_LABEL "Tutorial10 - IBL Precompute")

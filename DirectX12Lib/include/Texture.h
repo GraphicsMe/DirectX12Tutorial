@@ -10,6 +10,7 @@ public:
 
 	void Create(uint32_t Width, uint32_t Height, DXGI_FORMAT Format, const void* InitialData);
 	void LoadFromFile(const std::wstring& FileName, bool IsSRGB = true);
+	void SaveTexutre(const std::wstring& Path);
 
 	int GetWidth() const { return m_Width; }
 	int GetHeight() const { return m_Height; }

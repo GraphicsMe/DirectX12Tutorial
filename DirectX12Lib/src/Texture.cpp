@@ -2,7 +2,12 @@
 #include "D3D12RHI.h"
 #include "DirectXTex.h"
 #include "CommandContext.h"
+#include "CommandListManager.h"
+#include "CommandContext.h"
 
+using namespace DirectX;
+
+extern FCommandListManager g_CommandListManager;
 
 void FTexture::Create(uint32_t Width, uint32_t Height, DXGI_FORMAT Format, const void* InitialData)
 {
@@ -91,4 +96,21 @@ void FTexture::LoadFromFile(const std::wstring& FileName, bool IsSRGB)
 	D3D12RHI::Get().GetD3D12Device()->CreateShaderResourceView(m_Resource.Get(), nullptr, m_CpuDescriptorHandle);
 
 }
+
+void FTexture::SaveTexutre(const std::wstring& FileName)
+{
+	ScratchImage image;
+	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), false/*isCubeMap*/, image, m_AllCurrentState[0], m_AllCurrentState[0]);
+	if (SUCCEEDED(hr))
+	{
+		hr = DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DDS_FLAGS_NONE, FileName.c_str());
+		if (FAILED(hr))
+		{
+			printf("Falied to save texture to dds file\n");
+		}
+	}
+}
+
 
