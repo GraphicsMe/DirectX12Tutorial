@@ -33,8 +33,6 @@ FMatrix FCubeBuffer::GetViewMatrix(int Face)
 	return FMatrix::MatrixLookAtLH(Vector3f(0.f), CameraTargets[Face], CameraUps[Face]);
 }
 
-
-
 FMatrix FCubeBuffer::GetProjMatrix()
 {
 	return FMatrix::MatrixPerspectiveFovLH(MATH_PI_HALF, 1.f, 0.0f, 10.f);
@@ -67,6 +65,42 @@ void FCubeBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Heig
 	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
 	CreateTextureResource(Device, Name, ResDesc, ClearValue);
 	CreateDerivedViews(Device, Format, 6, m_NumMipMaps);
+}
+
+void FCubeBuffer::LoadFromFile(const std::wstring& FileName, bool IsSRGB)
+{
+	DirectX::ScratchImage image;
+	HRESULT hr;
+
+	// only support dds
+	if (FileName.rfind(L".dds") != std::string::npos)
+	{
+		hr = DirectX::LoadFromDDSFile(FileName.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+	}
+	else
+	{
+		printf("ERROR! CubeBuffer only support dds file!\n");
+		exit(-1);
+	}
+
+	m_Width = (int)image.GetImages()->width;
+	m_Height = (int)image.GetImages()->height;
+	m_Format = image.GetMetadata().format;
+	m_ArraySize = image.GetMetadata().arraySize;
+	m_NumMipMaps = image.GetMetadata().mipLevels;
+
+	Create(FileName, m_Width, m_Height, m_NumMipMaps, m_Format);
+
+	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
+
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+	ThrowIfFailed(PrepareUpload(Device, image.GetImages(), image.GetImageCount(), image.GetMetadata(), subresources));
+
+	Assert(subresources.size() > 0);
+	FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT);
+	CommandContext.TransitionResource(*this, D3D12_RESOURCE_STATE_COPY_DEST);
+	InitializeState(D3D12_RESOURCE_STATE_COPY_DEST);
+	FCommandContext::InitializeTexture(*this, (UINT)subresources.size(), &subresources[0]);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE FCubeBuffer::GetRTV(int Face, int Mip) const
@@ -167,6 +201,7 @@ void FCubeBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, u
 		}
 	}
 }
+
 
 void FCubeBuffer::SaveCubeMap(const std::wstring& FileName)
 {

@@ -33,7 +33,8 @@
 #include <dxgi1_4.h>
 #include <chrono>
 #include <iostream>
-
+#include <fstream>
+#include<sstream>       //istringstream 必须包含这个头文件
 
 extern FCommandListManager g_CommandListManager;
 
@@ -69,13 +70,11 @@ public:
 		SetupPipelineState();
 		SetupCameraLight();
 
-		GenerateCubeMap();
-		GenerateIrradianceMap();
-		GeneratePrefilteredMap();
-		PreIntegrateBRDF();
+		//GenerateCubeMap();
+		//GenerateIrradianceMap();
+		//GeneratePrefilteredMap();
 
 		//SaveCubeMap();
-		GenerateSHcoeffs();
 	}
 
 	void OnShutdown()
@@ -283,15 +282,81 @@ private:
 		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
 	}
 
+	void ParsePath()
+	{
+		size_t lastPeriodIndex = m_HDRFilePath.find_last_of('.');
+
+		if (lastPeriodIndex == m_HDRFilePath.npos)
+		{
+			printf("Input HDR file pathv is wrong\n");
+			exit(-1);
+		}
+
+		m_HDRFileName = m_HDRFilePath.substr(0, lastPeriodIndex);
+
+		m_IrradianceMapPath = m_HDRFileName + std::wstring(L"_IrradianceMap.dds");
+		m_PrefilteredMapPath = m_HDRFileName + std::wstring(L"_PrefilteredMap.dds");
+		m_SHCoeffsPath = m_HDRFileName + std::wstring(L"_SHCoeffs.txt");
+		m_PreIntegrateBRDFPath = std::wstring(L"../Resources/HDR/PreIntegrateBRDF.dds");
+
+		// check file exit
+		bool isExist = true;
+		isExist &= CheckFileExist(m_IrradianceMapPath);
+		isExist &= CheckFileExist(m_PrefilteredMapPath);
+		isExist &= CheckFileExist(m_SHCoeffsPath);
+		isExist &= CheckFileExist(m_PreIntegrateBRDFPath);
+		if (!isExist)
+		{
+			printf("this input HDR file do not precompute to generate IBL maps\n");
+			exit(-1);
+		}
+	}
+
+	bool CheckFileExist(const std::wstring& name)
+	{
+		std::ifstream f(name.c_str());
+		const bool isExist = f.good();
+		f.close();
+		return isExist;
+	}
+
 	void SetupMesh()
 	{
-		m_TextureLongLat.LoadFromFile(L"../Resources/HDR/spruit_sunrise_2k.hdr"); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
+		m_HDRFilePath = L"../Resources/HDR/spruit_sunrise_2k.hdr";
+		ParsePath();
+
+		m_TextureLongLat.LoadFromFile(m_HDRFilePath.c_str()); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true, false);
 	
 		m_FloorAlpha.LoadFromFile(L"../Resources/Models/harley/textures/Floor_Alpha.jpg", false);
 		m_FloorAlbedo.LoadFromFile(L"../Resources/Models/harley/textures/default.png", true);
+
+		// IBL
+		m_PreintegratedGF.LoadFromFile(L"../Resources/HDR/PreIntegrateBRDF.dds");
+		m_IrradianceCube.LoadFromFile(m_IrradianceMapPath.c_str(), false);
+		m_PrefilteredCube.LoadFromFile(m_PrefilteredMapPath.c_str(), false);
+
+		// 
+		m_SHCoeffs.resize(16);
+		std::ifstream ifs;;
+		ifs.open(m_SHCoeffsPath.c_str());
+		for (int i = 0; i < 4 * 4; ++i) 
+		{
+			std::string str;
+			getline(ifs, str);
+
+			std::istringstream is(str);
+			std::string s;
+			is >> s;
+			m_SHCoeffs[i].x = std::stof(s);
+			is >> s;
+			m_SHCoeffs[i].y = std::stof(s);
+			is >> s;
+			m_SHCoeffs[i].z = std::stof(s);
+		}
+		ifs.close();
 	}
 
 	void SetupShaders()
@@ -363,32 +428,6 @@ private:
 		m_SkyPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
 		m_SkyPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkyPS.Get()));
 		m_SkyPSO.Finalize();
-
-		m_GenIrradiancePSO.SetRootSignature(m_SkySignature);
-		m_GenIrradiancePSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
-		m_GenIrradiancePSO.SetBlendState(FPipelineState::BlendDisable);
-		m_GenIrradiancePSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		m_GenIrradiancePSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
-		m_GenIrradiancePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_GenIrradiancePSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
-		m_GenIrradiancePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
-		m_GenIrradiancePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_GenIrradiancePS.Get()));
-		m_GenIrradiancePSO.Finalize();
-
-		m_IrradianceCube.Create(L"Irradiance Map", IRRADIANCE_SIZE, IRRADIANCE_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
-
-		m_GenPrefilterPSO.SetRootSignature(m_SkySignature);
-		m_GenPrefilterPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
-		m_GenPrefilterPSO.SetBlendState(FPipelineState::BlendDisable);
-		m_GenPrefilterPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		m_GenPrefilterPSO.SetInputLayout((UINT)SkyBoxLayout.size(), &SkyBoxLayout[0]);
-		m_GenPrefilterPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_GenPrefilterPSO.SetRenderTargetFormats(1, &CubeFormat, DXGI_FORMAT_UNKNOWN);
-		m_GenPrefilterPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_SkyVS.Get()));
-		m_GenPrefilterPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_GenPrefilterPS.Get()));
-		m_GenPrefilterPSO.Finalize();
-
-		m_PrefilteredCube.Create(L"Prefiltered Map", PREFILTERED_SIZE, PREFILTERED_SIZE, 0, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 		FSamplerDesc PointSamplerDesc(D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 		m_Show2DTextureSignature.Reset(3, 1);
@@ -619,16 +658,6 @@ private:
 	void SaveCubeMap()
 	{
 		m_CubeBuffer.SaveCubeMap(L"spruit_sunrise_2k_cubemap.dds");
-	}
-
-	void GenerateSHcoeffs()
-	{
-		m_SHCoeffs = m_CubeBuffer.GenerateSHcoeffs(4, m_SHSampleNum);
-
-		for (int i=0;i<m_SHCoeffs.size();++i)
-		{
-			printf("[%f,%f,%f]\n", m_SHCoeffs[i].x, m_SHCoeffs[i].y, m_SHCoeffs[i].z);
-		}
 	}
 
 	void SkyPass(FCommandContext& GfxContext, bool Clear)
@@ -965,79 +994,14 @@ private:
 		m_CubeMapCross->Draw(GfxContext);
 	}
 
-	float G1(float k, float NoV) { return NoV / (NoV * (1.0f - k) + k); }
 
-	// Geometric Shadowing function
-	float G_Smith(float NoL, float NoV, float roughness)
-	{
-		float k = (roughness * roughness) * 0.5f;
-		return G1(k, NoL) * G1(k, NoV);
-	}
-
-	void PreIntegrateBRDF()
-	{
-		int width = 128; //NoV
-		int height = 32; //Roughness
-		std::vector<Vector2f> ImageData(width * height * sizeof(Vector2f));
-
-		for (int y = 0; y < height; ++y)
-		{
-			float Roughness = (float)(y + 0.5f) / height;
-			float m = Roughness * Roughness;
-			float m2 = m * m;
-
-			for (int x = 0; x < width; ++x)
-			{
-				float NoV = (float)(x + 0.5f) / width;
-
-				Vector3f V;
-				V.x = sqrt(1.0f - NoV * NoV);	// sin
-				V.y = 0.0f;
-				V.z = NoV;						// cos
-
-				float A = 0.0f;
-				float B = 0.0f;
-
-				const uint32_t NumSamples = 128;
-				for (uint32_t i = 0; i < NumSamples; i++)
-				{
-					float E1 = (float)i / NumSamples;
-					float E2 = (float)ReverseBits(i) / (float)0x100000000LL;
-
-					{
-						float Phi = 2.0f * MATH_PI * E1;
-						float CosPhi = cos(Phi);
-						float SinPhi = sin(Phi);
-						float CosTheta = sqrt((1.0f - E2) / (1.0f + (m2 - 1.0f) * E2));
-						float SinTheta = sqrt(1.0f - CosTheta * CosTheta);
-
-						Vector3f H(SinTheta * cos(Phi), SinTheta * sin(Phi), CosTheta);
-						Vector3f L = 2.0f * V.Dot(H) * H - V;
-
-						float NoL = std::max(L.z, 0.0f);
-						float NoH = std::max(H.z, 0.0f);
-						float VoH = std::max(V.Dot(H), 0.0f);
-
-						if (NoL > 0.0f)
-						{
-							float G = G_Smith(NoL, NoV, Roughness);
-							float NoL_Vis_PDF = (G * VoH) / (NoH * NoV);
-							float Fc = pow(1.0f - VoH, 5.f);
-							A += NoL_Vis_PDF * (1.0f - Fc);
-							B += NoL_Vis_PDF * Fc;
-						}
-					}
-				}
-
-				Vector2f& Texel = ImageData[y * width + x];
-				Texel.x = A / NumSamples;
-				Texel.y = B / NumSamples;
-			}
-		}
-
-		m_PreintegratedGF.Create(width, height, DXGI_FORMAT_R32G32_FLOAT, ImageData.data());
-	}
-
+private:
+	std::wstring m_HDRFilePath;
+	std::wstring m_HDRFileName;
+	std::wstring m_IrradianceMapPath;
+	std::wstring m_PrefilteredMapPath;
+	std::wstring m_SHCoeffsPath;
+	std::wstring m_PreIntegrateBRDFPath;
 
 private:
 	__declspec(align(16)) struct

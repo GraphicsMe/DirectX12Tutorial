@@ -24,6 +24,8 @@ public:
 
 	void Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips, DXGI_FORMAT Format = DXGI_FORMAT_R16G16B16A16_FLOAT);
 
+	void LoadFromFile(const std::wstring& FileName, bool IsSRGB = true);
+
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRTV(int Face, int Mip) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCubeSRV(int Mip = -1) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE GetFaceMipSRV(int Face, int Mip) const;
