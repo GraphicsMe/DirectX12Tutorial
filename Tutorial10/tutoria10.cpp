@@ -72,7 +72,7 @@ public:
 
 		// BRDF-LUT
 		m_PreIntegrateBRDFPath = std::wstring(L"../Resources/HDR/PreIntegrateBRDF.dds");
-		if (!CheckFileExit(m_PreIntegrateBRDFPath))
+		if (!CheckFileExist(m_PreIntegrateBRDFPath))
 		{
 			PreIntegrateBRDF();
 			m_PreintegratedGF.SaveTexutre(m_PreIntegrateBRDFPath);
@@ -99,9 +99,9 @@ private:
 		m_SHCoeffsPath = m_HDRFileName + std::wstring(L"_SHCoeffs.txt");
 	}
 
-	bool CheckFileExit(const std::wstring& name)
+	bool CheckFileExist(const std::wstring& name)
 	{
-		std::ifstream f(m_PreIntegrateBRDFPath.c_str());
+		std::ifstream f(name.c_str());
 		const bool isExist = f.good();
 		f.close();
 		return isExist;
