@@ -16,7 +16,7 @@ namespace DepthOfField
 	/*
 	* Whether enbale DOF effect
 	*/
-	bool	g_EnableDepthOfField  = true;
+	bool	g_EnableDepthOfField  = false;
 
 	/*
 	* the distance to the point of focus 

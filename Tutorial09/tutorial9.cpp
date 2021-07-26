@@ -1116,7 +1116,7 @@ private:
 	int m_MipLevel = 0;
 	int m_NumSamplesPerDir = 10;
 	bool m_RotateMesh = false;
-	float m_RotateY = 3.984f;
+	float m_RotateY = 0.f;//3.984f;
 	// floor PBR parameters
 	Vector3f m_FloorColor = Vector3f(0.3f);
 	float m_FloorMetallic = 0.f;

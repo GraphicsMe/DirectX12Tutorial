@@ -268,9 +268,7 @@ float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 	float AO = AlbedoAo.w;
 
 	float Depth = SceneDepthZ.Sample(LinearSampler, Tex).x;
-	float2 ScreenCoord = Tex;
-	ScreenCoord.y = 1.0 - ScreenCoord.y;
-	ScreenCoord = ScreenCoord * 2.0 - 1.0;
+	float2 ScreenCoord = float2(2.0, -2.0) * Tex + (-1.0, 1.0);
 	float4 NDCPos = float4(ScreenCoord, Depth, 1.0f);
 	float4 WorldPos = mul(NDCPos, InvViewProj);
 	WorldPos /= WorldPos.w;
