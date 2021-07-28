@@ -175,8 +175,8 @@ bool D3D12RHI::Initialize()
 
 	BufferManager::InitializeRenderingBuffers(WindowWin32::Get().GetWidth(), WindowWin32::Get().GetHeight());
 	FGenerateMips::Initialize();
-	TemporalEffects::Initialize();
 	MotionBlur::Initialize();
+	TemporalEffects::Initialize();
 	DepthOfField::Initialize();
 	PostProcessing::Initialize();
 

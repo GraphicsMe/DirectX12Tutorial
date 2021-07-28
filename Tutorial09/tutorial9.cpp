@@ -713,6 +713,7 @@ private:
 		// Indicate that the back buffer will be used as a render target.
 		GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(m_PrefilteredCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		
 		GfxContext.TransitionResource(SceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GfxContext.TransitionResource(g_GBufferA, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GfxContext.TransitionResource(g_GBufferB, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -723,7 +724,7 @@ private:
 		D3D12_CPU_DESCRIPTOR_HANDLE RTVs[] = {
 			SceneBuffer.GetRTV(), g_GBufferA.GetRTV(), g_GBufferB.GetRTV(), g_GBufferC.GetRTV(), MotionBlur::g_VelocityBuffer.GetRTV(),
 		};
-		GfxContext.SetRenderTargets(4, RTVs, g_SceneDepthZ.GetDSV());
+		GfxContext.SetRenderTargets(5, RTVs, g_SceneDepthZ.GetDSV());
 
 		if (Clear)
 		{
