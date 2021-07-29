@@ -32,6 +32,9 @@ public:
 	float GetFarClip() const { return m_FarZ; }
 
 	const FMatrix& GetViewProjMatrix() const { return m_ViewProjMatrix; }
+
+	const FMatrix& GetPreviousViewMatrix() const { return m_PreviousViewMat; }
+	const FMatrix& GetPreviousProjectionMatrix() const { return m_PreviousProjMat; }
 	const FMatrix& GetPreviousViewProjMatrix() const { return m_PreviousViewProjMatrix; }
 	const FMatrix& GetReprojectionMatrix() const { return m_ReprojectMatrix; }
 
@@ -52,6 +55,8 @@ private:
 	FMatrix m_ViewProjMatrix;
 
 	// The view-projection matrix from the previous frame
+	FMatrix m_PreviousViewMat;
+	FMatrix m_PreviousProjMat;
 	FMatrix m_PreviousViewProjMatrix;
 
 	// Projects a clip-space coordinate to the previous frame (useful for temporal effects).

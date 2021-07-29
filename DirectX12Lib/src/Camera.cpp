@@ -63,6 +63,8 @@ Vector4f FCamera::GetPosition() const
 void FCamera::UpdateAllMatrix()
 {
 	// Record the Previous frame ViewProjMatrix
+	m_PreviousViewMat = m_ViewMat;
+	m_PreviousProjMat = m_ProjMat;
 	m_PreviousViewProjMatrix = m_ViewMat * m_ProjMat;
 
 	UpdateViewMatrix();

@@ -29,7 +29,7 @@ void MotionBlur::Initialize(void)
 	uint32_t bufferHeight = g_SceneColorBuffer.GetHeight();
 
 	//g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R32_UINT);
-	g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16_FLOAT);
+	g_VelocityBuffer.Create(L"Motion Vectors", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
 
 	// RootSignatre
 	s_RootSignature.Reset(3, 0);

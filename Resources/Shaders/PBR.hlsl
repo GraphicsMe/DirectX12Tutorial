@@ -26,6 +26,7 @@ cbuffer PSContant : register(b0)
 	int		Degree;
 
 	float4x4 InvViewProj;
+	float4	TemporalAAJitter;
 	
 	float3	Coeffs[16];
 };
@@ -61,8 +62,9 @@ struct PixelInput
 	float3 B		: TEXCOORD2;
 	float3 N		: TEXCOORD3;
 	float3 WorldPos	: TEXCOORD4;
-	float3 PreviousScreenPos : TEXCOORD5;
-	float3 CurrentScreenPos  : TEXCOORD6;
+	// ClipSpace
+	float4 VelocityPrevScreenPosition	: TEXCOORD5;
+	float4 VelocityScreenPosition		: TEXCOORD6;
 };
 
 struct PixelOutput
@@ -71,8 +73,27 @@ struct PixelOutput
 	float4 Target1 : SV_Target1;
 	float4 Target2 : SV_Target2;
 	float4 Target3 : SV_Target3;
-	float2 Target4 : SV_Target4;
+	float4 Target4 : SV_Target4;
 };
+
+
+float3 Calculate3DVelocity(float4 CurrentVelocity, float4 PreVelocity)
+{
+	// minus jitter
+	float2 ScreenPos = CurrentVelocity.xy / CurrentVelocity.w - TemporalAAJitter.xy;
+	float2 PrevScreenPos = PreVelocity.xy / PreVelocity.w - TemporalAAJitter.zw;
+
+	float DeviceZ = CurrentVelocity.z / CurrentVelocity.w;
+	float PrevDeviceZ = PreVelocity.z / PreVelocity.w;
+
+	// 3d velocity, includes camera an object motion
+	float3 Velocity = float3(ScreenPos - PrevScreenPos, DeviceZ - PrevDeviceZ);
+	//Velocity.xy = float2(0.5f, -0.5f) * Velocity.xy;
+	//Velocity.xy *= float2(1024, 768);
+
+	// Make sure not to touch 0,0 which is clear color
+	return Velocity;
+}
 
 PixelInput VS_PBR(VertexInput In)
 {
@@ -81,26 +102,13 @@ PixelInput VS_PBR(VertexInput In)
 
 	float4 PreviousWorldPos = mul(float4(In.Position, 1.0), PreviousModelMatrix); 
 	float4 ClipPos = mul(PreviousWorldPos, PreviousViewProjMatrix);
-	ClipPos /= ClipPos.w;
-	Out.PreviousScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
-	Out.PreviousScreenPos.y = 1 - Out.PreviousScreenPos.y;
-	Out.PreviousScreenPos.xy *= ViewportSize;
-	Out.PreviousScreenPos.z = ClipPos.z;
+	Out.VelocityPrevScreenPosition = ClipPos;
 
 	float4 WorldPos = mul(float4(In.Position, 1.0), ModelMatrix);
 	ClipPos = mul(WorldPos, ViewProjMatrix);
+	Out.VelocityScreenPosition = ClipPos;
 
-	Out.WorldPos = WorldPos.xyz;
 	Out.Position = ClipPos;
-
-	ClipPos /= ClipPos.w;
-	Out.CurrentScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
-	Out.CurrentScreenPos.y = 1 - Out.CurrentScreenPos.y;
-	Out.CurrentScreenPos.xy *= ViewportSize;
-	Out.CurrentScreenPos.z = ClipPos.z;
-
-	//Out.WorldPos = WorldPos.xyz;
-	//Out.Position = mul(float4(Out.WorldPos, 1), ViewProjMatrix);
 
 	Out.N = mul(In.Normal, (float3x3)ModelMatrix);
 	Out.T = mul(In.Tangent.xyz, (float3x3)ModelMatrix);
@@ -138,26 +146,14 @@ PixelInput VS_PBR_Floor(in uint VertID : SV_VertexID)
 
 	float4 PreviousWorldPos = mul(float4(InPosition, 1.0), PreviousModelMatrix);
 	float4 ClipPos = mul(PreviousWorldPos, PreviousViewProjMatrix);
-	ClipPos /= ClipPos.w;
-	Out.PreviousScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
-	Out.PreviousScreenPos.y = 1 - Out.PreviousScreenPos.y;
-	Out.PreviousScreenPos.xy *= ViewportSize;
-	Out.PreviousScreenPos.z = ClipPos.z;
+	Out.VelocityPrevScreenPosition = ClipPos;
 
 	float4 WorldPos = mul(float4(InPosition, 1.0), ModelMatrix);
 	ClipPos = mul(WorldPos, ViewProjMatrix);
+	Out.VelocityScreenPosition = ClipPos;
 
 	Out.WorldPos = WorldPos.xyz;
 	Out.Position = ClipPos;
-
-	ClipPos /= ClipPos.w;
-	Out.CurrentScreenPos.xy = ClipPos.xy * 0.5 + 0.5;
-	Out.CurrentScreenPos.y = 1 - Out.CurrentScreenPos.y;
-	Out.CurrentScreenPos.xy *= ViewportSize;
-	Out.CurrentScreenPos.z = ClipPos.z;
-
-	//Out.WorldPos = WorldPos.xyz;
-	//Out.Position = mul(float4(Out.WorldPos, 1), ViewProjMatrix);
 
 	Out.N = mul(InNormal, (float3x3)ModelMatrix);
 	Out.T = mul(InTangent.xyz, (float3x3)ModelMatrix);
@@ -224,7 +220,7 @@ void PS_PBR_Floor(PixelInput In, out PixelOutput Out)
 	Out.Target1 = float4(0.5 * N + 0.5, 1.0);
 	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
 	Out.Target3 = float4(BaseColor, 1.0);
-	Out.Target4 = float2(0.0, 0.0);
+	Out.Target4 = float4(Calculate3DVelocity(In.VelocityScreenPosition, In.VelocityPrevScreenPosition), 0);
 }
 
 
@@ -248,7 +244,7 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	Out.Target1 = float4(0.5*N+0.5, 1.0);
 	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
 	Out.Target3 = float4(Albedo, AO);
-	Out.Target4 = In.PreviousScreenPos.xy - In.CurrentScreenPos.xy; // velocity
+	Out.Target4 = float4(Calculate3DVelocity(In.VelocityScreenPosition, In.VelocityPrevScreenPosition), 0);
 }
 
 Texture2D GBufferA		: register(t0); // normal
@@ -269,7 +265,11 @@ float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 	float AO = AlbedoAo.w;
 
 	float Depth = SceneDepthZ.Sample(LinearSampler, Tex).x;
-	float2 ScreenCoord = float2(2.0, -2.0) * Tex + (-1.0, 1.0);
+
+	float2 ScreenCoord = Tex;
+	ScreenCoord.x = ScreenCoord.x * 2 - 1;
+	ScreenCoord.y = (1 - ScreenCoord.y) * 2;
+
 	float4 NDCPos = float4(ScreenCoord, Depth, 1.0f);
 	float4 WorldPos = mul(NDCPos, InvViewProj);
 	WorldPos /= WorldPos.w;

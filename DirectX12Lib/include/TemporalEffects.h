@@ -1,9 +1,11 @@
 ﻿#pragma once
 #include <stdint.h>
+#include "MathLib.h"
 
 class FColorBuffer;
 class FCommandContext;
 class FComputeContext;
+class FCamera;
 
 namespace TemporalEffects
 {
@@ -20,9 +22,10 @@ namespace TemporalEffects
 	// Returns whether the frame is odd or even
 	uint32_t GetFrameIndexMod2(void);
 
-	// Jitter values are neutral at 0.5 and vary from [0, 1).  Jittering only occurs when temporal antialiasing
-	// is enabled.  You can use these values to jitter your viewport or projection matrix.
-	void GetJitterOffset(float& JitterX, float& JitterY);
+	void GetJitterOffset(Vector4f& TemporalAAJitter, float Width, float Height);
+
+	// return TAA ProjectionMatrix
+	FMatrix HackAddTemporalAAProjectionJitter(const FCamera& Camera, float Width, float Height, bool PrevFrame = false);
 
 	// Should be called after update() in one frame
 	FColorBuffer& GetHistoryBuffer();

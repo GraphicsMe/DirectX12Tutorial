@@ -6,7 +6,7 @@
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
 #include "MotionBlur.h"
-
+#include "Camera.h"
 
 using namespace TemporalEffects;
 using namespace BufferManager;
@@ -20,8 +20,10 @@ namespace TemporalEffects
 	uint32_t				s_FrameIndex = 0;
 	uint32_t				s_FrameIndexMod2 = 0;
 
-	float					s_JitterX = 0.5f;
-	float					s_JitterY = 0.5f;
+	float					s_JitterX = 0;
+	float					s_JitterY = 0;
+	float					s_PrevJitterX = 0;
+	float					s_PrevJitterY = 0;
 	float					s_JitterDeltaX = 0.0f;
 	float					s_JitterDeltaY = 0.0f;
 
@@ -76,6 +78,21 @@ void TemporalEffects::Destroy(void)
 	g_TemporalColor[1].Destroy();
 }
 
+/** [ Halton 1964, "Radical-inverse quasi-random point sequence" ] */
+inline float Halton(int32_t Index, int32_t Base)
+{
+	float Result = 0.0f;
+	float InvBase = 1.0f / Base;
+	float Fraction = InvBase;
+	while (Index > 0)
+	{
+		Result += (Index % Base) * Fraction;
+		Index /= Base;
+		Fraction *= InvBase;
+	}
+	return Result;
+}
+
 void TemporalEffects::Update(void)
 {
 	s_FrameIndex++;
@@ -84,54 +101,39 @@ void TemporalEffects::Update(void)
 	// 对抖动进行更新
 	if (g_EnableTAA)
 	{
-		const float* Offset = nullptr;
-		float Scale = 1.f;
+		s_PrevJitterX = s_JitterX;
+		s_PrevJitterY = s_JitterY;
 
-		bool EnableMSFTTAA = false;
-		if (EnableMSFTTAA)
-		{
-			static const float Halton23[8][2] =
-			{
-				{ 0.0f / 8.0f, 0.0f / 9.0f }, { 4.0f / 8.0f, 3.0f / 9.0f },
-				{ 2.0f / 8.0f, 6.0f / 9.0f }, { 6.0f / 8.0f, 1.0f / 9.0f },
-				{ 1.0f / 8.0f, 4.0f / 9.0f }, { 5.0f / 8.0f, 7.0f / 9.0f },
-				{ 3.0f / 8.0f, 2.0f / 9.0f }, { 7.0f / 8.0f, 5.0f / 9.0f }
-			};
-			Offset = Halton23[s_FrameIndex % 8];
-		}
-		else
-		{
-			// following work of Vaidyanathan et all: https://software.intel.com/content/www/us/en/develop/articles/coarse-pixel-shading-with-temporal-supersampling.html
-			static const float Halton23_16[16][2] = { 
-				{ 0.0f, 0.0f }, { 0.5f, 0.333333f }, { 0.25f, 0.666667f }, { 0.75f, 0.111111f }, 
-				{ 0.125f, 0.444444f }, { 0.625f, 0.777778f }, { 0.375f ,0.222222f }, { 0.875f ,0.555556f },
-				{ 0.0625f, 0.888889f }, { 0.562500f,0.037037f }, { 0.3125f, 0.37037f }, { 0.8125f, 0.703704f }, 
-				{ 0.1875f,0.148148f }, { 0.6875f, 0.481481f }, { 0.4375f ,0.814815f }, { 0.9375f ,0.259259f }
-			};
+		// Uniformly distribute temporal jittering in [-.5; .5], because there is no longer any alignement of input and output pixels.
+		//s_JitterX = Halton(s_FrameIndex , 2) - 0.5f;
+		//s_JitterX = Halton(s_FrameIndex , 3) - 0.5f;
+		float u1 = Halton(s_FrameIndex, 2);
+		float u2 = Halton(s_FrameIndex, 3);
 
-			static const float BlueNoise_16[16][2] = { 
-				{ 1.5f, 0.59375f }, { 1.21875f, 1.375f }, { 1.6875f, 1.90625f }, { 0.375f, 0.84375f },
-				{ 1.125f, 1.875f }, { 0.71875f, 1.65625f }, { 1.9375f ,0.71875f }, { 0.65625f ,0.125f }, 
-				{ 0.90625f, 0.9375f }, { 1.65625f, 1.4375f }, { 0.5f, 1.28125f }, { 0.21875f, 0.0625f },
-				{ 1.843750,0.312500 }, { 1.09375f, 0.5625f }, { 0.0625f, 1.21875f }, { 0.28125f, 1.65625f },
-			};
+		// Generates samples in normal distribution
+		// exp( x^2 / Sigma^2 )
+		float FilterSize = 1;
 
-			Scale = 1.f;
-			Offset = Halton23_16[s_FrameIndex % 16];
-		}
+		// Scale distribution to set non-unit variance
+		// Variance = Sigma^2
+		float Sigma = 0.47f * FilterSize;
 
-		s_JitterDeltaX = s_JitterX - Offset[0];
-		s_JitterDeltaY = s_JitterY - Offset[1];
-		s_JitterX = Offset[0];
-		s_JitterY = Offset[1];
+		// Window to [-0.5, 0.5] output
+		// Without windowing we could generate samples far away on the infinite tails.
+		float OutWindow = 0.5f;
+		float InWindow = std::exp(-0.5 * std::pow(OutWindow / Sigma, 2));
 
+		// Box-Muller transform
+		float Theta = 2.0f * MATH_PI * u2;
+		float r = Sigma * std::sqrt(-2.0f * std::log((1.0f - u1) * InWindow + u1));
+
+		s_JitterX = r * std::cos(Theta);
+		s_JitterY = r * std::sin(Theta);
 	}
 	else
 	{
-		s_JitterDeltaX = s_JitterX - 0.5f;
-		s_JitterDeltaY = s_JitterY - 0.5f;
-		s_JitterX = 0.5f;
-		s_JitterY = 0.5f;
+		s_JitterX = 0;
+		s_JitterY = 0;
 	}
 }
 
@@ -140,10 +142,36 @@ uint32_t TemporalEffects::GetFrameIndexMod2(void)
 	return s_FrameIndexMod2;
 }
 
-void TemporalEffects::GetJitterOffset(float& JitterX, float& JitterY)
+void TemporalEffects::GetJitterOffset(Vector4f& TemporalAAJitter,float Width,float Height)
 {
-	JitterX = s_JitterX;
-	JitterY = s_JitterY;
+	TemporalAAJitter.x = s_JitterX * 2.0f / Width;
+	TemporalAAJitter.y = s_JitterY * -2.0f / Height;
+	TemporalAAJitter.z = s_PrevJitterX * 2.0f / Width;
+	TemporalAAJitter.w = s_PrevJitterY * -2.0f / Height;
+}
+
+FMatrix TemporalEffects::HackAddTemporalAAProjectionJitter(const FCamera& Camera, float Width, float Height, bool PrevFrame /*= false*/)
+{
+	//Assert(abs(s_JitterX <= 0.5f) && abs(s_JitterY) <= 0.5f);
+	FMatrix ProjectMatrix;
+	Vector2f TemporalAAProjectionJitter;
+	if (PrevFrame)
+	{
+		ProjectMatrix = FMatrix(Camera.GetPreviousProjectionMatrix());
+		TemporalAAProjectionJitter.x = s_PrevJitterX * 2.0f / Width;
+		TemporalAAProjectionJitter.y = s_PrevJitterY * -2.0f / Height;
+	}
+	else
+	{
+		ProjectMatrix = FMatrix(Camera.GetProjectionMatrix());
+		TemporalAAProjectionJitter.x = s_JitterX * 2.0f / Width;
+		TemporalAAProjectionJitter.y = s_JitterY * -2.0f / Height;
+	}
+
+	ProjectMatrix.r2[0] += TemporalAAProjectionJitter.x;
+	ProjectMatrix.r2[1] += TemporalAAProjectionJitter.y;
+
+	return ProjectMatrix;
 }
 
 FColorBuffer& TemporalEffects::GetHistoryBuffer()
@@ -214,8 +242,8 @@ void TemporalEffects::ApplyTemporalAA(FComputeContext& Context, FColorBuffer& Sc
 
 	ConstantBuffer cbv;
 	cbv.Resolution = Vector4f(width, height, rcpWidth, rcpHeight);
-	cbv.CombinedJitter[0] = s_JitterDeltaX;
-	cbv.CombinedJitter[1] = s_JitterDeltaY;
+	cbv.CombinedJitter[0] = 0;
+	cbv.CombinedJitter[1] = 0;
 	cbv.FrameIndex = s_FirstFrame ? 1 : s_FrameIndex;
 
 	Context.SetDynamicConstantBufferView(0, sizeof(cbv), &cbv);

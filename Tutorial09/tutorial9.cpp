@@ -99,20 +99,21 @@ public:
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
 
-		// We use viewport offsets to jitter sample positions from frame to frame (for TAA.)
-		// D3D has a design quirk with fractional offsets such that the implicit scissor
-		// region of a viewport is floor(TopLeftXY) and floor(TopLeftXY + WidthHeight), so
-		// having a negative fractional top left, e.g. (-0.25, -0.25) would also shift the
-		// BottomRight corner up by a whole integer.  One solution is to pad your viewport
-		// dimensions with an extra pixel.  My solution is to only use positive fractional offsets,
-		// but that means that the average sample position is +0.5, which I use when I disable
-		// temporal AA.
-		TemporalEffects::GetJitterOffset(m_MainViewport.TopLeftX, m_MainViewport.TopLeftY);
-		//else
-		//{
-		//	m_MainViewport.TopLeftX = 0;
-		//	m_MainViewport.TopLeftY = 0;
-		//}
+		if (GameInput::IsKeyDown(32))
+		{
+			if (m_RotateMesh)
+			{
+				m_RotateMesh = false;
+			}
+			else
+			{
+				m_RotateMesh = true;
+			}
+		}
+
+
+		m_MainViewport.TopLeftX = 0.0f;
+		m_MainViewport.TopLeftY = 0.0f;
 
 		m_MainViewport.Width = (float)RenderWindow::Get().GetBackBuffer().GetWidth();
 		m_MainViewport.Height = (float)RenderWindow::Get().GetBackBuffer().GetHeight();
@@ -737,11 +738,22 @@ private:
 			GfxContext.ClearDepth(DepthBuffer);
 		}
 
-		m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
-		m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
-		m_VSConstants.PreviousModelMatrix = m_Mesh->GetPreviousModelMatrix();
-		m_VSConstants.PreviousViewProjMatrix = m_Camera.GetPreviousViewProjMatrix();
-		m_VSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
+		if (TemporalEffects::g_EnableTAA)
+		{
+			m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
+			m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * TemporalEffects::HackAddTemporalAAProjectionJitter(m_Camera, m_MainViewport.Width, m_MainViewport.Height, false);
+			m_VSConstants.PreviousModelMatrix = m_Mesh->GetPreviousModelMatrix();
+			m_VSConstants.PreviousViewProjMatrix = m_Camera.GetPreviousViewMatrix() * TemporalEffects::HackAddTemporalAAProjectionJitter(m_Camera, m_MainViewport.Width, m_MainViewport.Height, true);
+			m_VSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
+		}
+		else
+		{
+			m_VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
+			m_VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
+			m_VSConstants.PreviousModelMatrix = m_Mesh->GetPreviousModelMatrix();
+			m_VSConstants.PreviousViewProjMatrix = m_Camera.GetPreviousViewProjMatrix();
+			m_VSConstants.ViewportSize = Vector2f(m_MainViewport.Width, m_MainViewport.Height);
+		}
 
 		GfxContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstants), &m_VSConstants);
 
@@ -755,6 +767,8 @@ private:
 			int			MaxMipLevel;
 			int			bSHDiffuse;
 			int			Degree;
+			FMatrix		InvViewProj;
+			Vector4f	TemporalAAJitter;
 			Vector4f	Coeffs[16];
 		} PBR_Constants;
 
@@ -767,6 +781,11 @@ private:
 
 		PBR_Constants.bSHDiffuse = m_bSHDiffuse;
 		PBR_Constants.Degree = m_SHDegree;
+
+		Vector4f TemporalAAJitter;
+		TemporalEffects::GetJitterOffset(TemporalAAJitter, m_MainViewport.Width, m_MainViewport.Height);
+		PBR_Constants.TemporalAAJitter = TemporalAAJitter;
+
 		for (int i = 0; i < m_SHCoeffs.size(); ++i)
 		{
 			PBR_Constants.Coeffs[i] = m_SHCoeffs[i];
@@ -832,6 +851,7 @@ private:
 			int			bSHDiffuse;
 			int			Degree;
 			FMatrix		InvViewProj;
+			Vector4f	TemporalAAJitter;
 			Vector4f	Coeffs[16];
 		} PBR_Constants;
 

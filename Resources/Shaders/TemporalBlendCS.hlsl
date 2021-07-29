@@ -4,7 +4,7 @@ RWTexture2D<float4> OutTemporal             : register(u0);
 Texture2D<float3> InColor                   : register(t0);
 Texture2D<float4> InTemporal                : register(t1);
 //Texture2D<packed_velocity_t> VelocityBuffer : register(t2);
-Texture2D<float2> VelocityBuffer            : register(t2);
+Texture2D<float4> VelocityBuffer            : register(t2);
 
 Texture2D<float> DepthBuffer                : register(t3);
 
@@ -219,6 +219,7 @@ float2 GetVelocity(float2 uv)
     velocity = VelocityBuffer[uv + closestOffset].xy;
 
 #endif 
+    velocity *= float2(0.5, -0.5) * Resolution.xy;
     return velocity;
 }
 
@@ -231,7 +232,7 @@ void cs_main(
     uint3 Gid : SV_GroupID)
 {
     float2 uv = GetUV(DTid.xy);
-    if (uv.x >= 1.0f || uv.y >= 1.0f)
+    if (uv.x > 1.0f || uv.y > 1.0f || uv.x <  0 || uv.y < 0)
     {
         return;
     }
@@ -244,13 +245,14 @@ void cs_main(
     }
 
     // screenPos
-    const uint2 screenST = DTid.xy;
+    const float2 screenST = DTid.xy;
+
 
     float2 velocity = GetVelocity(screenST);
     // calculate confidence factor based on the velocity of current pixel, everything moving faster than FRAME_VELOCITY_IN_PIXELS_DIFF frame-to-frame will be marked as no-history
     const float velocityConfidenceFactor = saturate(1.f - length(velocity) / FRAME_VELOCITY_IN_PIXELS_DIFF);
 
-    const float2 historyScreenST = screenST + velocity;
+    const float2 historyScreenST = screenST - velocity;
     const float2 historyScreenUV = GetUV(historyScreenST);
     const float uvWeight = (historyScreenUV >= float2(0.f, 0.f) && historyScreenUV <= float2(1.f, 1.f)) ? 1.0f : 0.f;
     const bool hasValidHistory = (velocityConfidenceFactor * uvWeight) > 0.f;
