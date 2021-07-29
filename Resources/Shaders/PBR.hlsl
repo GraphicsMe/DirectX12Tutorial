@@ -224,6 +224,7 @@ void PS_PBR_Floor(PixelInput In, out PixelOutput Out)
 	Out.Target1 = float4(0.5 * N + 0.5, 1.0);
 	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
 	Out.Target3 = float4(BaseColor, 1.0);
+	Out.Target4 = float2(0.0, 0.0);
 }
 
 
@@ -247,7 +248,7 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	Out.Target1 = float4(0.5*N+0.5, 1.0);
 	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
 	Out.Target3 = float4(Albedo, AO);
-	Out.Target4 = In.PreviousScreenPos.xy - In.CurrentScreenPos.xy;
+	Out.Target4 = In.PreviousScreenPos.xy - In.CurrentScreenPos.xy; // velocity
 }
 
 Texture2D GBufferA		: register(t0); // normal

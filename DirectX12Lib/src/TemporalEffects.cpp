@@ -48,7 +48,7 @@ void TemporalEffects::Initialize(void)
 
 	// RootSignature
 	FSamplerDesc SamplerLinearBorderDesc;
-	SamplerLinearBorderDesc.SetLinearBorderDesc();
+	SamplerLinearBorderDesc.SetLinearBorderDesc(Vector4f(0.f));
 
 	s_RootSignature.Reset(3, 1);
 	s_RootSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_ALL);
@@ -144,6 +144,11 @@ void TemporalEffects::GetJitterOffset(float& JitterX, float& JitterY)
 {
 	JitterX = s_JitterX;
 	JitterY = s_JitterY;
+}
+
+FColorBuffer& TemporalEffects::GetHistoryBuffer()
+{
+	return g_TemporalColor[s_FrameIndexMod2];
 }
 
 void TemporalEffects::ClearHistory(FCommandContext& Context)

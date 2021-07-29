@@ -11,6 +11,9 @@
 #include "RenderWindow.h"
 #include "CommandListManager.h"
 #include "Texture.h"
+#include "Camera.h"
+#include "CubeBuffer.h"
+#include "TemporalEffects.h"
 
 using namespace BufferManager;
 extern FCommandListManager g_CommandListManager;
@@ -25,12 +28,13 @@ namespace PostProcessing
 	float g_BloomThreshold = 1.f;
 
 	FRootSignature m_CSSignature;
-	FRootSignature m_ToneMappWithBloomSignature;
+	FRootSignature m_PostProcessSignature;
 
 	FComputePipelineState m_CSUpSamplePSO;
 	FComputePipelineState m_CSDownSamplePSO;
 	FComputePipelineState m_CSExtractBloomPSO;
 	FGraphicsPipelineState m_ToneMapWithBloomPSO;
+	FGraphicsPipelineState m_SSRPSO;
 
 	ComPtr<ID3DBlob> m_UpSampleCS;
 	ComPtr<ID3DBlob> m_DownSampleCS;
@@ -38,6 +42,7 @@ namespace PostProcessing
 
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_ToneMapWithBloomPS;
+	ComPtr<ID3DBlob> m_SSRPS;
 
 	FColorBuffer g_BloomBuffers[5];
 
@@ -88,16 +93,19 @@ void PostProcessing::Initialize()
 	}
 
 	// post Process
-	m_ToneMappWithBloomSignature.Reset(2, 1);
-	m_ToneMappWithBloomSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
-	m_ToneMappWithBloomSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2);
-	m_ToneMappWithBloomSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
-	m_ToneMappWithBloomSignature.Finalize(L"ToneMapp-Bloom");
+	FSamplerDesc SSRSampler;
+	SSRSampler.SetLinearBorderDesc(Vector4f(0.f, 0.f, 0.f, 0.f));
+	m_PostProcessSignature.Reset(2, 2);
+	m_PostProcessSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+	m_PostProcessSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10);
+	m_PostProcessSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+	m_PostProcessSignature.InitStaticSampler(1, SSRSampler, D3D12_SHADER_VISIBILITY_PIXEL);
+	m_PostProcessSignature.Finalize(L"PostProcess");
 
 	m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
 	m_ToneMapWithBloomPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "PS_ToneMapAndBloom", "ps_5_1");
 
-	m_ToneMapWithBloomPSO.SetRootSignature(m_ToneMappWithBloomSignature);
+	m_ToneMapWithBloomPSO.SetRootSignature(m_PostProcessSignature);
 	m_ToneMapWithBloomPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 	m_ToneMapWithBloomPSO.SetBlendState(FPipelineState::BlendDisable);
 	m_ToneMapWithBloomPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
@@ -110,6 +118,19 @@ void PostProcessing::Initialize()
 
 	int Black = 0;
 	m_BlackTexture.Create(1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, &Black);
+
+	m_SSRPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/SSR.hlsl", "PS_SSR", "ps_5_1");
+
+	m_SSRPSO.SetRootSignature(m_PostProcessSignature);
+	m_SSRPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+	m_SSRPSO.SetBlendState(FPipelineState::BlendDisable);
+	m_SSRPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+	// no need to set input layout
+	m_SSRPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	m_SSRPSO.SetRenderTargetFormat(g_SceneColorBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
+	m_SSRPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
+	m_SSRPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SSRPS.Get()));
+	m_SSRPSO.Finalize();
 }
 
 void PostProcessing::Destroy()
@@ -193,7 +214,7 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 void PostProcessing::ToneMapping(FCommandContext& CommandContext)
 {
 	// Set necessary state.
-	CommandContext.SetRootSignature(m_ToneMappWithBloomSignature);
+	CommandContext.SetRootSignature(m_PostProcessSignature);
 	CommandContext.SetPipelineState(m_ToneMapWithBloomPSO);
 	CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	CommandContext.SetViewportAndScissor(0, 0, WindowWin32::Get().GetWidth(), WindowWin32::Get().GetHeight());
@@ -227,4 +248,48 @@ void PostProcessing::ToneMapping(FCommandContext& CommandContext)
 	CommandContext.Draw(3);
 
 	CommandContext.TransitionResource(g_BloomBuffers[0], D3D12_RESOURCE_STATE_COMMON, true);
+}
+
+void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, FCubeBuffer& CubeBuffer)
+{
+	// Set necessary state.
+	GfxContext.SetRootSignature(m_PostProcessSignature);
+	GfxContext.SetPipelineState(m_SSRPSO);
+	GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	// jitter offset
+	GfxContext.SetViewportAndScissor(0, 0, g_SSRBuffer.GetWidth(), g_SSRBuffer.GetHeight());
+
+	FColorBuffer& SceneBuffer = g_SceneColorBuffer;
+
+	// Indicate that the back buffer will be used as a render target.
+	GfxContext.TransitionResource(g_SSRBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	GfxContext.TransitionResource(g_GBufferA, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	GfxContext.TransitionResource(g_GBufferB, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	GfxContext.TransitionResource(g_GBufferC, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	GfxContext.TransitionResource(CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	GfxContext.TransitionResource(TemporalEffects::GetHistoryBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, true);
+
+	GfxContext.SetRenderTargets(1, &g_SSRBuffer.GetRTV());
+
+	__declspec(align(16)) struct
+	{
+		FMatrix		ViewProj;
+		FMatrix		InvViewProj;
+		Vector3f	CameraPos;
+	} PSConstants;
+
+	PSConstants.CameraPos = Camera.GetPosition();
+	PSConstants.ViewProj = Camera.GetViewProjMatrix();
+	PSConstants.InvViewProj = PSConstants.ViewProj.Inverse();
+
+	GfxContext.SetDynamicConstantBufferView(0, sizeof(PSConstants), &PSConstants);
+	GfxContext.SetDynamicDescriptor(1, 0, g_GBufferA.GetSRV());
+	GfxContext.SetDynamicDescriptor(1, 1, g_GBufferB.GetSRV());
+	GfxContext.SetDynamicDescriptor(1, 2, g_GBufferC.GetSRV());
+	GfxContext.SetDynamicDescriptor(1, 3, g_SceneDepthZ.GetSRV());
+	GfxContext.SetDynamicDescriptor(1, 4, TemporalEffects::GetHistoryBuffer().GetSRV());
+	GfxContext.SetDynamicDescriptor(1, 5, CubeBuffer.GetCubeSRV(0));
+
+	GfxContext.Draw(3);
 }

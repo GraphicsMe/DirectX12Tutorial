@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Common.h"
+#include "MathLib.h"
 
 class FSamplerDesc : public D3D12_SAMPLER_DESC
 {
@@ -47,7 +48,7 @@ public:
 		MaxLOD = D3D12_FLOAT32_MAX;
 	}
 
-	void SetLinearBorderDesc()
+	void SetLinearBorderDesc(const Vector4f& Border)
 	{
 		Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 		AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
@@ -56,7 +57,10 @@ public:
 		MipLODBias = 0.f;
 		MaxAnisotropy = 1;
 		ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-		BorderColor[0] = BorderColor[1] = BorderColor[2] = BorderColor[3] = 0;
+		BorderColor[0] = Border.x;
+		BorderColor[1] = Border.y;
+		BorderColor[2] = Border.z;
+		BorderColor[3] = Border.w;
 		MinLOD = 0.0f;
 		MaxLOD = D3D12_FLOAT32_MAX;
 	}

@@ -134,6 +134,7 @@ set(SHADER_FILES
 	../Resources/shaders/DepthOfField_Postfilter.hlsl
 	../Resources/shaders/DepthOfField_Combine.hlsl
 	../Resources/shaders/DiskKernels.hlsl
+	../Resources/shaders/SSR.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

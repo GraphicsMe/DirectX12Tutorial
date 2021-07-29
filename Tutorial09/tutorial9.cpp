@@ -247,6 +247,7 @@ public:
 		case SM_PBR:
 			//SkyPass(CommandContext, true);
 			BasePass(CommandContext, true);
+			PostProcessing::GenerateSSR(CommandContext, m_Camera, m_CubeBuffer);
 			IBLPass(CommandContext);
 			// DOF
 			{

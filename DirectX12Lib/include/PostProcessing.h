@@ -1,5 +1,8 @@
 #pragma once
 
+class FCamera;
+class FCubeBuffer;
+class FColorBuffer;
 class FCommandContext;
 
 namespace PostProcessing
@@ -14,4 +17,6 @@ namespace PostProcessing
 	void Render(FCommandContext& CommandContext);
 	void GenerateBloom(FCommandContext& CommandContext);
 	void ToneMapping(FCommandContext& CommandContext);
+
+	void GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, FCubeBuffer& CubeBuffer);
 }

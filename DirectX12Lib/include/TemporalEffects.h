@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include <stdint.h>
-#include "ColorBuffer.h"
 
+class FColorBuffer;
 class FCommandContext;
 class FComputeContext;
 
@@ -23,6 +23,9 @@ namespace TemporalEffects
 	// Jitter values are neutral at 0.5 and vary from [0, 1).  Jittering only occurs when temporal antialiasing
 	// is enabled.  You can use these values to jitter your viewport or projection matrix.
 	void GetJitterOffset(float& JitterX, float& JitterY);
+
+	// Should be called after update() in one frame
+	FColorBuffer& GetHistoryBuffer();
 
 	void ClearHistory(FCommandContext& Context);
 
