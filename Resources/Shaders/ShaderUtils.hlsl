@@ -271,3 +271,13 @@ float LinearEyeDepth(float depth,float near,float far)
 	float z = depth;
 	return (near * far) / (far - z * (far - near));
 }
+
+float2 ViewportUVToScreenPos(float2 ViewportUV)
+{
+	return float2(2 * ViewportUV.x - 1, 1 - 2 * ViewportUV.y);
+}
+
+float2 ScreenPosToViewportUV(float2 ScreenPos)
+{
+	return float2(0.5f * ScreenPos.x + 0.5f, 0.5f - 0.5f * ScreenPos.y);
+}
