@@ -400,12 +400,12 @@ void FCommandContext::ClearDepth(FDepthBuffer& Target)
 
 void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV)
 {
-	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, true, &DSV);
+	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, FALSE, &DSV);
 }
 
 void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[])
 {
-	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, true, nullptr);
+	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, false, nullptr);
 }
 
 void FCommandContext::SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV)
