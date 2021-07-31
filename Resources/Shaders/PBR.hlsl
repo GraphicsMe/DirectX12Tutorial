@@ -266,9 +266,7 @@ float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 
 	float Depth = SceneDepthZ.Sample(LinearSampler, Tex).x;
 
-	float2 ScreenCoord = Tex;
-	ScreenCoord.x = ScreenCoord.x * 2 - 1;
-	ScreenCoord.y = (1 - ScreenCoord.y) * 2;
+	float2 ScreenCoord = ViewportUVToScreenPos(Tex);
 
 	float4 NDCPos = float4(ScreenCoord, Depth, 1.0f);
 	float4 WorldPos = mul(NDCPos, InvViewProj);
