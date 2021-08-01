@@ -59,3 +59,8 @@ add_executable(Tutorial10 Tutorial10/tutoria10.cpp)
 target_link_libraries(Tutorial10 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial10 PROPERTIES
 	PROJECT_LABEL "Tutorial10 - IBL Precompute")
+	
+add_executable(TutorialSkin TutorialSkin/TutorialSkin.cpp)
+target_link_libraries(TutorialSkin LINK_PUBLIC DirectX12Lib)
+set_target_properties(TutorialSkin PROPERTIES
+	PROJECT_LABEL "TutorialSkin - Skin Rendering")

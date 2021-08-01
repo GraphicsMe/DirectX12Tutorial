@@ -413,6 +413,11 @@ void FCommandContext::SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV)
 	SetRenderTargets(0, nullptr, DSV);
 }
 
+void FCommandContext::SetStencilRef(UINT RefValue)
+{
+	m_CommandList->OMSetStencilRef(RefValue);
+}
+
 void FCommandContext::SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents)
 {
 	m_CommandList->SetGraphicsRoot32BitConstants(RootIndex, NumConstants, Contents, 0);

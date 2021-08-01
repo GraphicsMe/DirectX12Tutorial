@@ -46,6 +46,12 @@ float4 Pow4(float4 x)
 	return xx * xx;
 }
 
+float Pow5(float x)
+{
+	float xx = x * x;
+	return xx * xx * x;
+}
+
 float Max3(float a, float b, float c)
 {
 	return max(a, max(b, c));

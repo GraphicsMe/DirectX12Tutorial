@@ -20,6 +20,7 @@
 #include "MotionBlur.h"
 #include "PostProcessing.h"
 #include "DepthOfField.h"
+#include "ScreenSpaceSubsurface.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -179,12 +180,13 @@ bool D3D12RHI::Initialize()
 	TemporalEffects::Initialize();
 	DepthOfField::Initialize();
 	PostProcessing::Initialize();
-
+	ScreenSpaceSubsurface::Initialize();
 	return true;
 }
 
 void D3D12RHI::Destroy()
 {
+	ScreenSpaceSubsurface::Destroy();
 	PostProcessing::Destroy();
 	MotionBlur::Destroy();
 	DepthOfField::Destroy();

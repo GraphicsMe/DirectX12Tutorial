@@ -40,6 +40,7 @@
 	include/MotionBlur.h
 	include/PostProcessing.h
 	include/DepthOfField.h
+	include/ScreenSpaceSubsurface.h
 )
 
 set(SOURCES
@@ -81,6 +82,7 @@ set(SOURCES
 	src/MotionBlur.cpp
 	src/PostProcessing.cpp
 	src/DepthOfField.cpp
+	src/ScreenSpaceSubsurface.cpp
 )
 
 set( IMGUI_HEADERS
@@ -135,6 +137,10 @@ set(SHADER_FILES
 	../Resources/shaders/DepthOfField_Combine.hlsl
 	../Resources/shaders/DiskKernels.hlsl
 	../Resources/shaders/SSR.hlsl
+	../Resources/shaders/SkinPBR.hlsl
+	../Resources/shaders/ScreenSpaceSubsurfaceBlur.hlsl
+	../Resources/shaders/ScreenSpaceSubsurfaceCombine.hlsl
+	../Resources/shaders/TempBufferCopy.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

@@ -101,6 +101,8 @@ public:
 	void SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[], D3D12_CPU_DESCRIPTOR_HANDLE DSV);
 	void SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV);
 
+	void SetStencilRef(UINT RefValue);
+
 	void SetConstantArray(UINT RootIndex, UINT NumConstants, const void* Contents);
 	void SetDynamicConstantBufferView(UINT RootIndex, size_t BufferSize, const void* BufferData);
 

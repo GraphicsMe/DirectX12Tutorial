@@ -1,0 +1,7 @@
+# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
+# File Created: 30.07.2021 11:27:17
+
+newmtl HumanHead
+	map_Kd textures/Head_Diffuse.tga
+	map_bump textures/Head_NM.tga
+	map_Pr textures/Head_Roughness.tga
