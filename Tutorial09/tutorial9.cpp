@@ -330,7 +330,7 @@ private:
 		m_TextureLongLat.LoadFromFile(m_HDRFilePath.c_str()); //spruit_sunrise_2k.hdr, newport_loft.hdr, delta_2_2k
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
-		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true, false);
+		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true, false, true);
 	
 		m_FloorAlpha.LoadFromFile(L"../Resources/Models/harley/textures/Floor_Alpha.jpg", false);
 		m_FloorAlbedo.LoadFromFile(L"../Resources/Models/harley/textures/default.png", true);

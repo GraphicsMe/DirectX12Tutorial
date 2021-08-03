@@ -84,7 +84,7 @@ typedef std::map<std::string, ObjMaterial> MaterialLibType;
 class FObjLoader
 {
 public:
-	static MeshData* LoadObj(const std::string& FilePath, bool FlipV = false, bool NegateZ = false);
+	static MeshData* LoadObj(const std::string& FilePath, bool FlipV = false, bool NegateZ = false, bool FlipNormalZ = false);
 	
 private:
 	static bool LoadMaterialLib(MaterialLibType& MtlLib, const std::string& MtlFilePath);
