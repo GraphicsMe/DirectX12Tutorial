@@ -219,6 +219,18 @@ float D_GGX(float a2, float NoH)
 	return a2 / (PI*d*d);					// 4 mul, 1 rcp
 }
 
+// 大多数非金属的F0范围是0.02~0.04
+float DielectricSpecularToF0(float Specular)
+{
+	// 0.08f map Specular = 0.5 to 0.04
+	return 0.08f * Specular;
+}
+
+float3 ComputeF0(float Specular, float3 BaseColor, float Metallic)
+{
+	return lerp(DielectricSpecularToF0(Specular).xxx, BaseColor, Metallic.xxx);
+}
+
 half ComputeReflectionCaptureMipFromRoughness(float Roughness, half CubemapMaxMip)
 {
 	half LevelFrom1x1 = 1.0 - 1.2 * log2(max(Roughness, 0.001));

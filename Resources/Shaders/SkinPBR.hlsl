@@ -15,6 +15,9 @@ cbuffer PSContant : register(b0)
 	float3		CameraPos;
 	float		pad;
 	float3		LightDir;
+	float		LightScale;
+	float3		LightColor;
+	int			DebugFlag;
 };
 
 struct BxDFContext
@@ -72,8 +75,6 @@ float Vis_SmithJointApprox(float a2, float NoV, float NoL)
 float3 F_Schlick(float3 SpecularColor, float VoH)
 {
 	float Fc = Pow5(1 - VoH);					// 1 sub, 3 mul
-	//return Fc + (1 - Fc) * SpecularColor;		// 1 add, 3 mad
-
 	// Anything less than 2% is physically impossible and is instead considered to be shadowing
 	return saturate(50.0 * SpecularColor.g) * Fc + (1 - Fc) * SpecularColor;
 }
@@ -81,22 +82,15 @@ float3 F_Schlick(float3 SpecularColor, float VoH)
 float3 SpecularGGX(float Roughness, float3 SpecularColor, BxDFContext Context, float NoL)
 {
 	float a2 = Pow4(Roughness);
+
+	// need EnergyNormalization?
+
 	float D = D_GGX(a2, Context.NoH);
+	// denominator(4 * NoL * NoV) Reduce by G
 	float Vis = Vis_SmithJointApprox(a2, Context.NoV, NoL);
 	float3 F = F_Schlick(SpecularColor, Context.VoH);
 	return (D * Vis) * F;
 }
-
-float DielectricSpecularToF0(float Specular)
-{
-	return 0.08f * Specular;
-}
-
-float3 ComputeF0(float Specular, float3 BaseColor, float Metallic)
-{
-	return lerp(DielectricSpecularToF0(Specular).xxx, BaseColor, Metallic.xxx);
-}
-
 
 struct PixelOutput
 {
@@ -137,19 +131,35 @@ PixelOutput PS_SkinLighting(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Positio
 	// PBR Direct Lighting
 	BxDFContext Context;
 	Init(Context, N, V, L);
+	Context.NoL = saturate(Context.NoL);
+	Context.NoV = saturate(abs(Context.NoV) + 1e-5);
+
 	float3 Color = 0;
 
 	FDirectLighting Lighting;
+	Lighting.Diffuse = 0;
+	Lighting.Specular = 0;
 	// Diffuse
 	Lighting.Diffuse = Context.NoL * Diffuse_Lambert(DiffuseColor);
-	//Lighting.Diffuse = Context.NoL * Diffuse_Burley(DiffuseColor, Roughness, Context.NoV, Context.NoL, Context.VoH);
 
 	// Specular
-	// for skin Specular = 0;
-	Specular = 0.0;
+	Specular = 0.5;
 	float3 SpecularColor = ComputeF0(Specular, DiffuseColor, Metallic);
-	Lighting.Specular = Context.NoL * SpecularGGX(Roughness, SpecularColor, Context, Context.NoL);
+	Lighting.Specular = Context.NoL* SpecularGGX(Roughness, SpecularColor, Context, Context.NoL);
 
-	Out.Target0 = float4(Lighting.Diffuse + Lighting.Specular, 1.0f);
+	if (DebugFlag == 1)
+	{
+		Color = Lighting.Diffuse;
+	}
+	else if (DebugFlag == 2)
+	{
+		Color = Lighting.Specular;
+	}
+	else
+	{
+		Color = Lighting.Diffuse + Lighting.Specular;
+	}
+
+	Out.Target0 = float4(Color, 1.0f);
 	return Out;
 }

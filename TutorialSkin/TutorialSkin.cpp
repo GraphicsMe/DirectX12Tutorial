@@ -78,8 +78,8 @@ public:
 		{
 			m_RotateY += delta * 0.0005f * 2;
 			m_RotateY = fmodf(m_RotateY, MATH_2PI);
+			m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 		}
-		m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
@@ -125,10 +125,13 @@ public:
 		if (ImGui::Begin("Config", &ShowConfig, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			ImGui::Checkbox("Enable ScreenSapceSSS", &ScreenSpaceSubsurface::g_SSSSkinEnable);
+			ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
 			ImGui::SliderFloat("sssStrength", &ScreenSpaceSubsurface::g_sssStrength, 0.f, 10.f);
 			ImGui::SliderFloat("sssWidth", &ScreenSpaceSubsurface::g_sssWidth, 1.f, 10.f);
 			ImGui::SliderFloat("sssClampScale", &ScreenSpaceSubsurface::g_sssClampScale, 1.f, 100.f);
 			ImGui::SliderFloat("effect Strength", &ScreenSpaceSubsurface::g_EffectStr, 0.f, 1.f);
+			ImGui::SliderFloat("m_LightDir.x", &m_LightDir.x, -1, 1);
+			m_LightDir = m_LightDir.Normalize();
 		}
 		ImGui::End();
 
@@ -157,12 +160,42 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.0f, 0, 0.5f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(0.0f, 0, -0.5f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
 		const float FovVertical = MATH_PI / 4.f;
 		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
+	}
+
+	void ParsePath()
+	{
+		size_t lastPeriodIndex = m_HDRFilePath.find_last_of('.');
+
+		if (lastPeriodIndex == m_HDRFilePath.npos)
+		{
+			printf("Input HDR file pathv is wrong\n");
+			exit(-1);
+		}
+
+		m_HDRFileName = m_HDRFilePath.substr(0, lastPeriodIndex);
+
+		m_IrradianceMapPath = m_HDRFileName + std::wstring(L"_IrradianceMap.dds");
+		m_PrefilteredMapPath = m_HDRFileName + std::wstring(L"_PrefilteredMap.dds");
+		m_SHCoeffsPath = m_HDRFileName + std::wstring(L"_SHCoeffs.txt");
+		m_PreIntegrateBRDFPath = std::wstring(L"../Resources/HDR/PreIntegrateBRDF.dds");
+
+		// check file exit
+		bool isExist = true;
+		isExist &= CheckFileExist(m_IrradianceMapPath);
+		isExist &= CheckFileExist(m_PrefilteredMapPath);
+		isExist &= CheckFileExist(m_SHCoeffsPath);
+		isExist &= CheckFileExist(m_PreIntegrateBRDFPath);
+		if (!isExist)
+		{
+			printf("this input HDR file do not precompute to generate IBL maps\n");
+			exit(-1);
+		}
 	}
 
 	bool CheckFileExist(const std::wstring& name)
@@ -176,6 +209,36 @@ private:
 	void SetupMesh()
 	{
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/HumanHead/HumanHead.obj", true, false);
+		m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
+
+		m_HDRFilePath = L"../Resources/HDR/spruit_sunrise_2k.hdr";
+		ParsePath();
+
+		// IBL
+		m_PreintegratedGF.LoadFromFile(L"../Resources/HDR/PreIntegrateBRDF.dds");
+		m_IrradianceCube.LoadFromFile(m_IrradianceMapPath.c_str(), false);
+		m_PrefilteredCube.LoadFromFile(m_PrefilteredMapPath.c_str(), false);
+
+		m_SHCoeffs.resize(16);
+		std::ifstream ifs;;
+		ifs.open(m_SHCoeffsPath.c_str());
+		for (int i = 0; i < 4 * 4; ++i)
+		{
+			std::string str;
+			getline(ifs, str);
+
+			std::istringstream is(str);
+			std::string s;
+			is >> s;
+			m_SHCoeffs[i].x = std::stof(s);
+			is >> s;
+			m_SHCoeffs[i].y = std::stof(s);
+			is >> s;
+			m_SHCoeffs[i].z = std::stof(s);
+		}
+		ifs.close();
+
+		
 	}
 
 	void SetupShaders()
@@ -187,6 +250,9 @@ private:
 		// Lighting
 		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
 		m_SkinLightingPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/SkinPBR.hlsl", "PS_SkinLighting", "ps_5_1");
+
+		// IBL
+		m_IBLPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_IBL", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -206,7 +272,11 @@ private:
 		m_MeshPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 
 		m_MeshPSO.SetRootSignature(m_MeshSignature);
-		m_MeshPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+
+		D3D12_RASTERIZER_DESC CullBackRS;
+		CullBackRS = FPipelineState::RasterizerTwoSided;
+		CullBackRS.CullMode = D3D12_CULL_MODE_BACK;
+		m_MeshPSO.SetRasterizerState(CullBackRS);
 		m_MeshPSO.SetBlendState(FPipelineState::BlendDisable);
 
 		D3D12_DEPTH_STENCIL_DESC DSS = FPipelineState::DepthStateReadWrite;
@@ -242,6 +312,10 @@ private:
 		m_SkinLightingPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 
 		D3D12_BLEND_DESC BlendAdd = FPipelineState::BlendTraditional;
+		BlendAdd.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		BlendAdd.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		BlendAdd.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		BlendAdd.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
 		m_SkinLightingPSO.SetBlendState(BlendAdd);
 		m_SkinLightingPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
 		// no need to set input layout
@@ -252,6 +326,18 @@ private:
 		m_SkinLightingPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 		m_SkinLightingPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkinLightingPS.Get()));
 		m_SkinLightingPSO.Finalize();
+		
+		// IBL 
+		m_IBLPSO.SetRootSignature(m_SkinLightingSignature);
+		m_IBLPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_IBLPSO.SetBlendState(BlendAdd);
+		m_IBLPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		// no need to set input layout
+		m_IBLPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_IBLPSO.SetRenderTargetFormat(g_SceneColorBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
+		m_IBLPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
+		m_IBLPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_IBLPS.Get()));
+		m_IBLPSO.Finalize();
 	}
 
 	void BasePass(FCommandContext& GfxContext, bool Clear)
@@ -363,11 +449,17 @@ private:
 			Vector3f	CameraPos;
 			float		pad;
 			Vector3f	LightDir;
+			float		LightScale;
+			Vector3f	LightColor;
+			int			DebugFlag;
 		} SkinLightingPass_PSConstants;
 
 		SkinLightingPass_PSConstants.InvViewProj = m_Camera.GetViewProjMatrix().Inverse();
 		SkinLightingPass_PSConstants.CameraPos = m_Camera.GetPosition();
-		SkinLightingPass_PSConstants.LightDir = Vector3f(0, 0, 1);
+		SkinLightingPass_PSConstants.LightDir = m_LightDir;
+		SkinLightingPass_PSConstants.LightScale = m_LightScale;
+		SkinLightingPass_PSConstants.LightColor = m_LightColor;
+		SkinLightingPass_PSConstants.DebugFlag = m_DebugFlag;
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(SkinLightingPass_PSConstants), &SkinLightingPass_PSConstants);
 		GfxContext.SetDynamicDescriptor(2, 0, g_GBufferA.GetSRV());
@@ -398,15 +490,37 @@ private:
 	FRootSignature				m_SkinLightingSignature;
 	FGraphicsPipelineState		m_SkinLightingPSO;
 
+	// IBL Pass
+	FTexture m_PreintegratedGF;
+	FCubeBuffer m_IrradianceCube, m_PrefilteredCube;
+	std::vector<Vector3f> m_SHCoeffs;
+	bool m_bSHDiffuse = true;
+
+	ComPtr<ID3DBlob>			m_IBLPS;
+	FGraphicsPipelineState		m_IBLPSO;
+
+	// LightInfo
+	float						m_LightScale;
+	Vector3f					m_LightColor;
+	Vector3f					m_LightDir = Vector3f(0, 0, 1);
+
+	/*
+	* DebugFlag
+	* 0: None
+	* 1: OnlyDiffuse
+	* 2: OnlySpecular
+	*/
+	int							m_DebugFlag = 0;
+
 	// 
 	D3D12_VIEWPORT		m_MainViewport;
 	D3D12_RECT			m_MainScissor;
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
 	std::unique_ptr<FModel> m_Mesh;
-
+	float m_RotateY = MATH_PI;
 	bool m_RotateMesh = false;
-	float m_RotateY = 0.f;//3.984f;
+
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 
