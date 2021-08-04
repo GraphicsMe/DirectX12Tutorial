@@ -33,18 +33,21 @@ namespace PostProcessing
 	FComputePipelineState m_CSUpSamplePSO;
 	FComputePipelineState m_CSDownSamplePSO;
 	FComputePipelineState m_CSExtractBloomPSO;
+	FComputePipelineState m_CSBuildHZBPSO;
 	FGraphicsPipelineState m_ToneMapWithBloomPSO;
 	FGraphicsPipelineState m_SSRPSO;
 
 	ComPtr<ID3DBlob> m_UpSampleCS;
 	ComPtr<ID3DBlob> m_DownSampleCS;
 	ComPtr<ID3DBlob> m_ExtractBloomCS;
+	ComPtr<ID3DBlob> m_BuildHZBCS;
 
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_ToneMapWithBloomPS;
 	ComPtr<ID3DBlob> m_SSRPS;
 
 	FColorBuffer g_BloomBuffers[5];
+	FColorBuffer g_HiZBuffer;
 
 	FTexture m_BlackTexture;
 
@@ -58,11 +61,13 @@ namespace PostProcessing
 void PostProcessing::Initialize()
 {
 	FSamplerDesc DefaultSamplerDesc(D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
-	m_CSSignature.Reset(3, 1);
+	FSamplerDesc PointSampler(D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+	m_CSSignature.Reset(3, 2);
 	m_CSSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_ALL); // compute shader need 'all'
 	m_CSSignature[1].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
 	m_CSSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
 	m_CSSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_ALL);
+	m_CSSignature.InitStaticSampler(1, PointSampler, D3D12_SHADER_VISIBILITY_ALL);
 	m_CSSignature.Finalize(L"PostProcessing-Bloom");
 
 	m_UpSampleCS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "CS_UpSample", "cs_5_1");
@@ -79,6 +84,11 @@ void PostProcessing::Initialize()
 	m_CSExtractBloomPSO.SetRootSignature(m_CSSignature);
 	m_CSExtractBloomPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_ExtractBloomCS.Get()));
 	m_CSExtractBloomPSO.Finalize();
+
+	m_BuildHZBCS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/HZB.hlsl", "CS_BuildHZB", "cs_5_1");
+	m_CSBuildHZBPSO.SetRootSignature(m_CSSignature);
+	m_CSBuildHZBPSO.SetComputeShader(CD3DX12_SHADER_BYTECODE(m_BuildHZBCS.Get()));
+	m_CSBuildHZBPSO.Finalize();
 
 	uint32_t Width = WindowWin32::Get().GetWidth();
 	uint32_t Height = WindowWin32::Get().GetHeight();
@@ -250,8 +260,81 @@ void PostProcessing::ToneMapping(FCommandContext& CommandContext)
 	CommandContext.TransitionResource(g_BloomBuffers[0], D3D12_RESOURCE_STATE_COMMON, true);
 }
 
+void PostProcessing::BuildHZB(FCommandContext& CommandContext)
+{
+	int32_t ScreenWidth = WindowWin32::Get().GetWidth();
+	int32_t ScreenHeight = WindowWin32::Get().GetHeight();
+	int32_t NumMipsX = std::max((int32_t)std::ceil(std::log2(ScreenWidth) - 1.0), 1);
+	int32_t NumMipsY = std::max((int32_t)std::ceil(std::log2(ScreenHeight) - 1.0), 1);
+	int32_t NumMips = std::max(NumMipsX, NumMipsY);
+	int32_t HZBWidth = 1 << NumMipsX;
+	int32_t HZBHeight = 1 << NumMipsY;
+	g_HiZBuffer.Create(L"HZB", HZBWidth, HZBHeight, NumMips, DXGI_FORMAT_R16_FLOAT);
+
+	CommandContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, true);
+
+#if ASYNC_COMPUTE
+	g_CommandListManager.GetComputeQueue().WaitForFenceValue(CommandContext.Flush());
+	FComputeContext& ComputeContext = FComputeContext::Begin(L"Post Effects");
+#else
+	FComputeContext& ComputeContext = CommandContext.GetComputeContext();
+#endif
+
+	ComputeContext.SetRootSignature(m_CSSignature);
+	ComputeContext.SetPipelineState(m_CSBuildHZBPSO);
+
+	__declspec(align(16)) struct
+	{
+		Vector2f	SrcTexelSize;
+		Vector2f	InputViewportMaxBound;
+	} Constants;
+
+	for (int i = 0; i < NumMips; ++i)
+	{
+		if (i > 0)
+			ComputeContext.TransitionSubResource(g_HiZBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, i-1, true);
+		ComputeContext.TransitionSubResource(g_HiZBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, i, true);
+		ComputeContext.ClearUAV(g_HiZBuffer, i);
+
+		ComputeContext.SetDynamicDescriptor(1, 0, i == 0 ? g_SceneDepthZ.GetSRV() : g_HiZBuffer.GetMipSRV(i-1));
+		ComputeContext.SetDynamicDescriptor(2, 0, g_HiZBuffer.GetMipUAV(i));
+
+		int32_t DstSizeX = DivideByMultiple(HZBWidth, uint32_t(1 << i));
+		int32_t DstSizeY = DivideByMultiple(HZBHeight, uint32_t(1 << i));
+
+		float SrcWidth = (float)g_SceneDepthZ.GetWidth();
+		float SrcHeight = (float)g_SceneDepthZ.GetHeight();
+		if (i > 0)
+		{
+			SrcWidth = (float)DivideByMultiple(HZBWidth, uint32_t(1 << (i - 1)));
+			SrcHeight = (float)DivideByMultiple(HZBHeight, uint32_t(1 << (i - 1)));
+		}
+		Constants.SrcTexelSize = Vector2f(1.f / SrcWidth, 1.f / SrcHeight);
+
+		Vector2f ViewportBound = Vector2f(1.f, 1.f);
+		if (i == 0)
+		{
+			ViewportBound = Vector2f(1.f) - 0.5f * Constants.SrcTexelSize;
+		}
+		Constants.InputViewportMaxBound = ViewportBound;
+		ComputeContext.SetDynamicConstantBufferView(0, sizeof(Constants), &Constants);
+
+		ComputeContext.Dispatch2D(DstSizeX, DstSizeY);
+
+		ComputeContext.TransitionSubResource(g_HiZBuffer, D3D12_RESOURCE_STATE_COMMON, i, true);
+	}
+
+	//CommandContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_COMMON, true);
+	//ComputeContext.Flush(true);
+#if ASYNC_COMPUTE
+	ComputeContext.Finish(true);
+#endif
+}
+
 void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, FCubeBuffer& CubeBuffer)
 {
+	BuildHZB(GfxContext);
+
 	// Set necessary state.
 	GfxContext.SetRootSignature(m_PostProcessSignature);
 	GfxContext.SetPipelineState(m_SSRPSO);

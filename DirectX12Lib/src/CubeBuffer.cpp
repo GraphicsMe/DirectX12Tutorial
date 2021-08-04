@@ -86,8 +86,8 @@ void FCubeBuffer::LoadFromFile(const std::wstring& FileName, bool IsSRGB)
 	m_Width = (int)image.GetImages()->width;
 	m_Height = (int)image.GetImages()->height;
 	m_Format = image.GetMetadata().format;
-	m_ArraySize = image.GetMetadata().arraySize;
-	m_NumMipMaps = image.GetMetadata().mipLevels;
+	m_ArraySize = (uint32_t)image.GetMetadata().arraySize;
+	m_NumMipMaps = (uint32_t)image.GetMetadata().mipLevels;
 
 	Create(FileName, m_Width, m_Height, m_NumMipMaps, m_Format);
 

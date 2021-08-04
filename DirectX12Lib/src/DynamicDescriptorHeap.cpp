@@ -94,6 +94,25 @@ ID3D12DescriptorHeap* FDynamicDescriptorHeap::RequestDescriptorHeap(D3D12_DESCRI
 	}
 }
 
+D3D12_GPU_DESCRIPTOR_HANDLE FDynamicDescriptorHeap::UploadDirect(D3D12_CPU_DESCRIPTOR_HANDLE Handle)
+{
+	if (!HasSpace(1))
+	{
+		RetireCurrentHeap();
+		UnbindAllInvalid();
+	}
+
+	m_OwningContext.SetDescriptorHeap(m_HeapType, GetHeapPointer());
+
+	FDescriptorHandle DestHandle = m_FirstDescriptor + m_CurrentOffset * m_DescriptorSize;
+	m_CurrentOffset += 1;
+
+	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
+	Device->CopyDescriptorsSimple(1, DestHandle.GetCpuHandle(), Handle, m_HeapType);
+
+	return DestHandle.GetGpuHandle();
+}
+
 void FDynamicDescriptorHeap::CopyAndBindStagedTables(FDescriptorHandleCache& HandleCache, ID3D12GraphicsCommandList* CommandList, 
 	void(STDMETHODCALLTYPE ID3D12GraphicsCommandList::*SetFunc)(UINT, D3D12_GPU_DESCRIPTOR_HANDLE))
 {

@@ -18,5 +18,6 @@ namespace PostProcessing
 	void GenerateBloom(FCommandContext& CommandContext);
 	void ToneMapping(FCommandContext& CommandContext);
 
+	void BuildHZB(FCommandContext& GfxContext);
 	void GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, FCubeBuffer& CubeBuffer);
 }

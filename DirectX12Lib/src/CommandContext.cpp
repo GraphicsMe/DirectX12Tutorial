@@ -405,7 +405,7 @@ void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_
 
 void FCommandContext::SetRenderTargets(UINT NumRTVs, const D3D12_CPU_DESCRIPTOR_HANDLE RTVs[])
 {
-	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, false, nullptr);
+	m_CommandList->OMSetRenderTargets(NumRTVs, RTVs, FALSE, nullptr);
 }
 
 void FCommandContext::SetDepthStencilTarget(D3D12_CPU_DESCRIPTOR_HANDLE DSV)
@@ -513,6 +513,12 @@ void FComputeContext::SetDynamicConstantBufferView(UINT RootIndex, size_t Buffer
 	FAllocation Alloc = m_CpuLinearAllocator.Allocate(BufferSize);
 	memcpy(Alloc.CPU, BufferData, BufferSize);
 	m_CommandList->SetComputeRootConstantBufferView(RootIndex, Alloc.GpuAddress);
+}
+
+void FComputeContext::ClearUAV(FColorBuffer& Target, int Mip)
+{
+	D3D12_GPU_DESCRIPTOR_HANDLE GpuVisibleHandle = m_DynamicViewDescriptorHeap.UploadDirect(Target.GetMipUAV(Mip));
+	m_CommandList->ClearUnorderedAccessViewFloat(GpuVisibleHandle, Target.GetMipUAV(Mip), Target.GetResource(), Target.GetClearColor().data, 0, nullptr);
 }
 
 void FComputeContext::Dispatch(size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ)

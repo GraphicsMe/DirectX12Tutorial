@@ -137,6 +137,7 @@ set(SHADER_FILES
 	../Resources/shaders/DepthOfField_Combine.hlsl
 	../Resources/shaders/DiskKernels.hlsl
 	../Resources/shaders/SSR.hlsl
+	../Resources/shaders/HZB.hlsl
 	../Resources/shaders/SkinPBR.hlsl
 	../Resources/shaders/ScreenSpaceSubsurfaceBlur.hlsl
 	../Resources/shaders/ScreenSpaceSubsurfaceCombine.hlsl

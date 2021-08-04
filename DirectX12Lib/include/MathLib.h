@@ -34,7 +34,31 @@ struct Vector2
 	Vector2() : x(0), y(0) {}
 	Vector2(T c) : x(c), y(c) {}
 	Vector2(T x, T y) : x(x), y(y) {}
+
+	Vector2 operator - (const Vector2& rhs) const
+	{
+		return Vector2(x - rhs.x, y - rhs.y);
+	}
 };
+
+template<typename T, typename scalar>
+Vector2<T> operator * (const Vector2<T>& lhs, scalar s)
+{
+	return Vector2<T>(lhs.x * s, lhs.y * s);
+}
+
+template<typename T, typename scalar>
+Vector2<T> operator / (const Vector2<T>& lhs, scalar s)
+{
+	return Vector2<T>(lhs.x / s, lhs.y / s);
+}
+
+template<typename T, typename scalar>
+Vector2<T> operator * (scalar s, const Vector2<T>& lhs)
+{
+	return Vector2<T>(lhs.x * s, lhs.y * s);
+}
+
 
 template<typename T>
 struct Vector3

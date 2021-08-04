@@ -71,6 +71,8 @@ public:
 		ms_DescriptorHeapPool[1].clear();
 	}
 
+	D3D12_GPU_DESCRIPTOR_HANDLE UploadDirect(D3D12_CPU_DESCRIPTOR_HANDLE Handle);
+
 	void ParseGraphicsRootSignature(const FRootSignature& RootSignature)
 	{
 		m_GraphicsHandleCache.ParseRootSignature(m_HeapType, RootSignature);
