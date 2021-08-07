@@ -39,10 +39,7 @@
 
 extern FCommandListManager g_CommandListManager;
 
-const int CUBE_MAP_SIZE = 1024;
-const int IRRADIANCE_SIZE = 256;
 const int PREFILTERED_SIZE = 256;
-const bool CUBEMAP_DEBUG_VIEW = true;
 
 using namespace BufferManager;
 
@@ -60,6 +57,7 @@ public:
 		SetupPipelineState();
 		SetupCameraLight();
 
+		PreintegratedSkinLut();
 	}
 
 	void OnShutdown()
@@ -211,33 +209,35 @@ private:
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/HumanHead/HumanHead.obj", true, false);
 		m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 
-		m_HDRFilePath = L"../Resources/HDR/spruit_sunrise_2k.hdr";
-		ParsePath();
+		//m_HDRFilePath = L"../Resources/HDR/spruit_sunrise_2k.hdr";
+		//ParsePath();
 
 		// IBL
-		m_PreintegratedGF.LoadFromFile(L"../Resources/HDR/PreIntegrateBRDF.dds");
-		m_IrradianceCube.LoadFromFile(m_IrradianceMapPath.c_str(), false);
-		m_PrefilteredCube.LoadFromFile(m_PrefilteredMapPath.c_str(), false);
+		//m_PreintegratedGF.LoadFromFile(L"../Resources/HDR/PreIntegrateBRDF.dds");
+		//m_IrradianceCube.LoadFromFile(m_IrradianceMapPath.c_str(), false);
+		//m_PrefilteredCube.LoadFromFile(m_PrefilteredMapPath.c_str(), false);
 
-		m_SHCoeffs.resize(16);
-		std::ifstream ifs;;
-		ifs.open(m_SHCoeffsPath.c_str());
-		for (int i = 0; i < 4 * 4; ++i)
-		{
-			std::string str;
-			getline(ifs, str);
+		//m_SHCoeffs.resize(16);
+		//std::ifstream ifs;;
+		//ifs.open(m_SHCoeffsPath.c_str());
+		//for (int i = 0; i < 4 * 4; ++i)
+		//{
+		//	std::string str;
+		//	getline(ifs, str);
 
-			std::istringstream is(str);
-			std::string s;
-			is >> s;
-			m_SHCoeffs[i].x = std::stof(s);
-			is >> s;
-			m_SHCoeffs[i].y = std::stof(s);
-			is >> s;
-			m_SHCoeffs[i].z = std::stof(s);
-		}
-		ifs.close();
+		//	std::istringstream is(str);
+		//	std::string s;
+		//	is >> s;
+		//	m_SHCoeffs[i].x = std::stof(s);
+		//	is >> s;
+		//	m_SHCoeffs[i].y = std::stof(s);
+		//	is >> s;
+		//	m_SHCoeffs[i].z = std::stof(s);
+		//}
+		//ifs.close();
 
+		// 
+		m_PreintegratedSkinLut.Create(L"PreintegratedSkinLut", PREFILTERED_SIZE, PREFILTERED_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
 		
 	}
 
@@ -253,6 +253,9 @@ private:
 
 		// IBL
 		m_IBLPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_IBL", "ps_5_1");
+
+		// PreintegratedSkin
+		m_PreintegratedSkinLutPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PreIntegratedSkin.hlsl", "PS_PreIntegratedSkinLut", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -338,6 +341,21 @@ private:
 		m_IBLPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 		m_IBLPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_IBLPS.Get()));
 		m_IBLPSO.Finalize();
+
+		// PreintegratedSkinLut
+		m_PreintegratedSkinLutSignature.Reset(0, 0);
+		m_PreintegratedSkinLutSignature.Finalize(L"PreintegratedSkinLut RootSignature");
+
+		m_PreintegratedSkinLutPSO.SetRootSignature(m_PreintegratedSkinLutSignature);
+		m_PreintegratedSkinLutPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_PreintegratedSkinLutPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_PreintegratedSkinLutPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
+		// no need to set input layout
+		m_PreintegratedSkinLutPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_PreintegratedSkinLutPSO.SetRenderTargetFormat(DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_UNKNOWN);
+		m_PreintegratedSkinLutPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
+		m_PreintegratedSkinLutPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PreintegratedSkinLutPS.Get()));
+		m_PreintegratedSkinLutPSO.Finalize();
 	}
 
 	void BasePass(FCommandContext& GfxContext, bool Clear)
@@ -470,6 +488,24 @@ private:
 		GfxContext.Draw(3);
 	}
 
+	void PreintegratedSkinLut()
+	{
+		FCommandContext& GfxContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
+
+		GfxContext.SetRootSignature(m_PreintegratedSkinLutSignature);
+		GfxContext.SetPipelineState(m_PreintegratedSkinLutPSO);
+		GfxContext.SetViewportAndScissor(0, 0, PREFILTERED_SIZE, PREFILTERED_SIZE); // very important
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		GfxContext.TransitionResource(m_PreintegratedSkinLut, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+
+		GfxContext.SetRenderTargets(1, &m_PreintegratedSkinLut.GetRTV());
+
+		GfxContext.ClearColor(m_PreintegratedSkinLut);
+
+		GfxContext.Draw(3);
+		GfxContext.Flush(true);
+	}
+
 private:
 	std::wstring m_HDRFilePath;
 	std::wstring m_HDRFileName;
@@ -489,6 +525,12 @@ private:
 	ComPtr<ID3DBlob>			m_SkinLightingPS;
 	FRootSignature				m_SkinLightingSignature;
 	FGraphicsPipelineState		m_SkinLightingPSO;
+
+	// PreintegratedSkin
+	FColorBuffer				m_PreintegratedSkinLut;
+	ComPtr<ID3DBlob>			m_PreintegratedSkinLutPS;
+	FRootSignature				m_PreintegratedSkinLutSignature;
+	FGraphicsPipelineState		m_PreintegratedSkinLutPSO;
 
 	// IBL Pass
 	FTexture m_PreintegratedGF;

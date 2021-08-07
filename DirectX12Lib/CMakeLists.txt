@@ -142,6 +142,7 @@ set(SHADER_FILES
 	../Resources/shaders/ScreenSpaceSubsurfaceBlur.hlsl
 	../Resources/shaders/ScreenSpaceSubsurfaceCombine.hlsl
 	../Resources/shaders/TempBufferCopy.hlsl
+	../Resources/shaders/PreIntegratedSkin.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

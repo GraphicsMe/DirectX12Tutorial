@@ -79,7 +79,7 @@ float3 F_Schlick(float3 SpecularColor, float VoH)
 	return saturate(50.0 * SpecularColor.g) * Fc + (1 - Fc) * SpecularColor;
 }
 
-float3 SpecularGGX(float Roughness, float3 SpecularColor, BxDFContext Context, float NoL)
+float3 SpecularGGX(float Roughness, float3 F0, BxDFContext Context, float NoL)
 {
 	float a2 = Pow4(Roughness);
 
@@ -88,7 +88,7 @@ float3 SpecularGGX(float Roughness, float3 SpecularColor, BxDFContext Context, f
 	float D = D_GGX(a2, Context.NoH);
 	// denominator(4 * NoL * NoV) Reduce by G
 	float Vis = Vis_SmithJointApprox(a2, Context.NoV, NoL);
-	float3 F = F_Schlick(SpecularColor, Context.VoH);
+	float3 F = F_Schlick(F0, Context.VoH);
 	return (D * Vis) * F;
 }
 
@@ -126,7 +126,7 @@ PixelOutput PS_SkinLighting(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Positio
 
 	float3 L = -LightDir;
 
-	float3 DiffuseColor = AlbedoAo.rgb;
+	float3 DiffuseColor = AlbedoAo.rgb - Metallic * AlbedoAo.rgb;
 
 	// PBR Direct Lighting
 	BxDFContext Context;
@@ -144,8 +144,8 @@ PixelOutput PS_SkinLighting(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Positio
 
 	// Specular
 	Specular = 0.5;
-	float3 SpecularColor = ComputeF0(Specular, DiffuseColor, Metallic);
-	Lighting.Specular = Context.NoL* SpecularGGX(Roughness, SpecularColor, Context, Context.NoL);
+	float3 F0 = ComputeF0(Specular, DiffuseColor, Metallic);
+	Lighting.Specular = Context.NoL* SpecularGGX(Roughness, F0, Context, Context.NoL);
 
 	if (DebugFlag == 1)
 	{
