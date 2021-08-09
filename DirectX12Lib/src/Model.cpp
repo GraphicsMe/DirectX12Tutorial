@@ -29,7 +29,7 @@ FModel::~FModel()
 	}
 }
 
-void FModel::Draw(FCommandContext& CommandContext)
+void FModel::Draw(FCommandContext& CommandContext, bool UseDefualtMaterial)
 {
 	for (int i = 0, slot = 0; i < VET_Max; ++i)
 	{
@@ -50,7 +50,8 @@ void FModel::Draw(FCommandContext& CommandContext)
 			{
 				Handles[j] = m_Textures[TEX_PER_MATERIAL * MtlIndex + j].GetSRV();
 			}
-			CommandContext.SetDynamicDescriptors(2, 0, TEX_PER_MATERIAL, Handles);
+			if(UseDefualtMaterial)
+				CommandContext.SetDynamicDescriptors(2, 0, TEX_PER_MATERIAL, Handles);
 		}
 		CommandContext.DrawIndexed((UINT)m_MeshData->GetSubIndexCount(i), (UINT)m_MeshData->GetSubIndexStart(i));
 	}

@@ -19,7 +19,7 @@ public:
 	virtual ~FModel();
 
 	virtual bool IsSkyBox() const {return false;}
-	virtual void Draw(FCommandContext& CommandContext);
+	virtual void Draw(FCommandContext& CommandContext, bool UseDefualtMaterial = true);
 
 	void GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout);
 

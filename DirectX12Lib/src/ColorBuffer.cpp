@@ -1,5 +1,12 @@
 ﻿#include "ColorBuffer.h"
 #include "D3D12RHI.h"
+#include "DirectXTex.h"
+#include "CommandContext.h"
+#include "CommandListManager.h"
+#include "CommandContext.h"
+
+using namespace DirectX;
+extern FCommandListManager g_CommandListManager;
 
 void FColorBuffer::CreateFromSwapChain(const std::wstring& Name, ID3D12Resource* BaseResource)
 {
@@ -110,4 +117,20 @@ void FColorBuffer::CreateDerivedViews(ID3D12Device* Device, DXGI_FORMAT Format, 
 	}
 
 	Device->CreateRenderTargetView(m_Resource.Get(), &RTVDesc, m_RTVHandle);
+}
+
+void FColorBuffer::SaveColorBuffer(const std::wstring& FileName)
+{
+	ScratchImage image;
+	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	HRESULT hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), false/*isCubeMap*/, image, m_AllCurrentState[0], m_AllCurrentState[0]);
+	if (SUCCEEDED(hr))
+	{
+		hr = DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DDS_FLAGS_NONE, FileName.c_str());
+		if (FAILED(hr))
+		{
+			printf("Falied to save texture to dds file\n");
+		}
+	}
 }
