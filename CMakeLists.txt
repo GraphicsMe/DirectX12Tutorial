@@ -64,3 +64,9 @@ add_executable(TutorialSkin TutorialSkin/TutorialSkin.cpp)
 target_link_libraries(TutorialSkin LINK_PUBLIC DirectX12Lib)
 set_target_properties(TutorialSkin PROPERTIES
 	PROJECT_LABEL "TutorialSkin - Skin Rendering")
+	
+add_executable(TutorialLTC TutorialLTC/TutorialLTC.cpp)
+target_link_libraries(TutorialLTC LINK_PUBLIC DirectX12Lib)
+set_target_properties(TutorialLTC PROPERTIES
+	PROJECT_LABEL "TutorialLTC - PolygonalLightShadingWithLinearlyTransformedCosines")
+	

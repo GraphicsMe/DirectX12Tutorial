@@ -17,6 +17,7 @@ FModel::FModel(const std::string& FileName, bool FlipV, bool NegateZ, bool FlipN
 	, m_Scale(1.f)
 {
 	m_MeshData = FObjLoader::LoadObj(FileName, FlipV, NegateZ, FlipNormalZ);
+	m_MeshData->GetBoundingBox(m_BoundingBox.BoundMin, m_BoundingBox.BoundMax);
 	InitializeResource();
 }
 

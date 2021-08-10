@@ -18,7 +18,7 @@
 #include "ShadowBuffer.h"
 #include "Light.h"
 #include "CubeBuffer.h"
-#include "SkyBox.h"
+#include "Geometry.h"
 #include "CubeMapCross.h"
 #include "GameInput.h"
 #include "ImguiManager.h"

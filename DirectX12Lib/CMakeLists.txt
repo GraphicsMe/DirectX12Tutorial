@@ -31,8 +31,7 @@
 	include/Light.h
 	include/GameInput.h
 	include/CubeBuffer.h
-	include/SkyBox.h
-	include/CubeMapCross.h
+	include/Geometry.h
 	include/ImguiManager.h
 	include/GenerateMips.h
 	include/TemporalEffects.h
@@ -73,8 +72,7 @@ set(SOURCES
 	src/Light.cpp
 	src/GameInput.cpp
 	src/CubeBuffer.cpp
-	src/SkyBox.cpp
-	src/CubeMapCross.cpp
+	src/Geometry.cpp
 	src/ImguiManager.cpp
 	src/GenerateMips.cpp
 	src/TemporalEffects.cpp
@@ -143,6 +141,8 @@ set(SHADER_FILES
 	../Resources/shaders/ScreenSpaceSubsurfaceCombine.hlsl
 	../Resources/shaders/TempBufferCopy.hlsl
 	../Resources/shaders/PreIntegratedSkin.hlsl
+	../Resources/shaders/LTC_Floor.hlsl
+	../Resources/shaders/LTC_LightPolygon.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})
