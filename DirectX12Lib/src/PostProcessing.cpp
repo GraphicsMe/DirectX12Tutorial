@@ -202,7 +202,7 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 
 	// 3. upsample
 	ComputeContext.SetRootSignature(m_CSSignature);
-	ComputeContext.SetPipelineState(m_CSDownSamplePSO);
+	ComputeContext.SetPipelineState(m_CSUpSamplePSO);
 	for (int i = 4; i > 0; --i)
 	{
 		ComputeContext.TransitionResource(g_BloomBuffers[i], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
