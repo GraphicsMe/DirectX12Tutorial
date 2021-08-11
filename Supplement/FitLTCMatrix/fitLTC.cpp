@@ -263,7 +263,12 @@ void fitTab(mat3* tab, vec2* tabMagFresnel, const int N, const Brdf& brdf)
 			fit(ltc, brdf, V, alpha, epsilon, isotropic);
 
 			// copy data
-			tab[a + t * N] = ltc.M;	//按列存储，同一列上是theta在变
+			// 按列存储，同一列上是theta在变
+			// ---> roughness 从右向左存储，最左边是粗糙度为0。
+			// |
+			// ↓
+			// 垂直方向，parameterised by sqrt(1 - cosθ)
+			tab[a + t * N] = ltc.M;	
 
 			tabMagFresnel[a + t * N][0] = ltc.magnitude;
 			tabMagFresnel[a + t * N][1] = ltc.fresnel;

@@ -50,6 +50,7 @@ public:
 		SetupPipelineState();
 		SetupCameraLight();
 
+		PostProcessing::g_EnableBloom = false;
 	}
 
 	void OnShutdown()
@@ -64,6 +65,7 @@ public:
 		m_Camera.Update(delta);
 
 		m_Floor->Update();
+		m_LightPolygon->Update();
 
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
@@ -98,7 +100,7 @@ public:
 			ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
 			ImGui::SliderFloat("Light Intensity", &m_LightIntensity, 0, 10.0f);
 			ImGui::Checkbox("Is Two Side Light", &m_TwoSideLight);
-			ImGui::SliderFloat("Floor Roughness", &m_Roughness, 0, 1.0f);
+			ImGui::SliderFloat("Floor Roughness", &m_Roughness, 0.01f, 1.0f);
 			ImGui::ColorEdit3("Floor DiffuseColor", &m_FloorDiffuseColor.x);
 			ImGui::ColorEdit3("Floor SpecularColor", &m_SpecularColor.x);
 		}
@@ -127,7 +129,7 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.0f, 0.6f, -3.0f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(0.0f, 0.5f, -7.0f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
@@ -139,13 +141,14 @@ private:
 	{
 		m_LightPolygon = std::make_unique<FQuad>();
 		m_Floor = std::make_unique<FModel>("../Resources/Models/primitive/Plane.obj", true, true);
-		m_Floor->SetPosition(0, -0.5, 0);
+		m_Floor->SetPosition(0, -0.6f, 0);
+		m_Floor->SetScale(10, 10, 10);
 
 		m_LightTexture.LoadFromFile(L"../Resources/Textures/white.png", false);
 		
 		// LTC Textures
-		m_LTC_MatrixTexture.LoadFromFile(L"../Resources/Textures/LTC/ltc_mat.dds", false);
-		m_LTC_MagnitueTexture.LoadFromFile(L"../Resources/Textures/LTC/ltc_amp.dds", false);
+		m_LTC_MatrixTexture.LoadFromFile(L"../Resources/Textures/LTC/ltc_1.dds", false);
+		m_LTC_MagnitueTexture.LoadFromFile(L"../Resources/Textures/LTC/ltc_2.dds", false);
 	}
 
 	void SetupShaders()
@@ -160,7 +163,7 @@ private:
 	void SetupPipelineState()
 	{
 		FSamplerDesc DefaultSamplerDesc(D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
-		
+
 		// Floor
 		{
 			m_FloorSignature.Reset(3, 1);
@@ -359,12 +362,11 @@ private:
 
 private:
 	int					m_DebugFlag = 0;
-
-	float				m_Roughness = 0.15;
-	float				m_LightIntensity = 1.0f;
+	float				m_Roughness = 0.4f;
+	float				m_LightIntensity = 4.0f;
 	bool				m_TwoSideLight = false;
 	Vector3f			m_FloorDiffuseColor = Vector3f(1, 1, 1);
-	Vector3f			m_SpecularColor = Vector3f(1, 1, 1);
+	Vector3f			m_SpecularColor = Vector3f(0.172f, 0.172f, 0.172f);
 
 private:
 	D3D12_VIEWPORT		m_MainViewport;

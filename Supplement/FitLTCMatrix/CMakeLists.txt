@@ -17,6 +17,10 @@ set( SRC_FILES
 	dds.cpp
 )
 
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 add_executable( ${TARGET_NAME}	
     ${HEADER_FILES} 
     ${SRC_FILES}

@@ -54,6 +54,10 @@ const static float3x3 DiffuseMatrix = float3x3
 	float3(0, 0, 1)
 );
 
+const static float LUT_SIZE = 64.0;
+const static float LUT_SCALE = (LUT_SIZE - 1.0) / LUT_SIZE;
+const static float LUT_BIAS = 0.5 / LUT_SIZE;
+
 //------------------------------------------------------- Vetex Shader
 PixelInput VS_Floor(VertexInput In)
 {
@@ -69,179 +73,187 @@ PixelInput VS_Floor(VertexInput In)
 //------------------------------------------------------- HELP FUNCTIONS
 
 
-void clipPolygonalLightByZPlane(inout float3 vioPolygonalLightVertexPos[5], inout int voPolygonalLightVertexNumAfterClipping)
+void ClipQuadToHorizon(inout float3 L[5], inout int n)
 {
-	int Flag4HowManyVertexAboveZPlane = 0;
-	if (vioPolygonalLightVertexPos[0].y > 0.0) Flag4HowManyVertexAboveZPlane += 1;
-	if (vioPolygonalLightVertexPos[1].y > 0.0) Flag4HowManyVertexAboveZPlane += 2;
-	if (vioPolygonalLightVertexPos[2].y > 0.0) Flag4HowManyVertexAboveZPlane += 4;
-	if (vioPolygonalLightVertexPos[3].y > 0.0) Flag4HowManyVertexAboveZPlane += 8;
+	// detect clipping config
+	int config = 0;
+	if (L[0].z > 0.0) config += 1;
+	if (L[1].z > 0.0) config += 2;
+	if (L[2].z > 0.0) config += 4;
+	if (L[3].z > 0.0) config += 8;
 
-	voPolygonalLightVertexNumAfterClipping = 0;
-	if (Flag4HowManyVertexAboveZPlane == 0)
+	// clip
+	n = 0;
+
+	if (config == 0)
 	{
-		// none
+		// clip all
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 1)
+	else if (config == 1) // V1 clip V2 V3 V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 3;
-		vioPolygonalLightVertexPos[1] = -vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[0] + vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[1];
-		vioPolygonalLightVertexPos[2] = -vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[0] + vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[3];
+		n = 3;
+		L[1] = -L[1].z * L[0] + L[0].z * L[1];
+		L[2] = -L[3].z * L[0] + L[0].z * L[3];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 2)
+	else if (config == 2) // V2 clip V1 V3 V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 3;
-		vioPolygonalLightVertexPos[0] = -vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[1] + vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[0];
-		vioPolygonalLightVertexPos[2] = -vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[1] + vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[2];
+		n = 3;
+		L[0] = -L[0].z * L[1] + L[1].z * L[0];
+		L[2] = -L[2].z * L[1] + L[1].z * L[2];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 3)
+	else if (config == 3) // V1 V2 clip V3 V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 4;
-		vioPolygonalLightVertexPos[2] = -vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[1] + vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[2];
-		vioPolygonalLightVertexPos[3] = -vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[0] + vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[3];
+		n = 4;
+		L[2] = -L[2].z * L[1] + L[1].z * L[2];
+		L[3] = -L[3].z * L[0] + L[0].z * L[3];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 4)
+	else if (config == 4) // V3 clip V1 V2 V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 3;
-		vioPolygonalLightVertexPos[0] = -vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[2] + vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[3];
-		vioPolygonalLightVertexPos[1] = -vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[2] + vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[1];
+		n = 3;
+		L[0] = -L[3].z * L[2] + L[2].z * L[3];
+		L[1] = -L[1].z * L[2] + L[2].z * L[1];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 5)
+	else if (config == 5) // V1 V3 clip V2 V4) impossible
 	{
-		voPolygonalLightVertexNumAfterClipping = 0;
+		n = 0;
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 6)
+	else if (config == 6) // V2 V3 clip V1 V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 4;
-		vioPolygonalLightVertexPos[0] = -vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[1] + vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[0];
-		vioPolygonalLightVertexPos[3] = -vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[2] + vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[3];
+		n = 4;
+		L[0] = -L[0].z * L[1] + L[1].z * L[0];
+		L[3] = -L[3].z * L[2] + L[2].z * L[3];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 7)
+	else if (config == 7) // V1 V2 V3 clip V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 5;
-		vioPolygonalLightVertexPos[4] = -vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[0] + vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[3];
-		vioPolygonalLightVertexPos[3] = -vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[2] + vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[3];
+		n = 5;
+		L[4] = -L[3].z * L[0] + L[0].z * L[3];
+		L[3] = -L[3].z * L[2] + L[2].z * L[3];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 8)
+	else if (config == 8) // V4 clip V1 V2 V3
 	{
-		voPolygonalLightVertexNumAfterClipping = 3;
-		vioPolygonalLightVertexPos[0] = -vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[3] + vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[0];
-		vioPolygonalLightVertexPos[1] = -vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[3] + vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[2];
-		vioPolygonalLightVertexPos[2] = vioPolygonalLightVertexPos[3];
+		n = 3;
+		L[0] = -L[0].z * L[3] + L[3].z * L[0];
+		L[1] = -L[2].z * L[3] + L[3].z * L[2];
+		L[2] = L[3];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 9)
+	else if (config == 9) // V1 V4 clip V2 V3
 	{
-		voPolygonalLightVertexNumAfterClipping = 4;
-		vioPolygonalLightVertexPos[1] = -vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[0] + vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[1];
-		vioPolygonalLightVertexPos[2] = -vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[3] + vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[2];
+		n = 4;
+		L[1] = -L[1].z * L[0] + L[0].z * L[1];
+		L[2] = -L[2].z * L[3] + L[3].z * L[2];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 10)
+	else if (config == 10) // V2 V4 clip V1 V3) impossible
 	{
-		voPolygonalLightVertexNumAfterClipping = 0;
+		n = 0;
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 11)
+	else if (config == 11) // V1 V2 V4 clip V3
 	{
-		voPolygonalLightVertexNumAfterClipping = 5;
-		vioPolygonalLightVertexPos[4] = vioPolygonalLightVertexPos[3];
-		vioPolygonalLightVertexPos[3] = -vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[3] + vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[2];
-		vioPolygonalLightVertexPos[2] = -vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[1] + vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[2];
+		n = 5;
+		L[4] = L[3];
+		L[3] = -L[2].z * L[3] + L[3].z * L[2];
+		L[2] = -L[2].z * L[1] + L[1].z * L[2];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 12)
+	else if (config == 12) // V3 V4 clip V1 V2
 	{
-		voPolygonalLightVertexNumAfterClipping = 4;
-		vioPolygonalLightVertexPos[1] = -vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[2] + vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[1];
-		vioPolygonalLightVertexPos[0] = -vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[3] + vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[0];
+		n = 4;
+		L[1] = -L[1].z * L[2] + L[2].z * L[1];
+		L[0] = -L[0].z * L[3] + L[3].z * L[0];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 13)
+	else if (config == 13) // V1 V3 V4 clip V2
 	{
-		voPolygonalLightVertexNumAfterClipping = 5;
-		vioPolygonalLightVertexPos[4] = vioPolygonalLightVertexPos[3];
-		vioPolygonalLightVertexPos[3] = vioPolygonalLightVertexPos[2];
-		vioPolygonalLightVertexPos[2] = -vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[2] + vioPolygonalLightVertexPos[2].y * vioPolygonalLightVertexPos[1];
-		vioPolygonalLightVertexPos[1] = -vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[0] + vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[1];
+		n = 5;
+		L[4] = L[3];
+		L[3] = L[2];
+		L[2] = -L[1].z * L[2] + L[2].z * L[1];
+		L[1] = -L[1].z * L[0] + L[0].z * L[1];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 14)
+	else if (config == 14) // V2 V3 V4 clip V1
 	{
-		voPolygonalLightVertexNumAfterClipping = 5;
-		vioPolygonalLightVertexPos[4] = -vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[3] + vioPolygonalLightVertexPos[3].y * vioPolygonalLightVertexPos[0];
-		vioPolygonalLightVertexPos[0] = -vioPolygonalLightVertexPos[0].y * vioPolygonalLightVertexPos[1] + vioPolygonalLightVertexPos[1].y * vioPolygonalLightVertexPos[0];
+		n = 5;
+		L[4] = -L[0].z * L[3] + L[3].z * L[0];
+		L[0] = -L[0].z * L[1] + L[1].z * L[0];
 	}
-	else if (Flag4HowManyVertexAboveZPlane == 15)
+	else if (config == 15) // V1 V2 V3 V4
 	{
-		voPolygonalLightVertexNumAfterClipping = 4;
+		n = 4;
 	}
 
-	if (voPolygonalLightVertexNumAfterClipping == 3)
-		vioPolygonalLightVertexPos[3] = vioPolygonalLightVertexPos[0];
-	if (voPolygonalLightVertexNumAfterClipping == 4)
-		vioPolygonalLightVertexPos[4] = vioPolygonalLightVertexPos[0];
+	if (n == 3)
+		L[3] = L[0];
+	if (n == 4)
+		L[4] = L[0];
 }
 
-float integrateEdge(float3 v1, float3 v2,float3 n)
+float integrateEdge(float3 v1, float3 v2)
 {
 	float costheta = dot(v1, v2);
 	float theta = acos(costheta);
 	float3 l = cross(v1, v2);
-	return dot(l, n) * ((theta > 0.001) ? theta / sin(theta) : 1.0);
+	return 0.5f * dot(l, float3(0,0,1)) * ((theta > 0.001) ? theta / sin(theta) : 1.0);
 }
 
-/// <summary>
-/// LTC积分
-/// </summary>
-/// <param name="Normal">着色点的法线</param>
-/// <param name="ViewDir">View向量</param>
-/// <param name="PixelWorldPos">像素的世界坐标</param>
-/// <param name="LTCMatrix">LTC矩阵</param>
-/// <param name="PolygonalLightVertexPos">面光源的顶点坐标</param>
-/// <param name="bTwoSided">是否双面发光</param>
-/// <returns>返回颜色</returns>
-float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x3 LTCMatrix, float3 PolygonalLightVertexPos[4], bool bTwoSided)
+float inversesqrt(float f)
 {
-	// 着色点上的切线空间正交基
+	return 1.0f / sqrt(f);
+}
+
+float IntegrateEdgeVec(float3 v1, float3 v2)
+{
+	float x = dot(v1, v2);
+	float y = abs(x);
+
+	float a = 0.8543985 + (0.4965155 + 0.0145206 * y) * y;
+	float b = 3.4175940 + (4.1616724 + y) * y;
+	float v = a / b;
+
+	float theta_sintheta = (x > 0.0) ? v : 0.5 * inversesqrt(max(1.0 - x * x, 1e-7)) - v;
+	float3 l = cross(v1, v2);
+	return dot(l,float3(0, 0, 1)) * theta_sintheta;
+}
+
+float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x3 LTCMatrix, float3 Points[4], bool bTwoSided)
+{
+	// Orthogonal basis of tangent space on shading point
 	float3 Tangent = normalize(ViewDir - Normal * dot(ViewDir, Normal));
+	// hlsl的cross是右手规则
 	float3 Bitangent = cross(Tangent, Normal);
 
-	//float3x3 TBN = float3x3(Tangent, Bitangent, Normal);
-	float3x3 TBN = float3x3(Bitangent, Normal, Tangent);
+	float3x3 TBN = float3x3(Tangent, Bitangent, Normal);
 	TBN = transpose(TBN);
 
-	// 将变换矩阵转换到切线空间
-	LTCMatrix = LTCMatrix * TBN;
+	float3 L[5];
+	L[0] = mul((Points[0] - PixelWorldPos), TBN);
+	L[1] = mul((Points[1] - PixelWorldPos), TBN);
+	L[2] = mul((Points[2] - PixelWorldPos), TBN);
+	L[3] = mul((Points[3] - PixelWorldPos), TBN);
+	L[0] = mul(L[0], LTCMatrix);
+	L[1] = mul(L[1], LTCMatrix);
+	L[2] = mul(L[2], LTCMatrix);
+	L[3] = mul(L[3], LTCMatrix);
+	L[4] = L[0];
 
-	// 多边形顶点(因为被平面z=0裁剪以后，四边形可能变成5个顶点)
-	float3 PolygonalLightVertexPosInTangentSpace[5];
-	float3 PolygonalLightVertexPosBeforeClipping[4];
+	int VertexNum = 0;
+	ClipQuadToHorizon(L, VertexNum);
 
-	PolygonalLightVertexPosBeforeClipping[0] = PolygonalLightVertexPosInTangentSpace[0] = mul((PolygonalLightVertexPos[0] - PixelWorldPos), LTCMatrix);
-	PolygonalLightVertexPosBeforeClipping[1] = PolygonalLightVertexPosInTangentSpace[1] = mul((PolygonalLightVertexPos[1] - PixelWorldPos), LTCMatrix);
-	PolygonalLightVertexPosBeforeClipping[2] = PolygonalLightVertexPosInTangentSpace[2] = mul((PolygonalLightVertexPos[2] - PixelWorldPos), LTCMatrix);
-	PolygonalLightVertexPosBeforeClipping[3] = PolygonalLightVertexPosInTangentSpace[3] = mul((PolygonalLightVertexPos[3] - PixelWorldPos), LTCMatrix);
-	PolygonalLightVertexPosInTangentSpace[4] = PolygonalLightVertexPosInTangentSpace[3];
-
-	// 裁剪后的顶点数量
-	int PolygonalLightVertexNumAfterClipping = 0;
-	clipPolygonalLightByZPlane(PolygonalLightVertexPosInTangentSpace, PolygonalLightVertexNumAfterClipping);
-
-	if (PolygonalLightVertexNumAfterClipping == 0)
+	if (VertexNum == 0)
 		return float3(0, 0, 0);
 
-	// 把裁剪后的多边形投影到球面上（也就是对每个顶点坐标向量归一化)
-	PolygonalLightVertexPosInTangentSpace[0] = normalize(PolygonalLightVertexPosInTangentSpace[0]);
-	PolygonalLightVertexPosInTangentSpace[1] = normalize(PolygonalLightVertexPosInTangentSpace[1]);
-	PolygonalLightVertexPosInTangentSpace[2] = normalize(PolygonalLightVertexPosInTangentSpace[2]);
-	PolygonalLightVertexPosInTangentSpace[3] = normalize(PolygonalLightVertexPosInTangentSpace[3]);
-	PolygonalLightVertexPosInTangentSpace[4] = normalize(PolygonalLightVertexPosInTangentSpace[4]);
+	L[0] = normalize(L[0]);
+	L[1] = normalize(L[1]);
+	L[2] = normalize(L[2]);
+	L[3] = normalize(L[3]);
+	L[4] = normalize(L[4]);
 
-	// 用累加边的公式来求解积分
 	float Sum = 0;
-	Sum += integrateEdge(PolygonalLightVertexPosInTangentSpace[0], PolygonalLightVertexPosInTangentSpace[1], Normal);
-	Sum += integrateEdge(PolygonalLightVertexPosInTangentSpace[1], PolygonalLightVertexPosInTangentSpace[2], Normal);
-	Sum += integrateEdge(PolygonalLightVertexPosInTangentSpace[2], PolygonalLightVertexPosInTangentSpace[3], Normal);
-	if (PolygonalLightVertexNumAfterClipping >= 4)
-		Sum += integrateEdge(PolygonalLightVertexPosInTangentSpace[3], PolygonalLightVertexPosInTangentSpace[4], Normal);
-	if (PolygonalLightVertexNumAfterClipping == 5)
-		Sum += integrateEdge(PolygonalLightVertexPosInTangentSpace[4], PolygonalLightVertexPosInTangentSpace[0], Normal);
-	Sum *= 0.5;
+	Sum += IntegrateEdgeVec(L[0], L[1]);
+	Sum += IntegrateEdgeVec(L[1], L[2]);
+	Sum += IntegrateEdgeVec(L[2], L[3]);
+
+	if (VertexNum >= 4)
+		Sum += IntegrateEdgeVec(L[3], L[4]);
+	if (VertexNum == 5)
+		Sum += IntegrateEdgeVec(L[4], L[0]);
+	
 	Sum = bTwoSided ? abs(Sum) : max(Sum, 0.0);
 
 	return Sum * float3(1, 1, 1);
@@ -249,32 +261,29 @@ float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x
 
 float2 LTC_Coords(float Roughness, float CosTheta)
 {
-	float Theta = acos(CosTheta);
-	float2 Coords = float2(Roughness, Theta / (0.5 * PI));
-	const float LUT_SIZE = 32.0;
-	Coords.y = 1 - Coords.y;
+	float2 Coords = float2(Roughness, sqrt(1 - CosTheta));
 	// scale and bias coordinates, for correct filtered lookup
-	Coords = Coords * (LUT_SIZE - 1.0) / LUT_SIZE + 0.5 / LUT_SIZE;
+	Coords = Coords * LUT_SCALE + LUT_BIAS;
 	return Coords;
 }
 
 //------------------------------------------------------- Pixel Shader
 void PS_Floor(PixelInput In, out PixelOutput Out)
 {
-	float3 PixelWorldPos = In.WorldPos.xyz;
+	float3 PixelWorldPos = In.WorldPos;
 	
 	float3 GroundNormal = float3(0, 1, 0);
 	float3 ViewDir = normalize(CameraPosInWorldSpace - PixelWorldPos);
-	float NoV = dot(GroundNormal, ViewDir);
+	float NoV = saturate(dot(GroundNormal, ViewDir));
 	float2 UV = LTC_Coords(Roughness, NoV);
 
-	float4 LTCMatrixComponents = LTC_MatrixTexture.SampleLevel(LinearSampler, UV, 0);
+	float4 t1 = LTC_MatrixTexture.SampleLevel(LinearSampler, UV, 0);
 
 	float3x3 LTCMatrix = float3x3
 	(
-		float3(1, 0, LTCMatrixComponents.y),
-		float3(0, LTCMatrixComponents.z, 0),
-		float3(LTCMatrixComponents.w, 0, LTCMatrixComponents.x)
+		float3(t1.x, 0, t1.y),
+		float3(0, 1, 0),
+		float3(t1.z, 0, t1.w)
 	);
 
 	bool bTwoSided = bTwoSideLight;
@@ -282,9 +291,9 @@ void PS_Floor(PixelInput In, out PixelOutput Out)
 	float3 Diffuse = integrateLTC(GroundNormal, ViewDir, PixelWorldPos, DiffuseMatrix, PolygonalLightVertexPos, bTwoSided);
 	float3 Specular = integrateLTC(GroundNormal, ViewDir, PixelWorldPos, LTCMatrix, PolygonalLightVertexPos, bTwoSided);
 
-	Specular *= LTC_MagnitueTexture.SampleLevel(LinearSampler, UV, 0).w;
-	float2 Schlick = LTC_MagnitueTexture.SampleLevel(LinearSampler, UV, 0).xy;
-	Specular *= SpecularColor * Schlick.x + (1.0 - SpecularColor) * Schlick.y;
+	float4 t2 = LTC_MagnitueTexture.SampleLevel(LinearSampler, UV, 0);
+
+	Specular *= SpecularColor * t2.x + (1.0 - SpecularColor) * t2.y;
 
 	float3 ResultColor = 0;
 
@@ -294,15 +303,19 @@ void PS_Floor(PixelInput In, out PixelOutput Out)
 	}
 	else if (DebugFlag == 2)
 	{
-		ResultColor += LightIntensity * (Specular) / 10;
+		ResultColor += LightIntensity * (Specular);
 	}
 	else
 	{
 		ResultColor += LightIntensity * (Diffuse * DiffuseColor);
-		ResultColor += LightIntensity * (Specular) / 10;
+		ResultColor += LightIntensity * (Specular);
 	}
-	
-	ResultColor /= PI;
 
 	Out.Target0 = float4(ResultColor, 1.0);
+
+	// Test Cross
+	//float3 vec1Red = float3(1, 0, 0);
+	//float3 vec2Green = float3(0, 1, 0);
+	//float3 vec3Output = cross(vec1Red, vec2Green);
+	//Out.Target0 = float4(vec3Output, 1.0);
 }

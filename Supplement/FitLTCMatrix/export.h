@@ -114,8 +114,8 @@ void writeDDS(const char* path, float* data, int N)
 
 void writeDDS(vec4* data1, vec4* data2, int N)
 {
-    writeDDS("results/ltc_1.dds", &data1[0][0], N);
-    writeDDS("results/ltc_2.dds", &data2[0][0], N);
+    writeDDS("../../../Supplement/FitLTCMatrix/ltc_1.dds", &data1[0][0], N);
+    writeDDS("../../../Supplement/FitLTCMatrix/ltc_2.dds", &data2[0][0], N);
 }
 
 // export data to Javascript
