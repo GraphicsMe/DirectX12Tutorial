@@ -185,6 +185,17 @@ public:
 					ImGui::SliderFloat("Bloom Threshold", &PostProcessing::g_BloomThreshold, 0.f, 10.f);
 					ImGui::Indent(-20);
 				}
+				
+				ImGui::Checkbox("Enable SSR", &PostProcessing::g_EnableSSR);
+				if (PostProcessing::g_EnableSSR)
+				{
+					ImGui::Indent(20);
+					ImGui::Checkbox("Use Hi-Z", &PostProcessing::g_UseHiZ);
+					ImGui::Checkbox("Debug SSR", &PostProcessing::g_DebugSSR);
+					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 0.1f);
+					ImGui::SliderFloat("CompareTolerance", &PostProcessing::g_CompareTolerance, 0.f, 0.1f);
+					ImGui::Indent(-20);
+				}
 
 				ImGui::Checkbox("Enable DOF", &DepthOfField::g_EnableDepthOfField);
 				if (DepthOfField::g_EnableDepthOfField)
@@ -247,7 +258,10 @@ public:
 		case SM_PBR:
 			//SkyPass(CommandContext, true);
 			BasePass(CommandContext, true);
-			PostProcessing::GenerateSSR(CommandContext, m_Camera, m_CubeBuffer);
+			if (PostProcessing::g_EnableSSR)
+			{
+				PostProcessing::GenerateSSR(CommandContext, m_Camera, m_CubeBuffer);
+			}
 			IBLPass(CommandContext);
 			// DOF
 			{
@@ -280,7 +294,7 @@ private:
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
 		const float FovVertical = MATH_PI / 4.f;
-		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
+		m_Camera.SetPerspectiveParams(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.5f, 8.f);
 	}
 
 	void ParsePath()
@@ -1113,6 +1127,7 @@ int main()
 {
 	ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 	GameDesc Desc;
+	//Desc.Width = Desc.Height = 1024;
 	Desc.Caption = L"IBL Maps Generator";
 	Tutorial9 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);

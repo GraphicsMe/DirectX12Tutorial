@@ -121,7 +121,7 @@ void TemporalEffects::Update(void)
 		// Window to [-0.5, 0.5] output
 		// Without windowing we could generate samples far away on the infinite tails.
 		float OutWindow = 0.5f;
-		float InWindow = std::exp(-0.5 * std::pow(OutWindow / Sigma, 2));
+		float InWindow = std::exp(-0.5f * (float)std::pow(OutWindow / Sigma, 2));
 
 		// Box-Muller transform
 		float Theta = 2.0f * MATH_PI * u2;

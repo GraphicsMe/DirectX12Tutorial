@@ -19,10 +19,10 @@ void FColorBuffer::CreateFromSwapChain(const std::wstring& Name, ID3D12Resource*
 
 void FColorBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Height, uint32_t NumMips, DXGI_FORMAT Format)
 {
-	NumMips = (NumMips == 0) ? ComputeNumMips(Width, Height) : NumMips;
+	m_NumMipMaps = (NumMips == 0) ? ComputeNumMips(Width, Height) : NumMips;
 	
 	D3D12_RESOURCE_FLAGS Flags = CombineResourceFlags();
-	D3D12_RESOURCE_DESC ResDesc = DescribeTex2D(Width, Height, 1, NumMips, Format, Flags);
+	D3D12_RESOURCE_DESC ResDesc = DescribeTex2D(Width, Height, 1, m_NumMipMaps, Format, Flags);
 
 	ResDesc.SampleDesc.Count = m_SampleCount;
 	ResDesc.SampleDesc.Quality = 0;
@@ -36,7 +36,7 @@ void FColorBuffer::Create(const std::wstring& Name, uint32_t Width, uint32_t Hei
 
 	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
 	CreateTextureResource(Device, Name, ResDesc, ClearValue);
-	CreateDerivedViews(Device, Format, 1, NumMips);
+	CreateDerivedViews(Device, Format, 1, m_NumMipMaps);
 }
 
 const D3D12_CPU_DESCRIPTOR_HANDLE FColorBuffer::GetMipSRV(int Mip) const
