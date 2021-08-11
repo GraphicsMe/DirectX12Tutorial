@@ -6,9 +6,20 @@ if(WIN32)
 	add_compile_definitions(_UNICODE UNICODE)
 endif()
 
+# Use solution folders to organize projects
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 add_subdirectory(DirectX12Lib)
 add_subdirectory(ThirdParty/DirectXTex)
 
+set_target_properties(
+	DirectXTex
+	texassemble
+	texconv
+	texdiag
+	PROPERTIES
+		FOLDER ThirdParty
+)
 
 add_executable(Tutorial01 Tutorial01/tutorial1.cpp)
 target_link_libraries(Tutorial01 LINK_PUBLIC DirectX12Lib)
@@ -69,4 +80,20 @@ add_executable(TutorialLTC TutorialLTC/TutorialLTC.cpp)
 target_link_libraries(TutorialLTC LINK_PUBLIC DirectX12Lib)
 set_target_properties(TutorialLTC PROPERTIES
 	PROJECT_LABEL "TutorialLTC - PolygonalLightShadingWithLinearlyTransformedCosines")
-	
+
+set_target_properties(
+	Tutorial01
+	Tutorial02
+	Tutorial03
+	Tutorial04
+	Tutorial05
+	Tutorial06
+	Tutorial07
+	Tutorial08
+	Tutorial09
+	Tutorial10
+	TutorialSkin
+	TutorialLTC
+	PROPERTIES
+		FOLDER Tutorials
+)
