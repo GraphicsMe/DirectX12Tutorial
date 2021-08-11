@@ -10,16 +10,8 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(DirectX12Lib)
-add_subdirectory(ThirdParty/DirectXTex)
-
-set_target_properties(
-	DirectXTex
-	texassemble
-	texconv
-	texdiag
-	PROPERTIES
-		FOLDER ThirdParty
-)
+add_subdirectory(Supplement)
+add_subdirectory(ThirdParty)
 
 add_executable(Tutorial01 Tutorial01/tutorial1.cpp)
 target_link_libraries(Tutorial01 LINK_PUBLIC DirectX12Lib)
