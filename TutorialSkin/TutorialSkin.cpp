@@ -18,8 +18,6 @@
 #include "ShadowBuffer.h"
 #include "Light.h"
 #include "CubeBuffer.h"
-#include "SkyBox.h"
-#include "CubeMapCross.h"
 #include "GameInput.h"
 #include "ImguiManager.h"
 #include "GenerateMips.h"
@@ -58,6 +56,7 @@ public:
 		SetupCameraLight();
 
 		PreintegratedSkinLut();
+
 	}
 
 	void OnShutdown()
@@ -504,6 +503,9 @@ private:
 
 		GfxContext.Draw(3);
 		GfxContext.Flush(true);
+
+		m_PreintegratedSkinLut.SaveColorBuffer(L"../Resources/HDR/PreintegratedSkinLut.dds");
+
 	}
 
 private:

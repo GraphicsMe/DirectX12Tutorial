@@ -19,7 +19,6 @@
 #include "Light.h"
 #include "CubeBuffer.h"
 #include "Geometry.h"
-#include "CubeMapCross.h"
 #include "GameInput.h"
 #include "ImguiManager.h"
 #include "GenerateMips.h"
