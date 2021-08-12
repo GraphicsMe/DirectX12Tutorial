@@ -29,7 +29,7 @@ namespace PostProcessing
 
 	// SSR
 	bool g_EnableSSR = true;
-	bool g_DebugSSR = true;
+	bool g_DebugSSR = false;
 	bool g_UseHiZ = true;
 	bool g_UseMinMaxZ = true;
 	float g_Thickness = 0.03f;
