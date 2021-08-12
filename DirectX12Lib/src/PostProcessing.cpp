@@ -29,10 +29,11 @@ namespace PostProcessing
 
 	// SSR
 	bool g_EnableSSR = true;
-	bool g_DebugSSR = false;
-	bool g_UseHiZ = false;
-	float g_Thickness = 0.038f;
-	float g_CompareTolerance = 0.035f;
+	bool g_DebugSSR = true;
+	bool g_UseHiZ = true;
+	bool g_UseMinMaxZ = true;
+	float g_Thickness = 0.03f;
+	float g_CompareTolerance = 0.027f;
 
 	FRootSignature m_CSSignature;
 	FRootSignature m_PostProcessSignature;
@@ -147,6 +148,15 @@ void PostProcessing::Initialize()
 	m_SSRPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 	m_SSRPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SSRPS.Get()));
 	m_SSRPSO.Finalize();
+
+	int32_t ScreenWidth = WindowWin32::Get().GetWidth();
+	int32_t ScreenHeight = WindowWin32::Get().GetHeight();
+	int32_t NumMipsX = std::max((int32_t)std::ceil(std::log2(ScreenWidth) - 1.0), 1);
+	int32_t NumMipsY = std::max((int32_t)std::ceil(std::log2(ScreenHeight) - 1.0), 1);
+	int32_t NumMips = std::max(NumMipsX, NumMipsY);
+	int32_t HZBWidth = 1 << NumMipsX;
+	int32_t HZBHeight = 1 << NumMipsY;
+	g_HiZBuffer.Create(L"HZB", HZBWidth, HZBHeight, NumMips, DXGI_FORMAT_R32G32_FLOAT);
 }
 
 void PostProcessing::Destroy()
@@ -281,7 +291,6 @@ void PostProcessing::BuildHZB(FCommandContext& CommandContext)
 	int32_t NumMips = std::max(NumMipsX, NumMipsY);
 	int32_t HZBWidth = 1 << NumMipsX;
 	int32_t HZBHeight = 1 << NumMipsY;
-	g_HiZBuffer.Create(L"HZB", HZBWidth, HZBHeight, NumMips, DXGI_FORMAT_R32_FLOAT);
 
 	CommandContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, true);
 
@@ -378,6 +387,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 		float		Thickness;
 		float		CompareTolerance;
 		float		UseHiZ;
+		float		UseMinMaxZ;
 	} PSConstants;
 
 	float FactorX = 1.f * g_SSRBuffer.GetWidth() / g_HiZBuffer.GetWidth();
@@ -390,6 +400,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	PSConstants.Thickness = g_Thickness;
 	PSConstants.CompareTolerance = g_CompareTolerance;
 	PSConstants.UseHiZ = g_UseHiZ ? 1.f : 0.f;
+	PSConstants.UseMinMaxZ = g_UseMinMaxZ ? 1.f : 0.f;
 
 	GfxContext.SetDynamicConstantBufferView(0, sizeof(PSConstants), &PSConstants);
 	GfxContext.SetDynamicDescriptor(1, 0, g_GBufferA.GetSRV());

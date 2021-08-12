@@ -191,6 +191,10 @@ public:
 				{
 					ImGui::Indent(20);
 					ImGui::Checkbox("Use Hi-Z", &PostProcessing::g_UseHiZ);
+					if (PostProcessing::g_UseHiZ)
+					{
+						ImGui::Checkbox("Use Min-Max Z", &PostProcessing::g_UseMinMaxZ);
+					}
 					ImGui::Checkbox("Debug SSR", &PostProcessing::g_DebugSSR);
 					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 0.1f);
 					ImGui::SliderFloat("CompareTolerance", &PostProcessing::g_CompareTolerance, 0.f, 0.1f);

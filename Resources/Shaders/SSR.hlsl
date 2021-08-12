@@ -6,7 +6,7 @@ Texture2D GBufferA		: register(t0); // normal
 Texture2D GBufferB		: register(t1); // metallSpecularRoughness
 Texture2D GBufferC		: register(t2); // AlbedoAO
 Texture2D SceneDepthZ	: register(t3); // Depth
-Texture2D HiZBuffer		: register(t4); // Hi-Z Depth
+Texture2D<float2> HiZBuffer		: register(t4); // Hi-Z Depth
 Texture2D SceneColor	: register(t5); // history scene buffer
 TextureCube CubeMap		: register(t6); // environment map
 
@@ -23,6 +23,7 @@ cbuffer PSContant : register(b0)
 	float Thickness;
 	float CompareTolerance;
 	float UseHiZ;
+	float UseMinMaxZ;
 };
 
 
@@ -79,6 +80,11 @@ float GetMinimumDepthPlane(float2 Ray, float Level)
 	return HiZBuffer.SampleLevel(PointSampler, float2(Ray.x, Ray.y), Level).r;
 }
 
+float2 GetMinMaxDepthPlanes(float2 Ray, float Level)
+{
+	return HiZBuffer.SampleLevel(PointSampler, float2(Ray.x, Ray.y), Level).rg;
+}
+
 float3 IntersectCellBoundary(
 	float3 RayOrigin, float3 RayDirection, 
 	float2 CellIndex, float2 CellCount, 
@@ -123,13 +129,17 @@ bool CastSimpleRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 	return true;
 }
 
+bool WithinThickness(float3 Ray, float MinZ)
+{
+	return Ray.z < MinZ + Thickness;
+}
+
 bool CastHiZRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 {
 	Direction = normalize(Direction);
 
 	const float2 TextureSize = RootSizeMipCount.xy;
 	const float HIZ_MAX_LEVEL = RootSizeMipCount.z - 1;
-	//const float2 HIZ_CROSS_EPSILON = min(0.0000001, 0.05 / TextureSize); // maybe need to be smaller or larger? this is mip level 0 texel size
 	const float2 HIZ_CROSS_EPSILON = 0.5 / TextureSize;
 	
 	float Level = HIZ_START_LEVEL;
@@ -143,27 +153,32 @@ bool CastHiZRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 	float3 D = Direction.xyz / Direction.z;
 	float3 O = IntersectDepthPlane(Start, D, -Start.z);
 
+	bool intersected = false;
 	float2 RayCell = GetCell(Ray.xy, TextureSize);
 	Ray =  IntersectCellBoundary(O, D, RayCell, TextureSize, CrossStep, CrossOffset);
 	while (Level >= HIZ_STOP_LEVEL && Iteration < MAX_ITERATIONS)
 	{
 		const float2 CellCount = GetCellCount(TextureSize, Level);
 		const float2 OldCellIdx = GetCell(Ray.xy, CellCount);
-	
-		float MinZ = GetMinimumDepthPlane(Ray.xy, Level);
-		float3 TempRay = IntersectDepthPlane(O, D, max(Ray.z, MinZ + CompareTolerance));
+		
+		float2 MinMaxZ = GetMinMaxDepthPlanes(Ray.xy, Level);
+		float3 TempRay = IntersectDepthPlane(O, D, max(Ray.z, MinMaxZ.x + CompareTolerance));
 		const float2 NewCellIdx = GetCell(TempRay.xy, CellCount);
 		if (CrossedCellBoundary(OldCellIdx, NewCellIdx))
 		{
 			TempRay = IntersectCellBoundary(O, D, OldCellIdx, CellCount, CrossStep, CrossOffset);
 			Level = min(HIZ_MAX_LEVEL, Level + 2);
 		}
+		else if (Level == HIZ_START_LEVEL && WithinThickness(TempRay, MinMaxZ.x))
+		{
+			intersected = true;
+		}
 		Ray = TempRay;
 		--Level;
 		++Iteration;
 	}
 	OutHitUVz = Ray;
-	return true;
+	return intersected;
 }
 
 float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
@@ -171,16 +186,8 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 	float3 N = GBufferA.Sample(LinearSampler, Tex).xyz;
 	N = 2.0 * N - 1.0;
 
-	float Depth;
-	if (UseHiZ > 0.f)
-	{
-		float2 uv = Tex * HZBUvFactorAndInvFactor.xy * 0.5;
-		Depth = GetMinimumDepthPlane(uv, 0);
-	}
-	else
-	{
-		Depth = SceneDepthZ.SampleLevel(LinearSampler, Tex, 0).x;
-	}
+	float2 uv = Tex * HZBUvFactorAndInvFactor.xy * 0.5;
+	float Depth = UseHiZ > 0.f ? GetMinimumDepthPlane(uv, 0) : SceneDepthZ.SampleLevel(LinearSampler, Tex, 0).x;
 	
 	float3 Screen0 = float3(Tex, Depth);
 	float3 World0 = UnprojectScreen(Screen0);
@@ -220,9 +227,8 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 		}
 		else
 		{
-			return SceneColor.SampleLevel(LinearSampler, HitUVz.xy, 0);
+			return SceneColor.SampleLevel(LinearSampler, HitUVz.xy, 1.0);
 		}
-		
 	}
 	return float4(0.0, 0.0, 0.0, 0.0);
 }

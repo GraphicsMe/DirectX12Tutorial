@@ -6,7 +6,7 @@
 Texture2D SceneDepthZ		: register(t0); // Depth
 SamplerState PointSampler	: register(s1); // PointSamper
 
-RWTexture2D<float> ClosestHZB : register(u0);
+RWTexture2D<float2> ClosestHZB : register(u0);
 
 cbuffer PSContant : register(b0)
 {
@@ -31,6 +31,7 @@ void CS_BuildHZB(uint2 GroupId : SV_GroupID,
 	float2 BufferUV = (DispatchThreadId + 0.5) * SrcTexelSize * 2.0;
 	float4 DeviceZ = Gather4(BufferUV);
 
-	float ClosestDeviceZ = min(min(DeviceZ.x, DeviceZ.y), min(DeviceZ.z, DeviceZ.w));
-	ClosestHZB[DispatchThreadId] = ClosestDeviceZ;
+	float MinDeviceZ = min(min(DeviceZ.x, DeviceZ.y), min(DeviceZ.z, DeviceZ.w));
+	float MaxDeviceZ = max(max(DeviceZ.x, DeviceZ.y), max(DeviceZ.z, DeviceZ.w));
+	ClosestHZB[DispatchThreadId] = float2(MinDeviceZ, MaxDeviceZ);
 }
