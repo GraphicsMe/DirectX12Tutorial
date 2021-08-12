@@ -14,14 +14,15 @@ cbuffer PSContant : register(b0)
 	float	bTwoSideLight;
 	float3  SpecularColor;
 	float	LightIntensity;
+	float	bUseLightTexture;
 	int		DebugFlag;
-	float3	pad;
+	float2	pad;
 	float3	PolygonalLightVertexPos[4];
 };
 
-Texture2D FilteredLightTexture	: register(t0);
-Texture2D LTC_MatrixTexture		: register(t1);
-Texture2D LTC_MagnitueTexture	: register(t2);
+Texture2DArray FilteredLightTexture : register(t0);
+Texture2D LTC_MatrixTexture			: register(t1);
+Texture2D LTC_MagnitueTexture		: register(t2);
 
 SamplerState LinearSampler : register(s0);
 
@@ -184,20 +185,12 @@ void ClipQuadToHorizon(inout float3 L[5], inout int n)
 		L[4] = L[0];
 }
 
-float integrateEdge(float3 v1, float3 v2)
-{
-	float costheta = dot(v1, v2);
-	float theta = acos(costheta);
-	float3 l = cross(v1, v2);
-	return 0.5f * dot(l, float3(0,0,1)) * ((theta > 0.001) ? theta / sin(theta) : 1.0);
-}
-
 float inversesqrt(float f)
 {
 	return 1.0f / sqrt(f);
 }
 
-float IntegrateEdgeVec(float3 v1, float3 v2)
+float3 IntegrateEdgeVec(float3 v1, float3 v2)
 {
 	float x = dot(v1, v2);
 	float y = abs(x);
@@ -208,10 +201,41 @@ float IntegrateEdgeVec(float3 v1, float3 v2)
 
 	float theta_sintheta = (x > 0.0) ? v : 0.5 * inversesqrt(max(1.0 - x * x, 1e-7)) - v;
 	float3 l = cross(v1, v2);
-	return dot(l,float3(0, 0, 1)) * theta_sintheta;
+	return l * theta_sintheta;
 }
 
-float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x3 LTCMatrix, float3 Points[4], bool bTwoSided)
+// only L[4] be used
+float3 FetchDiffuseFilteredTexture(float3 L[5])
+{
+	float3 V1 = L[1] - L[0];
+	float3 V2 = L[3] - L[0];
+	// Plane's normal
+	float3 PlaneOrtho = cross(V1, V2);
+	float PlaneAreaSquared = dot(PlaneOrtho, PlaneOrtho);
+	float planeDistxPlaneArea = dot(PlaneOrtho, L[0]);
+	// orthonormal projection of (0,0,0) in area light space
+	float3 P = planeDistxPlaneArea * PlaneOrtho / PlaneAreaSquared - L[0];
+
+	// find tex coords of P
+	float dot_V1_V2 = dot(V1, V2);
+	float inv_dot_V1_V1 = 1.0 / dot(V1, V1);
+	float3 V2_ = V2 - V1 * dot_V1_V2 * inv_dot_V1_V1;
+	float2 UV;
+	UV.y = dot(V2_, P) / dot(V2_, V2_);
+	UV.x = dot(V1, P) * inv_dot_V1_V1 - dot_V1_V2 * inv_dot_V1_V1 * UV.y;
+
+	// LOD
+	float d = abs(planeDistxPlaneArea) / pow(PlaneAreaSquared, 0.75);
+	float Lod = log(2048.0 * d) / log(3.0);
+	float LodA = floor(Lod);
+	float LodB = ceil(Lod);
+	float t = Lod - LodA;
+	float3 ColorA = FilteredLightTexture.Sample(LinearSampler, float3(UV, LodA)).rgb;
+	float3 ColorB = FilteredLightTexture.Sample(LinearSampler, float3(UV, LodB)).rgb;
+	return lerp(ColorA, ColorB, t);
+}
+
+float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x3 LTCMatrix, float3 Points[4], bool bTwoSided,bool bUseTexture)
 {
 	// Orthogonal basis of tangent space on shading point
 	float3 Tangent = normalize(ViewDir - Normal * dot(ViewDir, Normal));
@@ -232,6 +256,12 @@ float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x
 	L[3] = mul(L[3], LTCMatrix);
 	L[4] = L[0];
 
+	float3 TextureLight = float3(1, 1, 1);
+	if (bUseTexture)
+	{
+		TextureLight = FetchDiffuseFilteredTexture(L);
+	}
+
 	int VertexNum = 0;
 	ClipQuadToHorizon(L, VertexNum);
 
@@ -244,19 +274,19 @@ float3 integrateLTC(float3 Normal, float3 ViewDir, float3 PixelWorldPos, float3x
 	L[3] = normalize(L[3]);
 	L[4] = normalize(L[4]);
 
-	float Sum = 0;
-	Sum += IntegrateEdgeVec(L[0], L[1]);
-	Sum += IntegrateEdgeVec(L[1], L[2]);
-	Sum += IntegrateEdgeVec(L[2], L[3]);
+	float3 VSum = float3(0, 0, 0);
+	VSum += IntegrateEdgeVec(L[0], L[1]);
+	VSum += IntegrateEdgeVec(L[1], L[2]);
+	VSum += IntegrateEdgeVec(L[2], L[3]);
 
 	if (VertexNum >= 4)
-		Sum += IntegrateEdgeVec(L[3], L[4]);
+		VSum += IntegrateEdgeVec(L[3], L[4]);
 	if (VertexNum == 5)
-		Sum += IntegrateEdgeVec(L[4], L[0]);
+		VSum += IntegrateEdgeVec(L[4], L[0]);
 	
-	Sum = bTwoSided ? abs(Sum) : max(Sum, 0.0);
+	float Sum = bTwoSided ? abs(VSum.z) : max(VSum.z, 0.0);
 
-	return Sum * float3(1, 1, 1);
+	return Sum * TextureLight;
 }
 
 float2 LTC_Coords(float Roughness, float CosTheta)
@@ -287,9 +317,10 @@ void PS_Floor(PixelInput In, out PixelOutput Out)
 	);
 
 	bool bTwoSided = bTwoSideLight;
+	bool bUseTexture = bUseLightTexture;
 
-	float3 Diffuse = integrateLTC(GroundNormal, ViewDir, PixelWorldPos, DiffuseMatrix, PolygonalLightVertexPos, bTwoSided);
-	float3 Specular = integrateLTC(GroundNormal, ViewDir, PixelWorldPos, LTCMatrix, PolygonalLightVertexPos, bTwoSided);
+	float3 Diffuse = integrateLTC(GroundNormal, ViewDir, PixelWorldPos, DiffuseMatrix, PolygonalLightVertexPos, bTwoSided, bUseTexture);
+	float3 Specular = integrateLTC(GroundNormal, ViewDir, PixelWorldPos, LTCMatrix, PolygonalLightVertexPos, bTwoSided, bUseTexture);
 
 	float4 t2 = LTC_MagnitueTexture.SampleLevel(LinearSampler, UV, 0);
 
@@ -311,6 +342,8 @@ void PS_Floor(PixelInput In, out PixelOutput Out)
 		ResultColor += LightIntensity * (Specular);
 	}
 
+	//ResultColor /= PI;
+
 	Out.Target0 = float4(ResultColor, 1.0);
 
 	// Test Cross
@@ -318,4 +351,10 @@ void PS_Floor(PixelInput In, out PixelOutput Out)
 	//float3 vec2Green = float3(0, 1, 0);
 	//float3 vec3Output = cross(vec1Red, vec2Green);
 	//Out.Target0 = float4(vec3Output, 1.0);
+
+	// Test TextureArray
+	//float3 uvw = float3(In.Tex, 6);
+	//float3 FilteredLight = FilteredLightTexture.Sample(LinearSampler, uvw).rgb;
+	//Out.Target0 = float4(FilteredLight, 1.0);
 }
+

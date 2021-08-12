@@ -9,6 +9,7 @@ cbuffer VSContant : register(b0)
 cbuffer PSContant : register(b0)
 {
 	float LightIntensity;
+	float bUseLightTexture;
 };
 
 Texture2D LightColorMap : register(t0);
@@ -47,10 +48,13 @@ PixelInput VS_LightPolygon(VertexInput In)
 
 void PS_LightPolygon(PixelInput In, out PixelOutput Out)
 {
-	float3 LightColor = LightColorMap.Sample(LinearSampler, In.Tex).xyz;
+	float3 LightColor = float3(1, 1, 1);
+	if (bUseLightTexture)
+	{
+		LightColor = LightColorMap.Sample(LinearSampler, In.Tex).xyz;
+	}
 
 	LightColor *= LightIntensity;
-
 	Out.Target0 = float4(LightColor, 1.0);
 	//Out.Target0 = float4(In.Tex, 0, 1);
 }

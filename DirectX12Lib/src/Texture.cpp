@@ -114,3 +114,53 @@ void FTexture::SaveTexutre(const std::wstring& FileName)
 }
 
 
+void FTextureArray::LoadFromFile(const std::wstring& FileName, bool IsSRGB /*= true*/)
+{
+	DirectX::ScratchImage image;
+	HRESULT hr;
+	if (FileName.rfind(L".dds") != std::string::npos)
+	{
+		hr = DirectX::LoadFromDDSFile(FileName.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
+	}
+	else if (FileName.rfind(L".tga") != std::string::npos)
+	{
+		hr = DirectX::LoadFromTGAFile(FileName.c_str(), nullptr, image);
+	}
+	else if (FileName.rfind(L".hdr") != std::string::npos)
+	{
+		hr = DirectX::LoadFromHDRFile(FileName.c_str(), nullptr, image);
+	}
+	else
+	{
+		hr = DirectX::LoadFromWICFile(FileName.c_str(), DirectX::WIC_FLAGS_IGNORE_SRGB, nullptr, image);
+	}
+
+	m_Width = (int)image.GetImages()->width;
+	m_Height = (int)image.GetImages()->height;
+
+	ThrowIfFailed(hr);
+	ID3D12Device* Device = D3D12RHI::Get().GetD3D12Device().Get();
+	ThrowIfFailed(DirectX::CreateTextureEx(Device, image.GetMetadata(), D3D12_RESOURCE_FLAG_NONE, IsSRGB, m_Resource.ReleaseAndGetAddressOf()));
+	InitializeState(D3D12_RESOURCE_STATE_COPY_DEST);
+
+	m_Resource->SetName(FileName.c_str());
+
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+	ThrowIfFailed(PrepareUpload(Device, image.GetImages(), image.GetImageCount(), image.GetMetadata(), subresources));
+
+	Assert(subresources.size() > 0);
+	FCommandContext::InitializeTexture(*this, (UINT)subresources.size(), &subresources[0]);
+
+	if (m_CpuDescriptorHandle.ptr == D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN)
+		m_CpuDescriptorHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, image.GetMetadata().arraySize);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = m_Resource->GetDesc().Format;//视图的默认格式
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;//2D纹理数组
+	srvDesc.Texture2DArray.ArraySize = m_Resource->GetDesc().DepthOrArraySize;//纹理数组长度
+	srvDesc.Texture2DArray.MostDetailedMip = 0;//MipMap层级为0
+	srvDesc.Texture2DArray.MipLevels = -1;//没有层级
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	D3D12RHI::Get().GetD3D12Device()->CreateShaderResourceView(m_Resource.Get(), &srvDesc, m_CpuDescriptorHandle);
+}

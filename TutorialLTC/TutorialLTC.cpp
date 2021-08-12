@@ -82,7 +82,6 @@ public:
 		m_MainScissor.top = 0;
 		m_MainScissor.right = (LONG)RenderWindow::Get().GetBackBuffer().GetWidth();
 		m_MainScissor.bottom = (LONG)RenderWindow::Get().GetBackBuffer().GetHeight();
-
 	}
 
 	void OnGUI(FCommandContext& CommandContext)
@@ -99,7 +98,8 @@ public:
 		{
 			ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
 			ImGui::SliderFloat("Light Intensity", &m_LightIntensity, 0, 10.0f);
-			ImGui::Checkbox("Is Two Side Light", &m_TwoSideLight);
+			ImGui::Checkbox("Use Light Texture", &m_bUseLightTexture);
+			ImGui::Checkbox("Is Two Side Light", &m_bTwoSideLight);
 			ImGui::SliderFloat("Floor Roughness", &m_Roughness, 0.01f, 1.0f);
 			ImGui::ColorEdit3("Floor DiffuseColor", &m_FloorDiffuseColor.x);
 			ImGui::ColorEdit3("Floor SpecularColor", &m_SpecularColor.x);
@@ -129,7 +129,7 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.0f, 0.5f, -7.0f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(0.0f, 0.35f, -4.0f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
@@ -141,10 +141,10 @@ private:
 	{
 		m_LightPolygon = std::make_unique<FQuad>();
 		m_Floor = std::make_unique<FModel>("../Resources/Models/primitive/Plane.obj", true, true);
-		m_Floor->SetPosition(0, -0.6f, 0);
+		m_Floor->SetPosition(0, -0.5f, 0);
 		m_Floor->SetScale(10, 10, 10);
 
-		m_LightTexture.LoadFromFile(L"../Resources/Textures/white.png", false);
+		m_LightTexture.LoadFromFile(L"../Resources/Textures/LTC/LightTextureArray.dds", true);
 		
 		// LTC Textures
 		m_LTC_MatrixTexture.LoadFromFile(L"../Resources/Textures/LTC/ltc_1.dds", false);
@@ -264,8 +264,9 @@ private:
 			float		bTwoSideLight;
 			Vector3f	SpecularColor;
 			float		LightIntensity;
+			float		bUseLightTexture;
 			int			DebugFlag;
-			Vector3f	pad;
+			Vector2f	pad;
 			Vector4f	PolygonalLightVertexPos[4];
 		}PSConstants;
 
@@ -273,8 +274,9 @@ private:
 		PSConstants.Roughness = m_Roughness;
 		PSConstants.DiffuseColor = m_FloorDiffuseColor;
 		PSConstants.SpecularColor = m_SpecularColor;
-		PSConstants.bTwoSideLight = m_TwoSideLight;
+		PSConstants.bTwoSideLight = m_bTwoSideLight;
 		PSConstants.LightIntensity = m_LightIntensity;
+		PSConstants.bUseLightTexture = m_bUseLightTexture;
 
 		std::vector<Vector4f> PolygonalLightVertexPosSet;
 		GetLightPolygonalVertexPosSet(PolygonalLightVertexPosSet);
@@ -332,9 +334,11 @@ private:
 		__declspec(align(16)) struct
 		{
 			float LightIntensity;
+			float bUseTexture;
 		}PSConstants;
 
 		PSConstants.LightIntensity = m_LightIntensity;
+		PSConstants.bUseTexture = m_bUseLightTexture;
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(PSConstants), &PSConstants);
 
@@ -356,7 +360,7 @@ private:
 	FRootSignature				m_LightPolygonSignature;
 	FGraphicsPipelineState		m_LightPolygonPSO;
 
-	FTexture					m_LightTexture;
+	FTextureArray				m_LightTexture;
 	FTexture					m_LTC_MatrixTexture;
 	FTexture					m_LTC_MagnitueTexture;
 
@@ -364,7 +368,8 @@ private:
 	int					m_DebugFlag = 0;
 	float				m_Roughness = 0.4f;
 	float				m_LightIntensity = 4.0f;
-	bool				m_TwoSideLight = false;
+	bool				m_bTwoSideLight = false;
+	bool				m_bUseLightTexture = true;
 	Vector3f			m_FloorDiffuseColor = Vector3f(1, 1, 1);
 	Vector3f			m_SpecularColor = Vector3f(0.172f, 0.172f, 0.172f);
 

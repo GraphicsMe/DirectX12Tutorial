@@ -9,7 +9,7 @@ public:
 	FTexture(D3D12_CPU_DESCRIPTOR_HANDLE Handle) : m_CpuDescriptorHandle(Handle) {}
 
 	void Create(uint32_t Width, uint32_t Height, DXGI_FORMAT Format, const void* InitialData);
-	void LoadFromFile(const std::wstring& FileName, bool IsSRGB = true);
+	virtual void LoadFromFile(const std::wstring& FileName, bool IsSRGB = true);
 	void SaveTexutre(const std::wstring& Path);
 
 	int GetWidth() const { return m_Width; }
@@ -20,4 +20,10 @@ public:
 protected:
 	int m_Width, m_Height;
 	D3D12_CPU_DESCRIPTOR_HANDLE m_CpuDescriptorHandle;
+};
+
+class FTextureArray : public FTexture
+{
+public:
+	virtual void LoadFromFile(const std::wstring& FileName, bool IsSRGB = true) override;
 };
