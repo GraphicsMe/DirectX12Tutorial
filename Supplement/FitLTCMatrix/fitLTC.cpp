@@ -38,7 +38,7 @@ void computeAvgTerms(const Brdf& brdf, const vec3& V, const float alpha,
 	fresnel = 0.0f;
 	averageDir = vec3(0, 0, 0);
 
-	for (int j = 0; j < Nsample; ++j)	//在整个0~1的随机范围内去计算L，计算brdf的值，采样数越多，0~1范围内被覆盖的点越多，算出来的L以及brdf的值越精准（感觉随机生成U1、U2的值也可以）
+	for (int j = 0; j < Nsample; ++j)
 		for (int i = 0; i < Nsample; ++i)
 		{
 			const float U1 = (i + 0.5f) / Nsample;
@@ -49,21 +49,23 @@ void computeAvgTerms(const Brdf& brdf, const vec3& V, const float alpha,
 			const vec3 L = brdf.sample(V, alpha, U1, U2);
 
 			// eval
+			// 计算BRDF（不含菲尼尔系数项）* dot(N,L)方程值，并得到其概率密度函数pdf
 			float pdf;
 			float eval = brdf.eval(V, L, alpha, pdf);
 
 			if (pdf > 0)
-			{
+			{ 
+				// 计算权重（重要性采样）
 				float weight = eval / pdf;
 
-				// 半程向量
 				vec3 H = normalize(V + L);
 
 				// accumulate
-				norm += weight;	//norm存储的是论文Fresnel项附加材料中的nD
-				fresnel += weight * pow(1.0f - glm::max(dot(V, H), 0.0f), 5.0f);		//fresnel存储的是论文Fresnel项附加材料中的fD
-
-				// 加权方向向量
+				//norm存储的是论文Fresnel项附加材料中的nD
+				norm += weight;	
+				//fresnel存储的是论文Fresnel项附加材料中的fD
+				fresnel += weight * pow(1.0f - glm::max(dot(V, H), 0.0f), 5.0f);
+				// 计算重要性采样的大致方向（反射镜叶）
 				averageDir += weight * L;
 			}
 		}
@@ -74,8 +76,7 @@ void computeAvgTerms(const Brdf& brdf, const vec3& V, const float alpha,
 	// clear y component, which should be zero with isotropic BRDFs
 	// 各向同性，不考虑方位角
 	averageDir.y = 0.0f;
-
-	// 归一化
+	// 归一化重要性采样的平均方向
 	averageDir = normalize(averageDir);
 }
 
