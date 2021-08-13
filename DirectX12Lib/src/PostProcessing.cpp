@@ -14,6 +14,7 @@
 #include "Camera.h"
 #include "CubeBuffer.h"
 #include "TemporalEffects.h"
+#include "MotionBlur.h"
 
 using namespace BufferManager;
 extern FCommandListManager g_CommandListManager;
@@ -373,6 +374,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	GfxContext.TransitionResource(g_HiZBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	GfxContext.TransitionResource(CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	GfxContext.TransitionResource(MotionBlur::g_VelocityBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	GfxContext.TransitionResource(TemporalEffects::GetHistoryBuffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, true);
 
 	GfxContext.SetRenderTargets(1, &g_SSRBuffer.GetRTV());
@@ -381,6 +383,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	{
 		FMatrix		ViewProj;
 		FMatrix		InvViewProj;
+		FMatrix		ClipToPreClipNoAA;
 		Vector4f	RootSizeMipCount;
 		Vector4f	HZBUvFactorAndInvFactor;
 		Vector3f	CameraPos;
@@ -397,6 +400,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	PSConstants.RootSizeMipCount = Vector4f((float)g_HiZBuffer.GetWidth(), (float)g_HiZBuffer.GetHeight(), (float)g_HiZBuffer.GetNumMips(), 0.f);
 	PSConstants.ViewProj = Camera.GetViewProjMatrix();
 	PSConstants.InvViewProj = PSConstants.ViewProj.Inverse();
+	PSConstants.ClipToPreClipNoAA = Camera.GetClipToPrevClipNoAA();
 	PSConstants.Thickness = g_Thickness;
 	PSConstants.CompareTolerance = g_CompareTolerance;
 	PSConstants.UseHiZ = g_UseHiZ ? 1.f : 0.f;
@@ -409,7 +413,8 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	GfxContext.SetDynamicDescriptor(1, 3, g_SceneDepthZ.GetSRV());
 	GfxContext.SetDynamicDescriptor(1, 4, g_HiZBuffer.GetSRV());
 	GfxContext.SetDynamicDescriptor(1, 5, TemporalEffects::GetHistoryBuffer().GetSRV());
-	GfxContext.SetDynamicDescriptor(1, 6, CubeBuffer.GetCubeSRV(0));
+	GfxContext.SetDynamicDescriptor(1, 6, MotionBlur::g_VelocityBuffer.GetSRV());
+	GfxContext.SetDynamicDescriptor(1, 7, CubeBuffer.GetCubeSRV(0));
 
 	GfxContext.Draw(3);
 }

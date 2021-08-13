@@ -845,6 +845,7 @@ private:
 		GfxContext.TransitionResource(g_GBufferA, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(g_GBufferB, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(g_GBufferC, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(BufferManager::g_SSRBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, true);
 
 		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV());
@@ -892,6 +893,7 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 1, g_GBufferB.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 2, g_GBufferC.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 3, g_SceneDepthZ.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 4, BufferManager::g_SSRBuffer.GetSRV());
 
 		GfxContext.SetDynamicDescriptor(2, 7, m_IrradianceCube.GetCubeSRV());
 		GfxContext.SetDynamicDescriptor(2, 8, m_PrefilteredCube.GetCubeSRV());
@@ -1122,8 +1124,8 @@ private:
 	float m_RotateY = 0.f;//3.984f;
 	// floor PBR parameters
 	Vector3f m_FloorColor = Vector3f(0.3f);
-	float m_FloorMetallic = 0.f;
-	float m_FloorRoughness = 1.f;
+	float m_FloorMetallic = 0.5f;
+	float m_FloorRoughness = 0.5f;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 

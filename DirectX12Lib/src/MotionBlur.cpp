@@ -55,7 +55,7 @@ void ClearVelocityBuffer(FCommandContext& Context)
 
 void MotionBlur::GenerateCameraVelocityBuffer(FCommandContext& Context, const FCamera& camera)
 {
-	MotionBlur::GenerateCameraVelocityBuffer(Context, camera.GetReprojectionMatrix(), camera.GetNearClip(), camera.GetFarClip());
+	MotionBlur::GenerateCameraVelocityBuffer(Context, camera.GetClipToPrevClip(), camera.GetNearClip(), camera.GetFarClip());
 }
 
 void MotionBlur::GenerateCameraVelocityBuffer(FCommandContext& BaseContext, const FMatrix& reprojectionMatrix, float nearClip, float farClip)

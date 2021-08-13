@@ -36,7 +36,8 @@ public:
 	const FMatrix& GetPreviousViewMatrix() const { return m_PreviousViewMat; }
 	const FMatrix& GetPreviousProjectionMatrix() const { return m_PreviousProjMat; }
 	const FMatrix& GetPreviousViewProjMatrix() const { return m_PreviousViewProjMatrix; }
-	const FMatrix& GetReprojectionMatrix() const { return m_ReprojectMatrix; }
+	const FMatrix& GetClipToPrevClip() const { return m_ClipToPrevClip; }
+	const FMatrix& GetClipToPrevClipNoAA() const { return m_ClipToPrevClipNoAA; }
 
 	void SetMouseMoveSpeed(float Speed) { m_MoveSpeed = Speed; }
 	void SetMouseZoomSpeed(float Speed) { m_ZoomSpeed = Speed; }
@@ -60,7 +61,8 @@ private:
 	FMatrix m_PreviousViewProjMatrix;
 
 	// Projects a clip-space coordinate to the previous frame (useful for temporal effects).
-	FMatrix m_ReprojectMatrix;
+	FMatrix m_ClipToPrevClip;
+	FMatrix m_ClipToPrevClipNoAA;
 
 	float CameraLength;
 	Vector3f Right, Up, Forward, Position;

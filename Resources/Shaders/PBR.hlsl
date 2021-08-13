@@ -176,7 +176,7 @@ float3 F_schlickR(float cosTheta, float3 F0, float roughness)
 }
 
 
-float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO)
+float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO, float4 SSR)
 {
 	float3 R = reflect(-V, N); //incident ray, surface normal
 
@@ -200,12 +200,13 @@ float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 	float3 Diffuse = Albedo * kD * Irradiance;
 
 	float Mip = ComputeReflectionCaptureMipFromRoughness(Roughness, MaxMipLevel - 1);
-	float2 BRDF = PreintegratedGF.Sample(LinearSampler, float2(NoV, Roughness)).rg;
+	float2 BRDF = PreintegratedGF.SampleLevel(LinearSampler, float2(NoV, Roughness), 0).rg;
 
 	float3 PrefilteredColor = PrefilteredCubeMap.SampleLevel(LinearSampler, R, Mip).rgb;
 	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
 
-	return (Diffuse + Specular) * AO;
+	float3 Final = (Diffuse + Specular) * AO + F * SSR.rgb * SSR.a;
+	return float4(Final, 1.0);
 }
 
 
@@ -251,20 +252,22 @@ Texture2D GBufferA		: register(t0); // normal
 Texture2D GBufferB		: register(t1); // metallSpecularRoughness
 Texture2D GBufferC		: register(t2); // AlbedoAO
 Texture2D SceneDepthZ	: register(t3); // Depth
+Texture2D SSRBuffer		: register(t4); // SSR
 
 float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 {
 	float3 N = GBufferA.Sample(LinearSampler, Tex).xyz;
 	N = 2.0 * N - 1.0;
 
-	float3 PBRParameters = GBufferB.Sample(LinearSampler, Tex).xyz;
+	float3 PBRParameters = GBufferB.SampleLevel(LinearSampler, Tex, 0).xyz;
 	float Metallic = PBRParameters.x;
 	float Roughness = PBRParameters.z;
 
-	float4 AlbedoAo = GBufferC.Sample(LinearSampler, Tex);
+	float4 AlbedoAo = GBufferC.SampleLevel(LinearSampler, Tex, 0);
 	float AO = AlbedoAo.w;
 
-	float Depth = SceneDepthZ.Sample(LinearSampler, Tex).x;
+	float Depth = SceneDepthZ.SampleLevel(LinearSampler, Tex, 0).x;
+	float4 SSR = SSRBuffer.SampleLevel(LinearSampler, Tex, 0);
 
 	float2 ScreenCoord = ViewportUVToScreenPos(Tex);
 
@@ -273,7 +276,7 @@ float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 	WorldPos /= WorldPos.w;
 
 	float3 V = normalize(CameraPos - WorldPos.xyz);
-	float3 IBL = CalcIBL(N, V, AlbedoAo.xyz, Metallic, Roughness, AO);
+	float3 IBL = CalcIBL(N, V, AlbedoAo.xyz, Metallic, Roughness, AO, SSR);
 
 	return float4(IBL, 1.0);
 }

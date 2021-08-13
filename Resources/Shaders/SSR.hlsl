@@ -7,8 +7,9 @@ Texture2D GBufferB		: register(t1); // metallSpecularRoughness
 Texture2D GBufferC		: register(t2); // AlbedoAO
 Texture2D SceneDepthZ	: register(t3); // Depth
 Texture2D<float2> HiZBuffer		: register(t4); // Hi-Z Depth
-Texture2D SceneColor	: register(t5); // history scene buffer
-TextureCube CubeMap		: register(t6); // environment map
+Texture2D HistorySceneColor	: register(t5); // history scene buffer
+Texture2D VelocityBuffer	: register(t6); // velocity buffer
+TextureCube CubeMap			: register(t7); // environment map
 
 SamplerState LinearSampler	: register(s0);
 SamplerState PointSampler	: register(s1);
@@ -17,6 +18,7 @@ cbuffer PSContant : register(b0)
 {
 	float4x4 ViewProj;
 	float4x4 InvViewProj;
+	float4x4 ClipToPreClipNoAA;
 	float4 RootSizeMipCount;
 	float4 HZBUvFactorAndInvFactor;
 	float3	CameraPos;
@@ -181,6 +183,29 @@ bool CastHiZRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 	return intersected;
 }
 
+float ComputeHitVignetteFromScreenPos(float2 ScreenPos)
+{
+	float2 Vignette = saturate(abs(ScreenPos) * 5 - 4);
+
+	return saturate(1.0 - dot(Vignette, Vignette));
+}
+
+void ReprojectHit(float3 HitUVz, out float2 OutPrevUV, out float OutVignette)
+{
+	float2 ThisScreen = 2.0 * HitUVz.xy - 1.0; //[-1,1]
+	float4 ThisClip = float4(ThisScreen, HitUVz.z, 1);
+	float4 PrevClip = mul(ThisClip, ClipToPreClipNoAA);
+	float2 PrevScreen = PrevClip.xy / PrevClip.w;
+
+	float2 Velocity = VelocityBuffer.SampleLevel(PointSampler, HitUVz.xy, 0).xy;
+	PrevScreen = ThisClip.xy - Velocity;
+
+	float2 PrevUV = 0.5 * PrevScreen.xy + 0.5;
+
+	OutVignette = min(ComputeHitVignetteFromScreenPos(ThisScreen), ComputeHitVignetteFromScreenPos(PrevScreen));
+	OutPrevUV = PrevUV;
+}
+
 float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 {
 	float3 N = GBufferA.Sample(LinearSampler, Tex).xyz;
@@ -219,16 +244,12 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 
 	if (bHit)
 	{
-		if (UseHiZ > 0.f)
-		{
-			float2 UV = HitUVz.xy * HZBUvFactorAndInvFactor.zw * 2;
-			float4 Sample = SceneColor.SampleLevel(LinearSampler, UV, 0);
-			return float4(Sample.xyz, 1.0);
-		}
-		else
-		{
-			return SceneColor.SampleLevel(LinearSampler, HitUVz.xy, 1.0);
-		}
+		HitUVz.xy = UseHiZ > 0.f ? HitUVz.xy * HZBUvFactorAndInvFactor.zw * 2 : HitUVz.xy;
+		
+		float Vignette;
+		float2 PrevUV;
+		ReprojectHit(HitUVz, PrevUV, Vignette);
+		return float4(HistorySceneColor.SampleLevel(LinearSampler, PrevUV, 0).xyz, 1.0) * Vignette;
 	}
 	return float4(0.0, 0.0, 0.0, 0.0);
 }

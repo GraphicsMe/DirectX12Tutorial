@@ -74,7 +74,19 @@ void FCamera::UpdateAllMatrix()
 	m_ViewProjMatrix = m_ViewMat * m_ProjMat;
 
 	// Update ReprojectMatrix
-	m_ReprojectMatrix = m_ViewProjMatrix.Inverse() * m_PreviousViewProjMatrix;
+	m_ClipToPrevClip = m_ViewProjMatrix.Inverse() * m_PreviousViewProjMatrix;
+
+	FMatrix PreProjNoAA = m_PreviousProjMat;
+	PreProjNoAA.r2.x = 0.f;
+	PreProjNoAA.r2.y = 0.f;
+	FMatrix PreViewProjNoAA = m_PreviousViewMat * PreProjNoAA;
+
+	FMatrix CurProjNoAA = m_ProjMat;
+	CurProjNoAA.r2.x = 0.f;
+	CurProjNoAA.r2.y = 0.f;
+	FMatrix CurViewProjNoAA = m_ViewMat * CurProjNoAA;
+
+	m_ClipToPrevClipNoAA = PreViewProjNoAA.Inverse() * CurViewProjNoAA;
 }
 
 void FCamera::UpdateViewMatrix()
