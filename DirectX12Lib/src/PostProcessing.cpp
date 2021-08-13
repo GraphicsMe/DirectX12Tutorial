@@ -35,6 +35,7 @@ namespace PostProcessing
 	bool g_UseMinMaxZ = true;
 	float g_Thickness = 0.03f;
 	float g_CompareTolerance = 0.027f;
+	int g_NumRays = 2;
 
 	FRootSignature m_CSSignature;
 	FRootSignature m_PostProcessSignature;
@@ -391,6 +392,8 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 		float		CompareTolerance;
 		float		UseHiZ;
 		float		UseMinMaxZ;
+		int			NumRays;
+		int			FrameIndexMod8;
 	} PSConstants;
 
 	float FactorX = 1.f * g_SSRBuffer.GetWidth() / g_HiZBuffer.GetWidth();
@@ -405,6 +408,8 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	PSConstants.CompareTolerance = g_CompareTolerance;
 	PSConstants.UseHiZ = g_UseHiZ ? 1.f : 0.f;
 	PSConstants.UseMinMaxZ = g_UseMinMaxZ ? 1.f : 0.f;
+	PSConstants.NumRays = g_NumRays;
+	PSConstants.FrameIndexMod8 = TemporalEffects::GetFrameIndex() % 8;
 
 	GfxContext.SetDynamicConstantBufferView(0, sizeof(PSConstants), &PSConstants);
 	GfxContext.SetDynamicDescriptor(1, 0, g_GBufferA.GetSRV());

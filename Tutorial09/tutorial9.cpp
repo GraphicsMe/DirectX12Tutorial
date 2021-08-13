@@ -198,6 +198,7 @@ public:
 					ImGui::Checkbox("Debug SSR", &PostProcessing::g_DebugSSR);
 					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 0.1f);
 					ImGui::SliderFloat("CompareTolerance", &PostProcessing::g_CompareTolerance, 0.f, 0.1f);
+					ImGui::SliderInt("NumRays", &PostProcessing::g_NumRays, 1, 16);
 					ImGui::Indent(-20);
 				}
 
@@ -1125,7 +1126,7 @@ private:
 	// floor PBR parameters
 	Vector3f m_FloorColor = Vector3f(0.3f);
 	float m_FloorMetallic = 0.5f;
-	float m_FloorRoughness = 0.5f;
+	float m_FloorRoughness = 0.1f;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };
 

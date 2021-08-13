@@ -29,6 +29,7 @@ namespace TemporalEffects
 
 	// Should be called after update() in one frame
 	FColorBuffer& GetHistoryBuffer();
+	uint32_t GetFrameIndex();
 
 	void ClearHistory(FCommandContext& Context);
 

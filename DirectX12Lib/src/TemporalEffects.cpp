@@ -179,6 +179,11 @@ FColorBuffer& TemporalEffects::GetHistoryBuffer()
 	return g_TemporalColor[s_FrameIndexMod2];
 }
 
+uint32_t TemporalEffects::GetFrameIndex()
+{
+	return s_FrameIndex;
+}
+
 void TemporalEffects::ClearHistory(FCommandContext& Context)
 {
 	if (g_EnableTAA)

@@ -3,7 +3,7 @@
 #include "ShaderUtils.hlsl"
 
 Texture2D GBufferA		: register(t0); // normal
-Texture2D GBufferB		: register(t1); // metallSpecularRoughness
+Texture2D GBufferB		: register(t1); // MetallicSpecularRoughness
 Texture2D GBufferC		: register(t2); // AlbedoAO
 Texture2D SceneDepthZ	: register(t3); // Depth
 Texture2D<float2> HiZBuffer		: register(t4); // Hi-Z Depth
@@ -26,6 +26,8 @@ cbuffer PSContant : register(b0)
 	float CompareTolerance;
 	float UseHiZ;
 	float UseMinMaxZ;
+	int NumRays;
+	int FrameIndexMod8;
 };
 
 
@@ -206,7 +208,7 @@ void ReprojectHit(float3 HitUVz, out float2 OutPrevUV, out float OutVignette)
 	OutPrevUV = PrevUV;
 }
 
-float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
+float4 PS_SSR(float2 Tex : TEXCOORD, float4 SVPosition : SV_Position) : SV_Target
 {
 	float3 N = GBufferA.Sample(LinearSampler, Tex).xyz;
 	N = 2.0 * N - 1.0;
@@ -216,40 +218,59 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 	
 	float3 Screen0 = float3(Tex, Depth);
 	float3 World0 = UnprojectScreen(Screen0);
+	Screen0 = UseHiZ > 0.f ? ApplyHZBUvFactor(Screen0) : Screen0;
 
 	float3 V = normalize(CameraPos - World0);
-	float3 R = reflect(-V, N); //incident ray, surface normal
-	float3 World1 = World0 + R * MaxWorldDistance;
-	float3 Screen1 = ProjectWorldPos(World1);
+	//float3 L = reflect(-V, N); //incident ray, surface normal
 
-	if (UseHiZ > 0.f)
-	{
-		Screen0 = ApplyHZBUvFactor(Screen0);
-		Screen1 = ApplyHZBUvFactor(Screen1);
-	}
+	float3 MetallicSpecularRoughness = GBufferB.SampleLevel(LinearSampler, Tex, 0).xyz;
+	float Roughness = MetallicSpecularRoughness.z;
+	float a = Roughness * Roughness;
+	float a2 = a * a;
 
-	float3 StartScreen = Screen0;			//[0, 1]
-	float3 StepScreen = Screen1 - Screen0;	//[-1, 1]
+	uint2 PixelPos = (uint2)SVPosition.xy;
+	uint2 Random = Rand3DPCG16(int3(PixelPos, FrameIndexMod8)).xy;
 
-	bool bHit;
-	float3 HitUVz;
-	if (UseHiZ > 0.f)
-	{
-		bHit = CastHiZRay(StartScreen, StepScreen, HitUVz);
-	}
-	else
-	{
-		bHit = CastSimpleRay(StartScreen, StepScreen, HitUVz);
-	}
+	float3x3 TangentBasis = GetTangentBasis(N);
+	float3 TangentV = mul(TangentBasis, V);
 
-	if (bHit)
+	float4 OutColor = 0;
+	for (int i = 0; i < NumRays; i++)
 	{
-		HitUVz.xy = UseHiZ > 0.f ? HitUVz.xy * HZBUvFactorAndInvFactor.zw * 2 : HitUVz.xy;
-		
-		float Vignette;
-		float2 PrevUV;
-		ReprojectHit(HitUVz, PrevUV, Vignette);
-		return float4(HistorySceneColor.SampleLevel(LinearSampler, PrevUV, 0).xyz, 1.0) * Vignette;
+		float2 E = Hammersley16(i, NumRays, Random);
+		float3 H = mul(ImportanceSampleVisibleGGX(UniformSampleDisk(E), a2, TangentV).xyz, TangentBasis);
+		float3 L = 2 * dot(V, H) * H - V;
+		//float3 L = reflect(-V, H);
+
+		float3 World1 = World0 + L * MaxWorldDistance;
+		float3 Screen1 = ProjectWorldPos(World1);
+		Screen1 = UseHiZ > 0.f ? ApplyHZBUvFactor(Screen1) : Screen1;
+
+		float3 StartScreen = Screen0;			//[0, 1]
+		float3 StepScreen = Screen1 - Screen0;	//[-1, 1]
+
+		bool bHit;
+		float3 HitUVz;
+		if (UseHiZ > 0.f)
+		{
+			bHit = CastHiZRay(StartScreen, StepScreen, HitUVz);
+		}
+		else
+		{
+			bHit = CastSimpleRay(StartScreen, StepScreen, HitUVz);
+		}
+
+		if (bHit)
+		{
+			HitUVz.xy = UseHiZ > 0.f ? HitUVz.xy * HZBUvFactorAndInvFactor.zw * 2 : HitUVz.xy;
+
+			float Vignette;
+			float2 PrevUV;
+			ReprojectHit(HitUVz, PrevUV, Vignette);
+			OutColor += HistorySceneColor.SampleLevel(LinearSampler, PrevUV, 0) * Vignette;
+		}
 	}
-	return float4(0.0, 0.0, 0.0, 0.0);
+	OutColor /= NumRays;
+	
+	return OutColor;
 }

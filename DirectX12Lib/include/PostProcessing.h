@@ -17,6 +17,7 @@ namespace PostProcessing
 	extern bool g_UseMinMaxZ;
 	extern float g_Thickness;
 	extern float g_CompareTolerance;
+	extern int g_NumRays;
 
 	void Initialize();
 	void Destroy();
