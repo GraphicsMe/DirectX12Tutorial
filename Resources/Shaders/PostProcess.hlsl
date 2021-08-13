@@ -65,7 +65,7 @@ void CS_ExtractBloom(uint3 DispatchThreadID : SV_DispatchThreadID)
 	float3 Color = SceneColorTexture.SampleLevel(LinearSampler, UV, 0).xyz;
 	// clamp to avoid artifacts from exceeding fp16 through framebuffer blending of multiple very bright lights
 	Color.rgb = min(float3(256 * 256, 256 * 256, 256 * 256), Color.rgb);
-
+	
 	half TotalLuminance = Luminance(Color);
 	half BloomLuminance = TotalLuminance - BloomThreshold;
 	half BloomAmount = saturate(BloomLuminance * 0.5f);
@@ -79,7 +79,8 @@ void CS_DownSample(uint3 DispatchThreadID : SV_DispatchThreadID)
 	float2 HalfPixelSize, UV;
 	GetSampleUV(DispatchThreadID.xy, UV, HalfPixelSize);
 
-	float3 Result = SceneColorTexture.SampleLevel(LinearSampler, UV, 0).xyz * 4.0;
+    const float Scale = 4.0f;
+    float3 Result = SceneColorTexture.SampleLevel(LinearSampler, UV, 0).xyz * Scale;
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV - HalfPixelSize, 0).xyz;
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + HalfPixelSize, 0).xyz;
 	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(HalfPixelSize.x, -HalfPixelSize.y), 0).xyz;
@@ -94,13 +95,14 @@ void CS_UpSample(uint3 DispatchThreadID : SV_DispatchThreadID)
 	GetSampleUV(DispatchThreadID.xy, UV, HalfPixelSize);
 
 	float3 Result = 0;
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x * 2.0, 0.0), 0).xyz;				//left
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x * 2.0, 0.0), 0).xyz;				//right
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(0.0, -HalfPixelSize.y * 2.0), 0).xyz;				//up
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(0.0, +HalfPixelSize.y * 2.0), 0).xyz;				//bottom
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x, -HalfPixelSize.y), 0).xyz * 2.0;  //top-left
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x, -HalfPixelSize.y), 0).xyz * 2.0;  //top-right
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x, +HalfPixelSize.y), 0).xyz * 2.0;  //bottom-left
-	Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x, +HalfPixelSize.y), 0).xyz * 2.0;  //bottom-right
+    const float Scale = 4.0f;
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x * Scale, 0.0), 0).xyz; //left
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x * Scale, 0.0), 0).xyz; //right
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(0.0, -HalfPixelSize.y * Scale), 0).xyz; //up
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(0.0, +HalfPixelSize.y * Scale), 0).xyz; //bottom
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x, -HalfPixelSize.y), 0).xyz * Scale; //top-left
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x, -HalfPixelSize.y), 0).xyz * Scale; //top-right
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(-HalfPixelSize.x, +HalfPixelSize.y), 0).xyz * Scale; //bottom-left
+    Result += SceneColorTexture.SampleLevel(LinearSampler, UV + float2(+HalfPixelSize.x, +HalfPixelSize.y), 0).xyz * Scale; //bottom-right
 	BloomResult[DispatchThreadID.xy] = Result / 12.0;
 }
