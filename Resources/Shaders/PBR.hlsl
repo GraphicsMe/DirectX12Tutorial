@@ -205,7 +205,7 @@ float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 	float3 PrefilteredColor = PrefilteredCubeMap.SampleLevel(LinearSampler, R, Mip).rgb;
 	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
 
-	float3 Final = (Diffuse + Specular) * AO + F * SSR.rgb * SSR.a;
+	float3 Final = (Diffuse + Specular) * AO * (1-SSR.a) + SSR.rgb;
 	return float4(Final, 1.0);
 }
 

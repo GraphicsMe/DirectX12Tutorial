@@ -23,6 +23,7 @@ cbuffer PSContant : register(b0)
 	float4 HZBUvFactorAndInvFactor;
 	float3	CameraPos;
 	float Thickness;
+	float WorldThickness;
 	float CompareTolerance;
 	float UseHiZ;
 	float UseMinMaxZ;
@@ -32,7 +33,6 @@ cbuffer PSContant : register(b0)
 
 
 static const int MaxStep = 256;
-static const float MaxWorldDistance = 1.0;
 
 static const float HIZ_START_LEVEL = 0.0f;
 static const float HIZ_STOP_LEVEL = 0.0f;
@@ -106,6 +106,9 @@ float3 IntersectCellBoundary(
 
 bool CastSimpleRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 {
+	float PerPixelThickness = abs(Direction.z);
+	float PerPixelCompareTolerance = 0.85 * PerPixelThickness;
+
 	float2 TextureSize;
 	SceneDepthZ.GetDimensions(TextureSize.x, TextureSize.y);
 	int MaxLinearStep = max(TextureSize.x, TextureSize.y);
@@ -123,7 +126,7 @@ bool CastSimpleRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 		if (Ray.z < 0 || Ray.z > 1)
 			return false;
 		Depth = SceneDepthZ.SampleLevel(PointSampler, Ray.xy, 0).x;
-		if (Depth + CompareTolerance < Ray.z && Ray.z < Depth + Thickness)
+		if (Depth + PerPixelCompareTolerance < Ray.z && Ray.z < Depth + PerPixelThickness)
 		{
 			OutHitUVz = Ray;
 			return true;
@@ -133,13 +136,16 @@ bool CastSimpleRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 	return true;
 }
 
-bool WithinThickness(float3 Ray, float MinZ)
+bool WithinThickness(float3 Ray, float MinZ, float TheThickness)
 {
-	return Ray.z < MinZ + Thickness;
+	return Ray.z < MinZ + TheThickness;
 }
 
 bool CastHiZRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 {
+	float PerPixelThickness = abs(Direction.z);
+	float PerPixelCompareTolerance = 0.85 * PerPixelThickness;
+
 	Direction = normalize(Direction);
 
 	const float2 TextureSize = RootSizeMipCount.xy;
@@ -164,16 +170,18 @@ bool CastHiZRay(float3 Start, float3 Direction, out float3 OutHitUVz)
 	{
 		const float2 CellCount = GetCellCount(TextureSize, Level);
 		const float2 OldCellIdx = GetCell(Ray.xy, CellCount);
+		if (Ray.z > 1.0)
+			return false;
 		
 		float2 MinMaxZ = GetMinMaxDepthPlanes(Ray.xy, Level);
-		float3 TempRay = IntersectDepthPlane(O, D, max(Ray.z, MinMaxZ.x + CompareTolerance));
+		float3 TempRay = IntersectDepthPlane(O, D, max(Ray.z, MinMaxZ.x + PerPixelCompareTolerance));
 		const float2 NewCellIdx = GetCell(TempRay.xy, CellCount);
 		if (CrossedCellBoundary(OldCellIdx, NewCellIdx))
 		{
 			TempRay = IntersectCellBoundary(O, D, OldCellIdx, CellCount, CrossStep, CrossOffset);
 			Level = min(HIZ_MAX_LEVEL, Level + 2);
 		}
-		else if (Level == HIZ_START_LEVEL && WithinThickness(TempRay, MinMaxZ.x))
+		else if (Level == HIZ_START_LEVEL && WithinThickness(TempRay, MinMaxZ.x, PerPixelThickness))
 		{
 			intersected = true;
 		}
@@ -241,8 +249,9 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 SVPosition : SV_Position) : SV_Targe
 		float3 H = mul(ImportanceSampleVisibleGGX(UniformSampleDisk(E), a2, TangentV).xyz, TangentBasis);
 		float3 L = 2 * dot(V, H) * H - V;
 		//float3 L = reflect(-V, H);
+		//float3 L = reflect(-V, N);
 
-		float3 World1 = World0 + L * MaxWorldDistance;
+		float3 World1 = World0 + L * WorldThickness;
 		float3 Screen1 = ProjectWorldPos(World1);
 		Screen1 = UseHiZ > 0.f ? ApplyHZBUvFactor(Screen1) : Screen1;
 

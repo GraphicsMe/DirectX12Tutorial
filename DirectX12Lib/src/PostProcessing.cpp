@@ -32,10 +32,11 @@ namespace PostProcessing
 	bool g_EnableSSR = true;
 	bool g_DebugSSR = false;
 	bool g_UseHiZ = true;
-	bool g_UseMinMaxZ = true;
+	bool g_UseMinMaxZ = false;
 	float g_Thickness = 0.03f;
+	float g_WorldThickness = 0.289f;
 	float g_CompareTolerance = 0.027f;
-	int g_NumRays = 2;
+	int g_NumRays = 1;
 
 	FRootSignature m_CSSignature;
 	FRootSignature m_PostProcessSignature;
@@ -389,6 +390,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 		Vector4f	HZBUvFactorAndInvFactor;
 		Vector3f	CameraPos;
 		float		Thickness;
+		float		WorldThickness;
 		float		CompareTolerance;
 		float		UseHiZ;
 		float		UseMinMaxZ;
@@ -405,6 +407,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 	PSConstants.InvViewProj = PSConstants.ViewProj.Inverse();
 	PSConstants.ClipToPreClipNoAA = Camera.GetClipToPrevClipNoAA();
 	PSConstants.Thickness = g_Thickness;
+	PSConstants.WorldThickness = g_WorldThickness;
 	PSConstants.CompareTolerance = g_CompareTolerance;
 	PSConstants.UseHiZ = g_UseHiZ ? 1.f : 0.f;
 	PSConstants.UseMinMaxZ = g_UseMinMaxZ ? 1.f : 0.f;

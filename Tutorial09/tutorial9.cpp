@@ -196,7 +196,8 @@ public:
 						ImGui::Checkbox("Use Min-Max Z", &PostProcessing::g_UseMinMaxZ);
 					}
 					ImGui::Checkbox("Debug SSR", &PostProcessing::g_DebugSSR);
-					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 0.1f);
+					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 10.f);
+					ImGui::SliderFloat("WorldThickness", &PostProcessing::g_WorldThickness, 0.f, 1.f);
 					ImGui::SliderFloat("CompareTolerance", &PostProcessing::g_CompareTolerance, 0.f, 0.1f);
 					ImGui::SliderInt("NumRays", &PostProcessing::g_NumRays, 1, 16);
 					ImGui::Indent(-20);
