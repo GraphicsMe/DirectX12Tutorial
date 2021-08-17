@@ -27,6 +27,7 @@
 #include "MotionBlur.h"
 #include "PostProcessing.h"
 #include "DepthOfField.h"
+#include "UserMarkers.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -196,7 +197,7 @@ public:
 						ImGui::Checkbox("Use Min-Max Z", &PostProcessing::g_UseMinMaxZ);
 					}
 					ImGui::Checkbox("Debug SSR", &PostProcessing::g_DebugSSR);
-					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 10.f);
+					ImGui::SliderFloat("Thickness", &PostProcessing::g_Thickness, 0.f, 0.2f);
 					ImGui::SliderFloat("WorldThickness", &PostProcessing::g_WorldThickness, 0.f, 1.f);
 					ImGui::SliderFloat("CompareTolerance", &PostProcessing::g_CompareTolerance, 0.f, 0.1f);
 					ImGui::SliderInt("NumRays", &PostProcessing::g_NumRays, 1, 16);
@@ -262,8 +263,8 @@ public:
 			ShowTexture2D(CommandContext, m_PreintegratedGF);
 			break;
 		case SM_PBR:
-			//SkyPass(CommandContext, true);
 			BasePass(CommandContext, true);
+			SkyPass(CommandContext, false);
 			if (PostProcessing::g_EnableSSR)
 			{
 				PostProcessing::GenerateSSR(CommandContext, m_Camera, m_CubeBuffer);
@@ -683,6 +684,7 @@ private:
 
 	void SkyPass(FCommandContext& GfxContext, bool Clear)
 	{
+		UserMarker GpuMarker(GfxContext, "SkyPass");
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_SkySignature);
 		GfxContext.SetPipelineState(m_SkyPSO);
@@ -693,7 +695,7 @@ private:
 		FDepthBuffer& DepthBuffer = g_SceneDepthZ;
 
 		// Indicate that the back buffer will be used as a render target.
-		GfxContext.TransitionResource(m_CubeBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		//GfxContext.TransitionResource(m_IrradianceCube, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GfxContext.TransitionResource(DepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
 
@@ -714,13 +716,14 @@ private:
 		m_PSConstants.Exposure = m_Exposure;
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(m_PSConstants), &m_PSConstants);
 
-		GfxContext.SetDynamicDescriptor(2, 0, m_CubeBuffer.GetCubeSRV());
+		GfxContext.SetDynamicDescriptor(2, 0, m_PrefilteredCube.GetCubeSRV());
 
 		m_SkyBox->Draw(GfxContext);
 	}
 
 	void BasePass(FCommandContext& GfxContext, bool Clear)
 	{
+		UserMarker GpuMarker(GfxContext, "BasePass");
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_MeshSignature);
 		GfxContext.SetPipelineState(m_MeshPSO);
@@ -831,6 +834,7 @@ private:
 
 	void IBLPass(FCommandContext& GfxContext)
 	{
+		UserMarker GpuMarker(GfxContext, "IBLPass");
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_IBLSignature);
 		GfxContext.SetPipelineState(m_IBLPSO);

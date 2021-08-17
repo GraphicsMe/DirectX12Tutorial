@@ -7,6 +7,7 @@
 #include "D3D12RHI.h"
 #include "MotionBlur.h"
 #include "Camera.h"
+#include "UserMarkers.h"
 
 using namespace TemporalEffects;
 using namespace BufferManager;
@@ -197,6 +198,7 @@ void TemporalEffects::ClearHistory(FCommandContext& Context)
 
 void TemporalEffects::ResolveImage(FCommandContext& GraphicsContext,FColorBuffer& SceneColor)
 {
+	UserMarker GpuMarker(GraphicsContext, "TAA");
 	static bool s_EnableTAA = false;
 
 	// 二者不相同，清理缓冲

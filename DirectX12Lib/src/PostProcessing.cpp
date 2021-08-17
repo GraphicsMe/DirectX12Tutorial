@@ -15,6 +15,7 @@
 #include "CubeBuffer.h"
 #include "TemporalEffects.h"
 #include "MotionBlur.h"
+#include "UserMarkers.h"
 
 using namespace BufferManager;
 extern FCommandListManager g_CommandListManager;
@@ -33,7 +34,7 @@ namespace PostProcessing
 	bool g_DebugSSR = false;
 	bool g_UseHiZ = true;
 	bool g_UseMinMaxZ = false;
-	float g_Thickness = 0.03f;
+	float g_Thickness = 0.08f;
 	float g_WorldThickness = 0.289f;
 	float g_CompareTolerance = 0.027f;
 	int g_NumRays = 1;
@@ -179,6 +180,7 @@ void PostProcessing::Render(FCommandContext& CommandContext)
 
 void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 {
+	UserMarker GpuMarker(CommandContext, "BloomPass");
 	CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, true);
 #if ASYNC_COMPUTE
 	g_CommandListManager.GetComputeQueue().WaitForFenceValue(CommandContext.Flush());
@@ -242,6 +244,7 @@ void PostProcessing::GenerateBloom(FCommandContext& CommandContext)
 
 void PostProcessing::ToneMapping(FCommandContext& CommandContext)
 {
+	UserMarker GpuMarker(CommandContext, "ToneMapping");
 	// Set necessary state.
 	CommandContext.SetRootSignature(m_PostProcessSignature);
 	CommandContext.SetPipelineState(m_ToneMapWithBloomPSO);
@@ -287,6 +290,7 @@ void PostProcessing::ToneMapping(FCommandContext& CommandContext)
 
 void PostProcessing::BuildHZB(FCommandContext& CommandContext)
 {
+	UserMarker GpuMarker(CommandContext, "BuildHZB");
 	int32_t ScreenWidth = WindowWin32::Get().GetWidth();
 	int32_t ScreenHeight = WindowWin32::Get().GetHeight();
 	int32_t NumMipsX = std::max((int32_t)std::ceil(std::log2(ScreenWidth) - 1.0), 1);
@@ -311,6 +315,7 @@ void PostProcessing::BuildHZB(FCommandContext& CommandContext)
 	{
 		Vector2f	SrcTexelSize;
 		Vector2f	InputViewportMaxBound;
+		float		Thickness;
 	} Constants;
 
 	for (int i = 0; i < NumMips; ++i)
@@ -340,6 +345,7 @@ void PostProcessing::BuildHZB(FCommandContext& CommandContext)
 		{
 			ViewportBound = Vector2f(1.f) - 0.5f * Constants.SrcTexelSize;
 		}
+		Constants.Thickness = g_Thickness;
 		Constants.InputViewportMaxBound = ViewportBound;
 		ComputeContext.SetDynamicConstantBufferView(0, sizeof(Constants), &Constants);
 
@@ -359,6 +365,7 @@ void PostProcessing::GenerateSSR(FCommandContext& GfxContext, FCamera& Camera, F
 {
 	BuildHZB(GfxContext);
 
+	UserMarker GpuMarker(GfxContext, "SSR");
 	// Set necessary state.
 	GfxContext.SetRootSignature(m_PostProcessSignature);
 	GfxContext.SetPipelineState(m_SSRPSO);
