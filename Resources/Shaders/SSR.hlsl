@@ -107,7 +107,7 @@ float3 IntersectCellBoundary(
 bool CastSimpleRay(float3 Start, float3 Direction, float ScreenDistance, out float3 OutHitUVz)
 {
 	float PerPixelThickness = ScreenDistance;
-	float PerPixelCompareTolerance = 0.85 * PerPixelThickness;
+	float PerPixelCompareBias = 0.85 * PerPixelThickness;
 
 	float2 TextureSize;
 	SceneDepthZ.GetDimensions(TextureSize.x, TextureSize.y);
@@ -126,7 +126,7 @@ bool CastSimpleRay(float3 Start, float3 Direction, float ScreenDistance, out flo
 		if (Ray.z < 0 || Ray.z > 1)
 			return false;
 		Depth = SceneDepthZ.SampleLevel(PointSampler, Ray.xy, 0).x;
-		if (Depth + PerPixelCompareTolerance < Ray.z && Ray.z < Depth + PerPixelThickness)
+		if (Depth + PerPixelCompareBias < Ray.z && Ray.z < Depth + PerPixelThickness)
 		{
 			OutHitUVz = Ray;
 			return true;
@@ -144,7 +144,7 @@ bool WithinThickness(float3 Ray, float MinZ, float TheThickness)
 bool CastHiZRay(float3 Start, float3 Direction, float ScreenDistance, out float3 OutHitUVz)
 {
 	float PerPixelThickness = ScreenDistance;
-	float PerPixelCompareTolerance = 0.85 * PerPixelThickness;
+	float PerPixelCompareBias = 0.85 * PerPixelThickness;
 
 	Direction = normalize(Direction);
 
@@ -175,7 +175,7 @@ bool CastHiZRay(float3 Start, float3 Direction, float ScreenDistance, out float3
 			return false;
 		
 		float2 MinMaxZ = GetMinMaxDepthPlanes(Ray.xy, Level);
-		float t = max(Ray.z, MinMaxZ.x + PerPixelCompareTolerance);//clamp(Ray.z, MinMaxZ.x + PerPixelCompareTolerance, MinMaxZ.y + PerPixelCompareTolerance);
+		float t = UseMinMaxZ > 0.f ? clamp(Ray.z, MinMaxZ.x + PerPixelCompareBias, MinMaxZ.y + PerPixelCompareBias) : max(Ray.z, MinMaxZ.x + PerPixelCompareBias);
 		float3 TempRay = IntersectDepthPlane(O, D, t);
 		const float2 NewCellIdx = GetCell(TempRay.xy, CellCount);
 		if (CrossedCellBoundary(OldCellIdx, NewCellIdx))
@@ -228,7 +228,7 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 SVPosition : SV_Position) : SV_Targe
 	
 	float3 Screen0 = float3(Tex, Depth);
 	float3 World0 = UnprojectScreen(Screen0);
-	
+	Screen0 = UseHiZ > 0.f ? ApplyHZBUvFactor(Screen0) : Screen0;
 
 	float3 V = normalize(CameraPos - World0);
 	//float3 L = reflect(-V, N); //incident ray, surface normal
@@ -250,19 +250,14 @@ float4 PS_SSR(float2 Tex : TEXCOORD, float4 SVPosition : SV_Position) : SV_Targe
 		float2 E = Hammersley16(i, NumRays, Random);
 		float3 H = mul(ImportanceSampleVisibleGGX(UniformSampleDisk(E), a2, TangentV).xyz, TangentBasis);
 		float3 L = 2 * dot(V, H) * H - V;
-		//float3 L = reflect(-V, H);
 		//float3 L = reflect(-V, N);
 
 		float3 World1 = World0 + L * WorldThickness;
 		float3 Screen1 = ProjectWorldPos(World1);
+		Screen1 = UseHiZ > 0.f ? ApplyHZBUvFactor(Screen1) : Screen1;
 
 		float ScreenDistance = abs(Screen1.z - Screen0.z);
 
-		if (UseHiZ > 0.f)
-		{
-			Screen0 = ApplyHZBUvFactor(Screen0);
-			Screen1 = ApplyHZBUvFactor(Screen1);
-		}
 		float3 StartScreen = Screen0;			//[0, 1]
 		float3 StepScreen = Screen1 - Screen0;	//[-1, 1]
 

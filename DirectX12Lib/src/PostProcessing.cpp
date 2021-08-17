@@ -35,9 +35,9 @@ namespace PostProcessing
 	bool g_UseHiZ = true;
 	bool g_UseMinMaxZ = false;
 	float g_Thickness = 0.08f;
-	float g_WorldThickness = 0.289f;
+	float g_WorldThickness = 0.06f;
 	float g_CompareTolerance = 0.027f;
-	int g_NumRays = 1;
+	int g_NumRays = 2;
 
 	FRootSignature m_CSSignature;
 	FRootSignature m_PostProcessSignature;

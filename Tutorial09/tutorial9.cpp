@@ -296,7 +296,7 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(1.5f, 0.6f, 0.3f), Vector3f(0.f, 0.3f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(2.0f, 0.6f, 0.0f), Vector3f(0.f, 0.3f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
@@ -351,7 +351,8 @@ private:
 		m_SkyBox = std::make_unique<FSkyBox>();
 		m_CubeMapCross = std::make_unique<FCubeMapCross>();
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/harley/harley.obj", true, false, true);
-	
+		m_Mesh->SetPosition(0.f, -0.05f, 0.f);
+
 		m_FloorAlpha.LoadFromFile(L"../Resources/Models/harley/textures/Floor_Alpha.jpg", false);
 		m_FloorAlbedo.LoadFromFile(L"../Resources/Models/harley/textures/default.png", true);
 
