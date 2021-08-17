@@ -1,5 +1,6 @@
 ﻿add_subdirectory(DirectXTex)
 add_subdirectory(GLM)
+add_subdirectory(AGS)
 
 set_target_properties(
 	DirectXTex

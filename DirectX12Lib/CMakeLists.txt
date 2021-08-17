@@ -40,6 +40,7 @@
 	include/PostProcessing.h
 	include/DepthOfField.h
 	include/ScreenSpaceSubsurface.h
+	include/UserMarkers.h
 )
 
 set(SOURCES
@@ -81,6 +82,7 @@ set(SOURCES
 	src/PostProcessing.cpp
 	src/DepthOfField.cpp
 	src/ScreenSpaceSubsurface.cpp
+	src/UserMarkers.cpp
 )
 
 set( IMGUI_HEADERS
@@ -157,8 +159,13 @@ add_library(DirectX12Lib
 	${IMGUI_SOURCE}
 )
 
-target_include_directories(DirectX12Lib PUBLIC include include/imgui)
+target_include_directories(
+	DirectX12Lib 
+	PUBLIC include include/imgui
+	PUBLIC ../ThirdParty
+	)
 
 target_link_libraries(DirectX12Lib LINK_PUBLIC DirectXTex)
+target_link_libraries(DirectX12Lib LINK_PUBLIC amd_ags)
 
 set_source_files_properties(${SHADER_FILES} PROPERTIES VS_TOOL_OVERRIDE "None")
