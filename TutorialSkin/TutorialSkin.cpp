@@ -27,19 +27,26 @@
 #include "PostProcessing.h"
 #include "DepthOfField.h"
 #include "ScreenSpaceSubsurface.h"
+#include "UserMarkers.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <chrono>
 #include <iostream>
 #include <fstream>
-#include<sstream>       //istringstream 必须包含这个头文件
+#include<sstream>
 
 extern FCommandListManager g_CommandListManager;
 
 const int PREFILTERED_SIZE = 256;
 
 using namespace BufferManager;
+
+enum EShowMode
+{
+	SM_ScreenSpaceSurfaceScater,
+	SM_PreIntegratedSkin,
+};
 
 class TutorialSkin : public FGame
 {
@@ -57,6 +64,8 @@ public:
 
 		PreintegratedSkinLut();
 
+		PostProcessing::g_EnableBloom = false;
+		PostProcessing::g_EnableSSR = false;
 	}
 
 	void OnShutdown()
@@ -121,12 +130,37 @@ public:
 		ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
 		if (ImGui::Begin("Config", &ShowConfig, ImGuiWindowFlags_AlwaysAutoResize))
 		{
-			ImGui::Checkbox("Enable ScreenSapceSSS", &ScreenSpaceSubsurface::g_SSSSkinEnable);
+			ImGui::BeginGroup();
+			ImGui::Text("Show Mode");
+			ImGui::Indent(20);
+			ImGui::RadioButton("ScreenSpaceSurfaceScater", &m_ShowMode, SM_ScreenSpaceSurfaceScater);
+			ImGui::RadioButton("PreIntegratedSkin", &m_ShowMode, SM_PreIntegratedSkin);
+			ImGui::EndGroup();
+
 			ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
-			ImGui::SliderFloat("sssStrength", &ScreenSpaceSubsurface::g_sssStrength, 0.f, 10.f);
-			ImGui::SliderFloat("sssWidth", &ScreenSpaceSubsurface::g_sssWidth, 1.f, 10.f);
-			ImGui::SliderFloat("sssClampScale", &ScreenSpaceSubsurface::g_sssClampScale, 1.f, 100.f);
-			ImGui::SliderFloat("effect Strength", &ScreenSpaceSubsurface::g_EffectStr, 0.f, 1.f);
+
+			if (m_ShowMode == SM_ScreenSpaceSurfaceScater)
+			{
+				ImGui::Checkbox("Enable ScreenSapceSSS", &ScreenSpaceSubsurface::g_SSSSkinEnable);
+				ImGui::SliderFloat("sssStrength", &ScreenSpaceSubsurface::g_sssStrength, 0.f, 10.f);
+				ImGui::SliderFloat("sssWidth", &ScreenSpaceSubsurface::g_sssWidth, 1.f, 10.f);
+				ImGui::SliderFloat("sssClampScale", &ScreenSpaceSubsurface::g_sssClampScale, 1.f, 100.f);
+				ImGui::SliderFloat("effect Strength", &ScreenSpaceSubsurface::g_EffectStr, 0.f, 1.f);
+			}
+			else if(m_ShowMode == SM_PreIntegratedSkin)
+			{
+				ImGui::SliderFloat("CurveFactor", &m_CurveFactor, 0.001, 1);
+				ImGui::Checkbox("UseBlurNoaml", &m_UseBlurNoaml);
+				if (m_UseBlurNoaml)
+				{
+					ImGui::Indent(20);
+					ImGui::SliderFloat3("TuneNormalBlur", &m_TuneNormalBlur.x, 0.f, 1.f);
+					ImGui::Indent(-20);
+				}
+				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001, 1);
+				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001, 1);
+			}
+			
 			ImGui::SliderFloat("m_LightDir.x", &m_LightDir.x, -1, 1);
 			m_LightDir = m_LightDir.Normalize();
 		}
@@ -139,10 +173,16 @@ public:
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		BasePass(CommandContext, true);
-		SkinLightingPass(CommandContext);
-
-		ScreenSpaceSubsurface::Render(CommandContext);
+		if (m_ShowMode == SM_ScreenSpaceSurfaceScater)
+		{
+			BasePass(CommandContext, true);
+			SkinLightingPass(CommandContext);
+			ScreenSpaceSubsurface::Render(CommandContext);
+		}
+		else if (m_ShowMode == SM_PreIntegratedSkin)
+		{
+			PrePreintegratedSkinRendering(CommandContext, true);
+		}
 
 		PostProcessing::Render(CommandContext);
 
@@ -208,36 +248,10 @@ private:
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/HumanHead/HumanHead.obj", true, false);
 		m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 
-		//m_HDRFilePath = L"../Resources/HDR/spruit_sunrise_2k.hdr";
-		//ParsePath();
-
-		// IBL
-		//m_PreintegratedGF.LoadFromFile(L"../Resources/HDR/PreIntegrateBRDF.dds");
-		//m_IrradianceCube.LoadFromFile(m_IrradianceMapPath.c_str(), false);
-		//m_PrefilteredCube.LoadFromFile(m_PrefilteredMapPath.c_str(), false);
-
-		//m_SHCoeffs.resize(16);
-		//std::ifstream ifs;;
-		//ifs.open(m_SHCoeffsPath.c_str());
-		//for (int i = 0; i < 4 * 4; ++i)
-		//{
-		//	std::string str;
-		//	getline(ifs, str);
-
-		//	std::istringstream is(str);
-		//	std::string s;
-		//	is >> s;
-		//	m_SHCoeffs[i].x = std::stof(s);
-		//	is >> s;
-		//	m_SHCoeffs[i].y = std::stof(s);
-		//	is >> s;
-		//	m_SHCoeffs[i].z = std::stof(s);
-		//}
-		//ifs.close();
-
-		// 
 		m_PreintegratedSkinLut.Create(L"PreintegratedSkinLut", PREFILTERED_SIZE, PREFILTERED_SIZE, 1, DXGI_FORMAT_R16G16B16A16_FLOAT);
-		
+
+		m_BlurNormalMap.LoadFromFile(L"../Resources/Models/HumanHead/textures/Head_NM_blur.tga", false);
+		m_SpecularBRDF.LoadFromFile(L"../Resources/Models/HumanHead/textures/zirmayKalosSpecularBRDF.png", false);
 	}
 
 	void SetupShaders()
@@ -250,11 +264,11 @@ private:
 		m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
 		m_SkinLightingPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/SkinPBR.hlsl", "PS_SkinLighting", "ps_5_1");
 
-		// IBL
-		m_IBLPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PBR.hlsl", "PS_IBL", "ps_5_1");
-
 		// PreintegratedSkin
-		m_PreintegratedSkinLutPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PreIntegratedSkin.hlsl", "PS_PreIntegratedSkinLut", "ps_5_1");
+		m_PreintegratedSkinLutPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PreIntegratedSkinLut.hlsl", "PS_PreIntegratedSkinLut", "ps_5_1");
+
+		m_PreintegratedSkinShadingVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PreIntegratedSkinShading.hlsl", "VS_PreIntegratedSkin", "vs_5_1");
+		m_PreintegratedSkinShadingPS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PreIntegratedSkinShading.hlsl", "PS_PreIntegratedSkin", "ps_5_1");
 	}
 
 	void SetupPipelineState()
@@ -292,7 +306,6 @@ private:
 		DSS.BackFace = DSS.FrontFace;
 		m_MeshPSO.SetDepthStencilState(DSS);
 
-		m_MeshPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_MeshPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		DXGI_FORMAT RTFormats[] = {
 			g_SceneColorBuffer.GetFormat(), g_GBufferA.GetFormat(), g_GBufferB.GetFormat(), g_GBufferC.GetFormat(), MotionBlur::g_VelocityBuffer.GetFormat(),
@@ -329,18 +342,6 @@ private:
 		m_SkinLightingPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkinLightingPS.Get()));
 		m_SkinLightingPSO.Finalize();
 		
-		// IBL 
-		m_IBLPSO.SetRootSignature(m_SkinLightingSignature);
-		m_IBLPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
-		m_IBLPSO.SetBlendState(BlendAdd);
-		m_IBLPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
-		// no need to set input layout
-		m_IBLPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_IBLPSO.SetRenderTargetFormat(g_SceneColorBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
-		m_IBLPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
-		m_IBLPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_IBLPS.Get()));
-		m_IBLPSO.Finalize();
-
 		// PreintegratedSkinLut
 		m_PreintegratedSkinLutSignature.Reset(0, 0);
 		m_PreintegratedSkinLutSignature.Finalize(L"PreintegratedSkinLut RootSignature");
@@ -355,10 +356,32 @@ private:
 		m_PreintegratedSkinLutPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 		m_PreintegratedSkinLutPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PreintegratedSkinLutPS.Get()));
 		m_PreintegratedSkinLutPSO.Finalize();
+
+		// PreintegratedSkinShading
+		m_PreintegratedSkinShadingSignature.Reset(3, 1);
+		m_PreintegratedSkinShadingSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
+		m_PreintegratedSkinShadingSignature[1].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_PreintegratedSkinShadingSignature[2].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10);
+		m_PreintegratedSkinShadingSignature.InitStaticSampler(0, DefaultSamplerDesc, D3D12_SHADER_VISIBILITY_PIXEL);
+		m_PreintegratedSkinShadingSignature.Finalize(L"PreintegratedSkinShading RootSignature", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		m_PreintegratedSkinShadingPSO.SetRootSignature(m_PreintegratedSkinShadingSignature);
+		m_PreintegratedSkinShadingPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
+		m_PreintegratedSkinShadingPSO.SetBlendState(FPipelineState::BlendDisable);
+		m_PreintegratedSkinShadingPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		m_PreintegratedSkinShadingPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
+		m_PreintegratedSkinShadingPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		m_PreintegratedSkinShadingPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), g_SceneDepthZ.GetFormat());
+
+		m_PreintegratedSkinShadingPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PreintegratedSkinShadingVS.Get()));
+		m_PreintegratedSkinShadingPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PreintegratedSkinShadingPS.Get()));
+		m_PreintegratedSkinShadingPSO.Finalize();
 	}
 
 	void BasePass(FCommandContext& GfxContext, bool Clear)
 	{
+		UserMarker GPUMaker(GfxContext, "Base Pass");
+
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_MeshSignature);
 		GfxContext.SetPipelineState(m_MeshPSO);
@@ -437,6 +460,8 @@ private:
 
 	void SkinLightingPass(FCommandContext& GfxContext)
 	{
+		UserMarker GPUMaker(GfxContext, "Skin Lighting Pass");
+
 		// Set necessary state.
 		GfxContext.SetRootSignature(m_SkinLightingSignature);
 		GfxContext.SetPipelineState(m_SkinLightingPSO);
@@ -490,6 +515,8 @@ private:
 	void PreintegratedSkinLut()
 	{
 		FCommandContext& GfxContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
+		
+		UserMarker GPUMaker(GfxContext, "Pre-Preintegrated Skin Lut");
 
 		GfxContext.SetRootSignature(m_PreintegratedSkinLutSignature);
 		GfxContext.SetPipelineState(m_PreintegratedSkinLutPSO);
@@ -505,7 +532,74 @@ private:
 		GfxContext.Flush(true);
 
 		m_PreintegratedSkinLut.SaveColorBuffer(L"../Resources/HDR/PreintegratedSkinLut.dds");
+	}
+	
+	void PrePreintegratedSkinRendering(FCommandContext& GfxContext,bool Clear)
+	{
+		UserMarker GPUMaker(GfxContext, "Pre-Preintegrated Skin Shading");
+		
+		// Set necessary state.
+		GfxContext.SetRootSignature(m_PreintegratedSkinShadingSignature);
+		GfxContext.SetPipelineState(m_PreintegratedSkinShadingPSO);
+		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		GfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
 
+		// Indicate that the back buffer will be used as a render target.
+		GfxContext.TransitionResource(m_SpecularBRDF, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_BlurNormalMap, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_PreintegratedSkinLut, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
+
+		GfxContext.SetRenderTargets(1, &g_SceneColorBuffer.GetRTV(), g_SceneDepthZ.GetDSV());
+
+		if (Clear)
+		{
+			GfxContext.ClearColor(g_SceneColorBuffer);
+			GfxContext.ClearDepth(g_SceneDepthZ);
+		}
+
+		__declspec(align(16)) struct
+		{
+			FMatrix ModelMatrix;
+			FMatrix ViewProjMatrix;
+		} VSConstants;
+
+		VSConstants.ModelMatrix = m_Mesh->GetModelMatrix();
+		VSConstants.ViewProjMatrix = m_Camera.GetViewMatrix() * m_Camera.GetProjectionMatrix();
+
+		GfxContext.SetDynamicConstantBufferView(0, sizeof(VSConstants), &VSConstants);
+
+		__declspec(align(16)) struct
+		{
+			Vector3f	CameraPos;
+			float		CurveFactor;
+			Vector3f	LightDir;
+			int			DebugFlag;
+			Vector3f	SubsurfaceColor;
+			float		UseBlurNoaml;
+			Vector3f	TuneNormalBlur;
+			float		Smooth;
+			float		SpecularScale;
+		} PSConstants;
+
+		PSConstants.CameraPos = m_Camera.GetPosition();
+		PSConstants.CurveFactor = m_CurveFactor;
+		PSConstants.LightDir = m_LightDir;
+		PSConstants.DebugFlag = m_DebugFlag;
+		PSConstants.SubsurfaceColor = Vector3f(0.655000, 0.559480f, 0.382083f);
+		PSConstants.UseBlurNoaml = m_UseBlurNoaml;
+		PSConstants.TuneNormalBlur = m_TuneNormalBlur;
+		PSConstants.Smooth = m_SpecularSmooth;
+		PSConstants.SpecularScale = m_SpecularScale;
+
+		GfxContext.SetDynamicConstantBufferView(1, sizeof(PSConstants), &PSConstants);
+
+		GfxContext.SetDynamicDescriptor(2, 7, m_PreintegratedSkinLut.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 8, m_BlurNormalMap.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 9, m_SpecularBRDF.GetSRV());
+
+		m_Mesh->Draw(GfxContext);
 	}
 
 private:
@@ -533,20 +627,19 @@ private:
 	ComPtr<ID3DBlob>			m_PreintegratedSkinLutPS;
 	FRootSignature				m_PreintegratedSkinLutSignature;
 	FGraphicsPipelineState		m_PreintegratedSkinLutPSO;
+	
+	FTexture					m_BlurNormalMap;
+	FTexture					m_SpecularBRDF;
 
-	// IBL Pass
-	FTexture m_PreintegratedGF;
-	FCubeBuffer m_IrradianceCube, m_PrefilteredCube;
-	std::vector<Vector3f> m_SHCoeffs;
-	bool m_bSHDiffuse = true;
-
-	ComPtr<ID3DBlob>			m_IBLPS;
-	FGraphicsPipelineState		m_IBLPSO;
+	ComPtr<ID3DBlob>			m_PreintegratedSkinShadingVS;
+	ComPtr<ID3DBlob>			m_PreintegratedSkinShadingPS;
+	FRootSignature				m_PreintegratedSkinShadingSignature;
+	FGraphicsPipelineState		m_PreintegratedSkinShadingPSO;
 
 	// LightInfo
 	float						m_LightScale;
 	Vector3f					m_LightColor;
-	Vector3f					m_LightDir = Vector3f(0, 0, 1);
+	Vector3f					m_LightDir = Vector3f(1, 0, 1);
 
 	/*
 	* DebugFlag
@@ -555,6 +648,17 @@ private:
 	* 2: OnlySpecular
 	*/
 	int							m_DebugFlag = 0;
+
+	//
+	float						m_CurveFactor = 1.f;
+	bool						m_UseBlurNoaml = true;
+	Vector3f					m_TuneNormalBlur = Vector3f(0.9f, 0.8, 0.7);
+
+	float						m_SpecularSmooth = 0.65;
+	float						m_SpecularScale = 0.30;
+
+	// ShowMode
+	int							m_ShowMode = SM_PreIntegratedSkin;
 
 	// 
 	D3D12_VIEWPORT		m_MainViewport;

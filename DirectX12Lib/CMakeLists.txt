@@ -142,7 +142,8 @@ set(SHADER_FILES
 	../Resources/shaders/ScreenSpaceSubsurfaceBlur.hlsl
 	../Resources/shaders/ScreenSpaceSubsurfaceCombine.hlsl
 	../Resources/shaders/TempBufferCopy.hlsl
-	../Resources/shaders/PreIntegratedSkin.hlsl
+	../Resources/shaders/PreIntegratedSkinLut.hlsl
+	../Resources/shaders/PreIntegratedSkinShading.hlsl
 	../Resources/shaders/LTC_Floor.hlsl
 	../Resources/shaders/LTC_LightPolygon.hlsl
 )

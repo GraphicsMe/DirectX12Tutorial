@@ -5,6 +5,7 @@
 #include "PipelineState.h"
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
+#include "UserMarkers.h"
 
 using namespace BufferManager;
 
@@ -117,6 +118,8 @@ void ScreenSpaceSubsurface::Render(FCommandContext& CommandContext)
 {
 	if (g_SSSSkinEnable == false)
 		return;
+
+	UserMarker GPUMaker(CommandContext, "Screen Space Subsurface");
 
 	// blur
 	{
