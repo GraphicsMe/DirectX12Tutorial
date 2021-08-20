@@ -169,12 +169,24 @@ float4 visualizeVec(float3 v)
 	return float4(vv, 1.0);
 }
 
+// [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
+float3 F_Schlick(float3 F0, float VoH)
+{
+	float Fc = Pow5(1 - VoH);
+	return Fc + (1 - Fc) * F0;
+}
+
 
 float3 F_schlickR(float cosTheta, float3 F0, float roughness)
 {
 	return F0 + (max(1.0 - roughness, F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
+//Moving Frostbite to PBR
+float GetSpecularOcclusion(float NoV, float AO, float roughness)
+{
+	return saturate(pow(NoV + AO, exp2(-16.0 * roughness - 1.0)) - 1.0 + AO);
+}
 
 float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO, float4 SSR)
 {
@@ -183,8 +195,6 @@ float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 	float NoV = saturate(dot(N, V));
 	float3 F0 = lerp(0.04, Albedo.rgb, Metallic);
 	float3 F = F_schlickR(NoV, F0, Roughness);
-
-	float3 kD = (1.0 - F) * (1.0 - Metallic);
 
 	float3 Irradiance = 0;
 	if (bSHDiffuse)
@@ -197,7 +207,8 @@ float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 		Irradiance = IrradianceCubeMap.SampleLevel(LinearSampler, N, 0).xyz;
 	}
 
-	float3 Diffuse = Albedo * kD * Irradiance;
+	float3 DiffuseColor = (1.0 - Metallic) * Albedo;
+	float3 Diffuse = DiffuseColor * Irradiance; // no need to multiply "(1 - F)"
 
 	float Mip = ComputeReflectionCaptureMipFromRoughness(Roughness, MaxMipLevel - 1);
 	float2 BRDF = PreintegratedGF.SampleLevel(LinearSampler, float2(NoV, Roughness), 0).rg;
@@ -205,7 +216,8 @@ float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 	float3 PrefilteredColor = PrefilteredCubeMap.SampleLevel(LinearSampler, R, Mip).rgb;
 	float3 Specular = PrefilteredColor * (F * BRDF.x + BRDF.y);
 
-	float3 Final = (Diffuse + Specular) * AO * (1-SSR.a) + SSR.rgb;
+	float SpecAO = GetSpecularOcclusion(NoV, AO, Roughness);
+	float3 Final = (Diffuse * AO + Specular * SpecAO) * (1-SSR.a) + SSR.rgb;
 	return float4(Final, 1.0);
 }
 

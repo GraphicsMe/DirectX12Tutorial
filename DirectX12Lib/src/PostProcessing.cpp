@@ -26,7 +26,7 @@ namespace PostProcessing
 {
 	// bloom
 	bool g_EnableBloom = true;
-	float g_BloomIntensity = 1.f;
+	float g_BloomIntensity = 0.5f;
 	float g_BloomThreshold = 1.f;
 
 	// SSR

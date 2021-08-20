@@ -150,7 +150,7 @@ bool CastHiZRay(float3 Start, float3 Direction, float ScreenDistance, out float3
 
 	const float2 TextureSize = RootSizeMipCount.xy;
 	const float HIZ_MAX_LEVEL = RootSizeMipCount.z - 1;
-	const float2 HIZ_CROSS_EPSILON = 0.5 / TextureSize;
+	float2 HIZ_CROSS_EPSILON = 0.05 / TextureSize; // 0.5 in original paper, smaller value generate better result
 	
 	float Level = HIZ_START_LEVEL;
 	float Iteration = 0.f;

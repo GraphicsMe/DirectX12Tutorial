@@ -334,6 +334,16 @@ private:
 		return G1(k, NoL) * G1(k, NoV);
 	}
 
+	// Appoximation of joint Smith term for GGX
+	// [Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"]
+	float G_SmithJointApprox(float a2, float NoV, float NoL)
+	{
+		float a = sqrt(a2);
+		float Vis_SmithV = NoL * (NoV * (1 - a) + a);
+		float Vis_SmithL = NoV * (NoL * (1 - a) + a);
+		return 0.5f / (Vis_SmithV + Vis_SmithL);
+	}
+
 	void PreIntegrateBRDF()
 	{
 		int width = 128; //NoV
@@ -380,8 +390,8 @@ private:
 
 						if (NoL > 0.0f)
 						{
-							float G = G_Smith(NoL, NoV, Roughness);
-							float NoL_Vis_PDF = (G * VoH) / (NoH * NoV);
+							float Vis = G_SmithJointApprox(m2, NoV, NoL);
+							float NoL_Vis_PDF = NoL * Vis * (4.f * VoH / NoH);
 							float Fc = pow(1.0f - VoH, 5.f);
 							A += NoL_Vis_PDF * (1.0f - Fc);
 							B += NoL_Vis_PDF * Fc;
