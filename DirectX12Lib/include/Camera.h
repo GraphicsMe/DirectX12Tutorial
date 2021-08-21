@@ -31,6 +31,8 @@ public:
 	float GetNearClip() const { return m_NearZ; }
 	float GetFarClip() const { return m_FarZ; }
 
+	float GetFovY() const { return m_VerticalFov; }
+
 	const FMatrix& GetViewProjMatrix() const { return m_ViewProjMatrix; }
 
 	const FMatrix& GetPreviousViewMatrix() const { return m_PreviousViewMat; }

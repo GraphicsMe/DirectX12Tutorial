@@ -347,10 +347,16 @@ float Luminance(float3 Linear)
 }
 
 // convert view space linear depth
-float LinearEyeDepth(float depth,float near,float far)
+float Linear01Depth(float depth, float near, float far)
 {
 	float z = depth;
 	return (near * far) / (far - z * (far - near));
+}
+
+float LinearEyeDepth(float depth,float near,float far)
+{
+	float t = Linear01Depth(depth, near, far);
+	return lerp(near, far, t);
 }
 
 float2 ViewportUVToScreenPos(float2 ViewportUV)

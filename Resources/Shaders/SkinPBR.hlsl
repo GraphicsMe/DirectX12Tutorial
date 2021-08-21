@@ -6,6 +6,7 @@ Texture2D GBufferA : register(t0); // normal
 Texture2D GBufferB : register(t1); // metallSpecularRoughness
 Texture2D GBufferC : register(t2); // AlbedoAO
 Texture2D SceneDepthZ : register(t3); // Depth
+Texture2D SpecularBRDF : register(t4);
 
 SamplerState LinearSampler : register(s0);
 
@@ -18,6 +19,10 @@ cbuffer PSContant : register(b0)
 	float		LightScale;
 	float3		LightColor;
 	int			DebugFlag;
+	float		Smooth;
+	float		SpecularScale;
+	float2		pad2;
+	float3		SubsurfaceColor;
 };
 
 struct BxDFContext
@@ -94,7 +99,8 @@ float3 SpecularGGX(float Roughness, float3 F0, BxDFContext Context, float NoL)
 
 struct PixelOutput
 {
-	float4	Target0 : SV_Target0;
+	float4	DiffuseTerm	 : SV_Target0;
+	float4	SpecularTerm : SV_Target1;
 };
 
 PixelOutput PS_SkinLighting(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position)
@@ -125,6 +131,7 @@ PixelOutput PS_SkinLighting(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Positio
 	float3 V = normalize(CameraPos - WorldPos.xyz);
 
 	float3 L = -LightDir;
+	float3 H = normalize(L + V);
 
 	float3 DiffuseColor = AlbedoAo.rgb - Metallic * AlbedoAo.rgb;
 
@@ -143,23 +150,16 @@ PixelOutput PS_SkinLighting(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Positio
 	Lighting.Diffuse = Context.NoL * Diffuse_Lambert(DiffuseColor);
 
 	// Specular
-	Specular = 0.5;
-	float3 F0 = ComputeF0(Specular, DiffuseColor, Metallic);
-	Lighting.Specular = Context.NoL* SpecularGGX(Roughness, F0, Context, Context.NoL);
+	//Specular = 0.5;
+	//float3 F0 = ComputeF0(Specular, DiffuseColor, Metallic);
+	//Lighting.Specular = Context.NoL* SpecularGGX(Roughness, F0, Context, Context.NoL);
+	float NoH = dot(N, H);
+	float PH = pow(2.0 * SpecularBRDF.Sample(LinearSampler, float2(NoH, Smooth)).g, 10.0);
+	float F = 0.028;
+	Lighting.Specular = max(PH * F / dot(H, H), 0) * SpecularScale;
 
-	if (DebugFlag == 1)
-	{
-		Color = Lighting.Diffuse;
-	}
-	else if (DebugFlag == 2)
-	{
-		Color = Lighting.Specular;
-	}
-	else
-	{
-		Color = Lighting.Diffuse + Lighting.Specular;
-	}
-
-	Out.Target0 = float4(Color, 1.0f);
+	Out.DiffuseTerm = float4(Lighting.Diffuse, 1.0f);
+	Out.SpecularTerm = float4(Lighting.Specular, 1.0f);
+	
 	return Out;
 }

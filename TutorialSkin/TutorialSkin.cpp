@@ -137,25 +137,22 @@ public:
 			ImGui::RadioButton("PreIntegratedSkin", &m_ShowMode, SM_PreIntegratedSkin);
 			ImGui::EndGroup();
 
-			ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
-
 			if (m_ShowMode == SM_ScreenSpaceSurfaceScater)
 			{
-				ImGui::Checkbox("Enable ScreenSapceSSS", &ScreenSpaceSubsurface::g_SSSSkinEnable);
-				ImGui::SliderFloat("sssStrength", &ScreenSpaceSubsurface::g_sssStrength, 0.f, 10.f);
-				ImGui::SliderFloat("sssWidth", &ScreenSpaceSubsurface::g_sssWidth, 1.f, 10.f);
-				ImGui::SliderFloat("sssClampScale", &ScreenSpaceSubsurface::g_sssClampScale, 1.f, 100.f);
-				ImGui::SliderFloat("effect Strength", &ScreenSpaceSubsurface::g_EffectStr, 0.f, 1.f);
+				ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &ScreenSpaceSubsurface::g_DebugFlag, 0, 2);
+				ImGui::SliderFloat("sss Width", &ScreenSpaceSubsurface::g_sssWidth, 1.f, 80.f);
+				ImGui::SliderFloat("sss Strength", &ScreenSpaceSubsurface::g_sssStr, 0.f, 3.f);
+				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001, 1);
+				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001, 1);
 			}
 			else if(m_ShowMode == SM_PreIntegratedSkin)
 			{
+				ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
 				ImGui::SliderFloat("CurveFactor", &m_CurveFactor, 0.001, 1);
 				ImGui::Checkbox("UseBlurNoaml", &m_UseBlurNoaml);
 				if (m_UseBlurNoaml)
 				{
-					ImGui::Indent(20);
 					ImGui::SliderFloat3("TuneNormalBlur", &m_TuneNormalBlur.x, 0.f, 1.f);
-					ImGui::Indent(-20);
 				}
 				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001, 1);
 				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001, 1);
@@ -177,7 +174,7 @@ public:
 		{
 			BasePass(CommandContext, true);
 			SkinLightingPass(CommandContext);
-			ScreenSpaceSubsurface::Render(CommandContext);
+			ScreenSpaceSubsurface::Render(CommandContext, m_Camera);
 		}
 		else if (m_ShowMode == SM_PreIntegratedSkin)
 		{
@@ -336,7 +333,12 @@ private:
 		// no need to set input layout
 		m_SkinLightingPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 
-		m_SkinLightingPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), g_SceneDepthZ.GetFormat());
+		DXGI_FORMAT SkinLight_RTFormats[] = {
+			ScreenSpaceSubsurface::g_DiffuseTerm.GetFormat(),
+			ScreenSpaceSubsurface::g_SpecularTerm.GetFormat(),
+		};
+
+		m_SkinLightingPSO.SetRenderTargetFormats(2, SkinLight_RTFormats, g_SceneDepthZ.GetFormat());
 
 		m_SkinLightingPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 		m_SkinLightingPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SkinLightingPS.Get()));
@@ -368,7 +370,7 @@ private:
 		m_PreintegratedSkinShadingPSO.SetRootSignature(m_PreintegratedSkinShadingSignature);
 		m_PreintegratedSkinShadingPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 		m_PreintegratedSkinShadingPSO.SetBlendState(FPipelineState::BlendDisable);
-		m_PreintegratedSkinShadingPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+		m_PreintegratedSkinShadingPSO.SetDepthStencilState(DSS);
 		m_PreintegratedSkinShadingPSO.SetInputLayout((UINT)MeshLayout.size(), &MeshLayout[0]);
 		m_PreintegratedSkinShadingPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_PreintegratedSkinShadingPSO.SetRenderTargetFormats(1, &g_SceneColorBuffer.GetFormat(), g_SceneDepthZ.GetFormat());
@@ -468,16 +470,22 @@ private:
 		GfxContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		GfxContext.SetViewportAndScissor(m_MainViewport, m_MainScissor);
 
-		FColorBuffer& SceneBuffer = g_SceneColorBuffer;
-
 		// Indicate that the back buffer will be used as a render target.
-		GfxContext.TransitionResource(SceneBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(ScreenSpaceSubsurface::g_DiffuseTerm, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GfxContext.TransitionResource(ScreenSpaceSubsurface::g_SpecularTerm, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GfxContext.TransitionResource(g_GBufferA, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(g_GBufferB, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(g_GBufferC, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		GfxContext.TransitionResource(m_SpecularBRDF, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		GfxContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, true);
 
-		GfxContext.SetRenderTargets(1, &SceneBuffer.GetRTV());
+		D3D12_CPU_DESCRIPTOR_HANDLE RTVs[] = {
+			ScreenSpaceSubsurface::g_DiffuseTerm.GetRTV(), ScreenSpaceSubsurface::g_SpecularTerm.GetRTV(), 
+		};
+		GfxContext.SetRenderTargets(2, RTVs, g_SceneDepthZ.GetDSV());
+
+		GfxContext.ClearColor(ScreenSpaceSubsurface::g_DiffuseTerm);
+		GfxContext.ClearColor(ScreenSpaceSubsurface::g_SpecularTerm);
 
 		__declspec(align(16)) struct
 		{
@@ -494,6 +502,10 @@ private:
 			float		LightScale;
 			Vector3f	LightColor;
 			int			DebugFlag;
+			float		Smooth;
+			float		SpecularScale;
+			Vector2f	pad2;
+			Vector3f	SubsurfaceColor;
 		} SkinLightingPass_PSConstants;
 
 		SkinLightingPass_PSConstants.InvViewProj = m_Camera.GetViewProjMatrix().Inverse();
@@ -502,12 +514,16 @@ private:
 		SkinLightingPass_PSConstants.LightScale = m_LightScale;
 		SkinLightingPass_PSConstants.LightColor = m_LightColor;
 		SkinLightingPass_PSConstants.DebugFlag = m_DebugFlag;
+		SkinLightingPass_PSConstants.Smooth = m_SpecularSmooth;
+		SkinLightingPass_PSConstants.SpecularScale = m_SpecularScale;
+		SkinLightingPass_PSConstants.SubsurfaceColor = Vector3f(0.655000, 0.559480f, 0.382083f);
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(SkinLightingPass_PSConstants), &SkinLightingPass_PSConstants);
 		GfxContext.SetDynamicDescriptor(2, 0, g_GBufferA.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 1, g_GBufferB.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 2, g_GBufferC.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 3, g_SceneDepthZ.GetSRV());
+		GfxContext.SetDynamicDescriptor(2, 4, m_SpecularBRDF.GetSRV());
 
 		GfxContext.Draw(3);
 	}
@@ -599,6 +615,7 @@ private:
 		GfxContext.SetDynamicDescriptor(2, 8, m_BlurNormalMap.GetSRV());
 		GfxContext.SetDynamicDescriptor(2, 9, m_SpecularBRDF.GetSRV());
 
+		GfxContext.SetStencilRef(0x1);
 		m_Mesh->Draw(GfxContext);
 	}
 
@@ -658,7 +675,7 @@ private:
 	float						m_SpecularScale = 0.30;
 
 	// ShowMode
-	int							m_ShowMode = SM_PreIntegratedSkin;
+	int							m_ShowMode = SM_ScreenSpaceSurfaceScater;
 
 	// 
 	D3D12_VIEWPORT		m_MainViewport;

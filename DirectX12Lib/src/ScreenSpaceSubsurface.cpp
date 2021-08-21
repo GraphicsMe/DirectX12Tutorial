@@ -5,6 +5,7 @@
 #include "PipelineState.h"
 #include "SamplerManager.h"
 #include "D3D12RHI.h"
+#include "Camera.h"
 #include "UserMarkers.h"
 
 using namespace BufferManager;
@@ -13,13 +14,14 @@ namespace ScreenSpaceSubsurface
 {
 	// Paramters
 	bool					g_SSSSkinEnable = true;
-	float					g_sssStrength = 0.15f;
-	float					g_sssWidth = 3.0f;
-	float					g_sssClampScale = 50;
-	float					g_EffectStr = 0.5f;
+	float					g_sssWidth = 40.0f;
+	float					g_sssStr = 2.0f;
+	int						g_DebugFlag = 0;
 
 	// Buffers
-	FColorBuffer			g_SceneColorCopy;
+	FColorBuffer			g_DiffuseTerm;
+	FColorBuffer			g_SpecularTerm;
+
 	FColorBuffer			g_SubsurfaceColor[2];
 
 	// Shaders and PSOs
@@ -43,7 +45,9 @@ void ScreenSpaceSubsurface::Initialize()
 	// Buffers
 	g_SubsurfaceColor[0].Create(L"Subsurface Color 0", bufferWidth, bufferHeight, 1, g_SceneColorBuffer.GetFormat());
 	g_SubsurfaceColor[1].Create(L"Subsurface Color 1", bufferWidth, bufferHeight, 1, g_SceneColorBuffer.GetFormat());
-	g_SceneColorCopy.Create(L"SceneColor Copy ", bufferWidth, bufferHeight, 1, g_SceneColorBuffer.GetFormat());
+
+	g_DiffuseTerm.Create(L"Subsurface DiffuseTerm", bufferWidth, bufferHeight, 1, g_SceneColorBuffer.GetFormat());
+	g_SpecularTerm.Create(L"Subsurface SpecularTerm", bufferWidth, bufferHeight, 1, g_SceneColorBuffer.GetFormat());
 
 	// Shader and PSO
 	m_ScreenQuadVS = D3D12RHI::Get().CreateShader(L"../Resources/Shaders/PostProcess.hlsl", "VS_ScreenQuad", "vs_5_1");
@@ -80,7 +84,7 @@ void ScreenSpaceSubsurface::Initialize()
 	m_SubsurfacePSO.SetDepthStencilState(DSS);
 	m_SubsurfacePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 
-	m_SubsurfacePSO.SetRenderTargetFormats(1, &g_SceneColorCopy.GetFormat(), g_SceneDepthZ.GetFormat());
+	m_SubsurfacePSO.SetRenderTargetFormats(1, &g_DiffuseTerm.GetFormat(), g_SceneDepthZ.GetFormat());
 	m_SubsurfacePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 	m_SubsurfacePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SubsurfacePS.Get()));
 	m_SubsurfacePSO.Finalize();
@@ -90,7 +94,7 @@ void ScreenSpaceSubsurface::Initialize()
 	m_SubsurfaceCombinePSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
 	m_SubsurfaceCombinePSO.SetBlendState(FPipelineState::BlendDisable);
 	m_SubsurfaceCombinePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	m_SubsurfaceCombinePSO.SetRenderTargetFormats(1, &g_SceneColorCopy.GetFormat(), g_SceneDepthZ.GetFormat());
+	m_SubsurfaceCombinePSO.SetRenderTargetFormats(1, &g_DiffuseTerm.GetFormat(), g_SceneDepthZ.GetFormat());
 	m_SubsurfaceCombinePSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 	m_SubsurfaceCombinePSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_SubsurfaceCombinePS.Get()));
 	m_SubsurfaceCombinePSO.Finalize();
@@ -101,7 +105,7 @@ void ScreenSpaceSubsurface::Initialize()
 	m_TempBufferPSO.SetBlendState(FPipelineState::BlendDisable);
 	m_TempBufferPSO.SetDepthStencilState(FPipelineState::DepthStateDisabled);
 	m_TempBufferPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	m_TempBufferPSO.SetRenderTargetFormats(1, &g_SceneColorCopy.GetFormat(), g_SceneDepthZ.GetFormat());
+	m_TempBufferPSO.SetRenderTargetFormats(1, &g_DiffuseTerm.GetFormat(), g_SceneDepthZ.GetFormat());
 	m_TempBufferPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_ScreenQuadVS.Get()));
 	m_TempBufferPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_TempBufferPS.Get()));
 	m_TempBufferPSO.Finalize();
@@ -109,12 +113,13 @@ void ScreenSpaceSubsurface::Initialize()
 
 void ScreenSpaceSubsurface::Destroy()
 {
+	g_DiffuseTerm.Destroy();
+	g_SpecularTerm.Destroy();
 	g_SubsurfaceColor[0].Destroy();
 	g_SubsurfaceColor[1].Destroy();
-	g_SceneColorCopy.Destroy();
 }
 
-void ScreenSpaceSubsurface::Render(FCommandContext& CommandContext)
+void ScreenSpaceSubsurface::Render(FCommandContext& CommandContext,FCamera& Camera)
 {
 	if (g_SSSSkinEnable == false)
 		return;
@@ -123,69 +128,54 @@ void ScreenSpaceSubsurface::Render(FCommandContext& CommandContext)
 
 	// blur
 	{
+		float fovy = Camera.GetFovY();
+		float height = g_DiffuseTerm.GetHeight();
+		float width = g_DiffuseTerm.GetWidth();
+		float Scale = 0.1f;
+
+		__declspec(align(16)) struct
+		{
+			Vector2f	dir;
+			Vector2f	NearFar;
+			float		sssWidth;
+		} Subsurface_Constants;
+
 		CommandContext.SetRootSignature(m_SubsurfaceSignature);
 		CommandContext.SetPipelineState(m_SubsurfacePSO);
 		CommandContext.TransitionResource(g_SceneDepthZ, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
 
-		for (int i = 0; i < 6; ++i)
+		// Horizontal Blur
 		{
-			// Horizontal Blur
-			if (i == 0)
-			{
-				CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			}
-			else
-			{
-				CommandContext.TransitionResource(g_SubsurfaceColor[1], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			}
-
+			CommandContext.TransitionResource(g_DiffuseTerm, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			CommandContext.TransitionResource(g_SubsurfaceColor[0], D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 			CommandContext.SetRenderTargets(1, &g_SubsurfaceColor[0].GetRTV(), g_SceneDepthZ.GetDSV());
 			CommandContext.ClearColor(g_SubsurfaceColor[0]);
 
-			__declspec(align(16)) struct
-			{
-				Vector2f	dir;
-				float		sssStrength;
-				float		sssWidth;
-				float		pixelSize;
-				float		clampScale;
-			} Subsurface_Constants;
-
-			Subsurface_Constants.dir = Vector2f(0, 1);
-			Subsurface_Constants.pixelSize = 1.0f / g_SceneColorBuffer.GetWidth();
-			Subsurface_Constants.sssStrength = g_sssStrength;
-			Subsurface_Constants.sssWidth = g_sssWidth;
-			Subsurface_Constants.clampScale = g_sssClampScale;
+			Subsurface_Constants.dir = Vector2f(1, 0);
+			Subsurface_Constants.sssWidth = g_sssWidth * tanf(fovy * 0.5f) * height / width * Scale;
+			Subsurface_Constants.NearFar = Vector2f(Camera.GetNearClip(), Camera.GetFarClip());
 
 			CommandContext.SetDynamicConstantBufferView(0, sizeof(Subsurface_Constants), &Subsurface_Constants);
 
-			if (i == 0)
-			{
-				CommandContext.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
-			}
-			else
-			{
-				CommandContext.SetDynamicDescriptor(1, 0, g_SubsurfaceColor[1].GetSRV());
-			}
+			CommandContext.SetDynamicDescriptor(1, 0, g_DiffuseTerm.GetSRV());
 			CommandContext.SetDynamicDescriptor(1, 1, g_SceneDepthZ.GetSRV());
 
 			CommandContext.SetStencilRef(0x1);
 			// no need to set vertex buffer and index buffer
 			CommandContext.Draw(3);
+		}
 
-			// Vertical Blur
+		// Vertical Blur
+		{
 			CommandContext.TransitionResource(g_SubsurfaceColor[0], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			CommandContext.TransitionResource(g_SubsurfaceColor[1], D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 
 			CommandContext.SetRenderTargets(1, &g_SubsurfaceColor[1].GetRTV(), g_SceneDepthZ.GetDSV());
 			CommandContext.ClearColor(g_SubsurfaceColor[1]);
 
-			Subsurface_Constants.dir = Vector2f(1, 0);
-			Subsurface_Constants.pixelSize = 1.0f / g_SceneColorBuffer.GetWidth();
-			Subsurface_Constants.sssStrength = g_sssStrength;
-			Subsurface_Constants.sssWidth = g_sssWidth;
-			Subsurface_Constants.clampScale = g_sssClampScale;
+			Subsurface_Constants.dir = Vector2f(0, 1);
+			Subsurface_Constants.sssWidth = g_sssWidth * tanf(fovy * 0.5f) * height / width * Scale;
+			Subsurface_Constants.NearFar = Vector2f(Camera.GetNearClip(), Camera.GetFarClip());
 
 			CommandContext.SetDynamicConstantBufferView(0, sizeof(Subsurface_Constants), &Subsurface_Constants);
 
@@ -198,26 +188,13 @@ void ScreenSpaceSubsurface::Render(FCommandContext& CommandContext)
 		}
 	}
 
-	// copy to tempbuffer
-	{
-		CommandContext.SetRootSignature(m_SubsurfaceSignature);
-		CommandContext.SetPipelineState(m_TempBufferPSO);
-
-		CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		CommandContext.TransitionResource(g_SceneColorCopy, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-
-		CommandContext.SetRenderTargets(1, &g_SceneColorCopy.GetRTV());
-
-		CommandContext.SetDynamicDescriptor(1, 0, g_SceneColorBuffer.GetSRV());
-		CommandContext.Draw(3);
-	}
-
 	// Combine
 	{
 		CommandContext.SetRootSignature(m_SubsurfaceSignature);
 		CommandContext.SetPipelineState(m_SubsurfaceCombinePSO);
 		
-		CommandContext.TransitionResource(g_SceneColorCopy, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		CommandContext.TransitionResource(g_DiffuseTerm, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		CommandContext.TransitionResource(g_SpecularTerm, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		CommandContext.TransitionResource(g_SubsurfaceColor[1], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		CommandContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
 		CommandContext.SetRenderTargets(1, &g_SceneColorBuffer.GetRTV(), g_SceneDepthZ.GetDSV());
@@ -226,14 +203,17 @@ void ScreenSpaceSubsurface::Render(FCommandContext& CommandContext)
 		{
 			Vector3f	SubsurfaceColor;
 			float		EffectStr;
+			int			DebugFlag;
 		} Combine_Constants;
 
 		Combine_Constants.SubsurfaceColor = Vector3f(0.655000, 0.559480f, 0.382083f);
-		Combine_Constants.EffectStr = g_EffectStr;
+		Combine_Constants.EffectStr = g_sssStr;
+		Combine_Constants.DebugFlag = g_DebugFlag;
 
 		CommandContext.SetDynamicConstantBufferView(0, sizeof(Combine_Constants), &Combine_Constants);
-		CommandContext.SetDynamicDescriptor(1, 0, g_SceneColorCopy.GetSRV());
-		CommandContext.SetDynamicDescriptor(1, 1, g_SubsurfaceColor[1].GetSRV());
+		CommandContext.SetDynamicDescriptor(1, 0, g_DiffuseTerm.GetSRV());
+		CommandContext.SetDynamicDescriptor(1, 1, g_SpecularTerm.GetSRV());
+		CommandContext.SetDynamicDescriptor(1, 2, g_SubsurfaceColor[1].GetSRV());
 
 		CommandContext.Draw(3);
 	}
