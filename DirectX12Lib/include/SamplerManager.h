@@ -13,7 +13,7 @@ public:
 		AddressV = AddressMode;
 		AddressW = AddressMode;
 		MipLODBias = 0.f;
-		MaxAnisotropy = 1;
+		MaxAnisotropy = 16;
 		ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 		BorderColor[0] = BorderColor[1] = BorderColor[2] = BorderColor[3] = 1.f;
 		MinLOD = 0.0f;
