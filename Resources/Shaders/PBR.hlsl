@@ -259,6 +259,7 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	float3 tNormal = NormalMap.Sample(LinearSampler, In.Tex).xyz;
 	tNormal = 2 * tNormal - 1.0; // [0,1] -> [-1, 1]
 	float3 N = mul(tNormal, TBN);
+	N = normalize(N);
 
 	Out.Target0 = float4(Emissive, 1.0);
 	Out.Target1 = float4(0.5*N+0.5, 1.0);
