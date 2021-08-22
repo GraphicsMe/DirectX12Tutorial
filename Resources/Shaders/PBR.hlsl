@@ -28,6 +28,9 @@ cbuffer PSContant : register(b0)
 	float4x4 InvViewProj;
 	float4	TemporalAAJitter;
 	
+	int		OpacityInAlbedoAlpha;
+	float3	pad;
+
 	float3	Coeffs[16];
 };
 
@@ -239,10 +242,14 @@ void PS_PBR_Floor(PixelInput In, out PixelOutput Out)
 
 void PS_PBR(PixelInput In, out PixelOutput Out)
 {
+	float4 Albedo = BaseMap.Sample(LinearSampler, In.Tex);
 	float Opacity = OpacityMap.Sample(LinearSampler, In.Tex).r;
+	if (OpacityInAlbedoAlpha > 0)
+	{
+		Opacity = Albedo.a;
+	}
 	clip(Opacity < 0.1f ? -1 : 1);
 
-	float4 Albedo = BaseMap.Sample(LinearSampler, In.Tex);
 	float Metallic = MetallicMap.Sample(LinearSampler, In.Tex).x;
 	float Roughness = RoughnessMap.Sample(LinearSampler, In.Tex).x;
 	float AO = AOMap.Sample(LinearSampler, In.Tex).x;

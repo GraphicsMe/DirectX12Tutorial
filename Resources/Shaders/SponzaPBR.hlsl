@@ -92,6 +92,12 @@ float3 SpecularGGX(float Roughness, float3 F0, BxDFContext Context, float NoL)
 	return (D * Vis) * F;
 }
 
+//Moving Frostbite to PBR
+float GetSpecularOcclusion(float NoV, float AO, float roughness)
+{
+	return saturate(pow(NoV + AO, exp2(-16.0 * roughness - 1.0)) - 1.0 + AO);
+}
+
 struct PixelOutput
 {
 	float4	Color	 : SV_Target0;
@@ -145,21 +151,22 @@ PixelOutput PS_SponzaPBR(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position)
 	Context.NoL = saturate(Context.NoL);
 	Context.NoV = saturate(abs(Context.NoV) + 1e-5);
 
+	float SpecularAO = GetSpecularOcclusion(Context.NoV, AO, Roughness);
+
 	float3 Color = 0;
 
 	FDirectLighting Lighting;
 	Lighting.Diffuse = 0;
 	Lighting.Specular = 0;
+
 	// Diffuse
-	Lighting.Diffuse = Context.NoL * Diffuse_Lambert(DiffuseColor) * falloff * LightScale * LightColor;
+	Lighting.Diffuse = Context.NoL * Diffuse_Lambert(DiffuseColor) * falloff * LightScale * LightColor * AO;
 
 	// Specular
 	float3 F0 = ComputeF0(Specular, DiffuseColor, Metallic);
-	Lighting.Specular = Context.NoL * SpecularGGX(Roughness, F0, Context, Context.NoL) * falloff * LightScale * LightColor;
-	//Lighting.Specular = 0;
+	Lighting.Specular = Context.NoL * SpecularGGX(Roughness, F0, Context, Context.NoL) * falloff * LightScale * LightColor * SpecularAO;
 
 	Out.Color = float4(Lighting.Specular + Lighting.Diffuse, 1.0f);
-	//Out.Color = float4(DiffuseColor, 1);
 
 	return Out;
 }

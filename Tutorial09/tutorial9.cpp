@@ -792,6 +792,8 @@ private:
 			int			Degree;
 			FMatrix		InvViewProj;
 			Vector4f	TemporalAAJitter;
+			float		OpacityInAlbedoAlpha;
+			Vector3f	pad;
 			Vector4f	Coeffs[16];
 		} PBR_Constants;
 
@@ -808,6 +810,8 @@ private:
 		Vector4f TemporalAAJitter;
 		TemporalEffects::GetJitterOffset(TemporalAAJitter, m_MainViewport.Width, m_MainViewport.Height);
 		PBR_Constants.TemporalAAJitter = TemporalAAJitter;
+
+		PBR_Constants.OpacityInAlbedoAlpha = false;
 
 		for (int i = 0; i < m_SHCoeffs.size(); ++i)
 		{

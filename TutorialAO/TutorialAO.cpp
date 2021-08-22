@@ -389,6 +389,8 @@ private:
 			int			Degree;
 			FMatrix		InvViewProj;
 			Vector4f	TemporalAAJitter;
+			float		OpacityInAlbedoAlpha;
+			Vector3f	pad;
 			Vector4f	Coeffs[16];
 		} BasePass_PSConstants;
 
@@ -397,6 +399,8 @@ private:
 		Vector4f TemporalAAJitter;
 		TemporalEffects::GetJitterOffset(TemporalAAJitter, m_MainViewport.Width, m_MainViewport.Height);
 		BasePass_PSConstants.TemporalAAJitter = TemporalAAJitter;
+
+		BasePass_PSConstants.OpacityInAlbedoAlpha = true;
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(BasePass_PSConstants), &BasePass_PSConstants);
 
