@@ -242,7 +242,7 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	float Opacity = OpacityMap.Sample(LinearSampler, In.Tex).r;
 	clip(Opacity < 0.1f ? -1 : 1);
 
-	float3 Albedo = BaseMap.Sample(LinearSampler, In.Tex).xyz;
+	float4 Albedo = BaseMap.Sample(LinearSampler, In.Tex);
 	float Metallic = MetallicMap.Sample(LinearSampler, In.Tex).x;
 	float Roughness = RoughnessMap.Sample(LinearSampler, In.Tex).x;
 	float AO = AOMap.Sample(LinearSampler, In.Tex).x;
@@ -256,7 +256,7 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	Out.Target0 = float4(Emissive, 1.0);
 	Out.Target1 = float4(0.5*N+0.5, 1.0);
 	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
-	Out.Target3 = float4(Albedo, AO);
+	Out.Target3 = float4(Albedo.rgb, AO);
 	Out.Target4 = float4(Calculate3DVelocity(In.VelocityScreenPosition, In.VelocityPrevScreenPosition), 0);
 }
 
