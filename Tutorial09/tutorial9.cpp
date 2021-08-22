@@ -792,8 +792,9 @@ private:
 			int			Degree;
 			FMatrix		InvViewProj;
 			Vector4f	TemporalAAJitter;
-			float		OpacityInAlbedoAlpha;
-			Vector3f	pad;
+			int			OpacityInAlbedoAlpha;
+			int			UseGeometryNormal;
+			Vector2f	pad;
 			Vector4f	Coeffs[16];
 		} PBR_Constants;
 
@@ -812,6 +813,7 @@ private:
 		PBR_Constants.TemporalAAJitter = TemporalAAJitter;
 
 		PBR_Constants.OpacityInAlbedoAlpha = false;
+		PBR_Constants.UseGeometryNormal = false;
 
 		for (int i = 0; i < m_SHCoeffs.size(); ++i)
 		{

@@ -72,7 +72,7 @@ public:
 		
 		// update lights
 		static float lightAnimTime = 0.0f;
-		//if (false)
+		if(m_AnimationLight)
 		{
 			lightAnimTime += static_cast<float>(delta) * 0.0005f * MATH_PI;
 		}
@@ -89,9 +89,9 @@ public:
 			float angle = lightAnimTime + directionalLightOffset * i;
 
 			Vector3f positionWS(
-				-static_cast<float>(std::cos(angle)) * radius,
-				-static_cast<float>(std::sin(angle)) * radius,
-				-radius
+				static_cast<float>(std::cos(angle)) * radius,
+				static_cast<float>(std::sin(angle)) * radius,
+				radius
 			);
 
 			Vector3f directionWS = positionWS.Normalize();
@@ -105,8 +105,8 @@ public:
 		{
 			m_RotateY += delta * 0.0005f;
 			m_RotateY = fmodf(m_RotateY, MATH_2PI);
-			m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 		}
+		m_Mesh->SetRotation(FMatrix::RotateY(m_RotateY));
 
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
@@ -151,10 +151,10 @@ public:
 		ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
 		if (ImGui::Begin("Config", &ShowConfig, ImGuiWindowFlags_AlwaysAutoResize))
 		{
-			ImGui::BeginGroup();
-			ImGui::Text("Show Mode");
-			ImGui::Indent(20);
-			ImGui::EndGroup();
+			ImGui::Checkbox("Animation Light", &m_AnimationLight);
+			ImGui::Checkbox("Rotate Mesh", &m_RotateMesh);
+			ImGui::SameLine();
+			ImGui::SliderFloat("RotateY", &m_RotateY, 0, MATH_2PI);
 		}
 		ImGui::End();
 
@@ -186,7 +186,7 @@ public:
 private:
 	void SetupCameraLight()
 	{
-		m_Camera = FCamera(Vector3f(0.0f, 0, -0.5f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		m_Camera = FCamera(Vector3f(0.0f, 0, -1.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_Camera.SetMouseMoveSpeed(1e-3f);
 		m_Camera.SetMouseRotateSpeed(1e-4f);
 
@@ -234,7 +234,6 @@ private:
 
 	void SetupMesh()
 	{
-		// https://sketchfab.com/3d-models/sponza-scene-725bc7dc88b049a5b38bfa718b218909
 		m_Mesh = std::make_unique<FModel>("../Resources/Models/SponzaPBR_dds2tga/SponzaPBR.obj", false, false, false);
 		m_Mesh->SetPosition(0, 1.5, 0);
 	}
@@ -389,8 +388,9 @@ private:
 			int			Degree;
 			FMatrix		InvViewProj;
 			Vector4f	TemporalAAJitter;
-			float		OpacityInAlbedoAlpha;
-			Vector3f	pad;
+			int			OpacityInAlbedoAlpha;
+			int			UseGeometryNormal;
+			Vector2f	pad;
 			Vector4f	Coeffs[16];
 		} BasePass_PSConstants;
 
@@ -401,6 +401,7 @@ private:
 		BasePass_PSConstants.TemporalAAJitter = TemporalAAJitter;
 
 		BasePass_PSConstants.OpacityInAlbedoAlpha = true;
+		BasePass_PSConstants.UseGeometryNormal = true;
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(BasePass_PSConstants), &BasePass_PSConstants);
 
@@ -496,9 +497,10 @@ private:
 
 	std::vector<FDirectionalLight>	m_DirectionalLights;
 	const int						m_NumDirectionalLights = 3;
+	bool							m_AnimationLight = false;
 
 	std::unique_ptr<FModel> m_Mesh;
-	float m_RotateY = MATH_PI / 2;
+	float m_RotateY = MATH_PI;
 	bool m_RotateMesh = false;
 
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;

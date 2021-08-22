@@ -29,7 +29,8 @@ cbuffer PSContant : register(b0)
 	float4	TemporalAAJitter;
 	
 	int		OpacityInAlbedoAlpha;
-	float3	pad;
+	int		UseGeometryNormal;
+	float2	pad;
 
 	float3	Coeffs[16];
 };
@@ -259,6 +260,10 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	float3 tNormal = NormalMap.Sample(LinearSampler, In.Tex).xyz;
 	tNormal = 2 * tNormal - 1.0; // [0,1] -> [-1, 1]
 	float3 N = mul(tNormal, TBN);
+	if (UseGeometryNormal)
+	{
+		N = In.N;
+	}
 	N = normalize(N);
 
 	Out.Target0 = float4(Emissive, 1.0);
