@@ -1,8 +1,10 @@
 # DirectX12 Tutorial
 
-此项目是受[LearnOpenGL](https://learnopengl.com/)启发，开发的一个基于DirectX 12的、以学习为目的的渲染器。完成的基础工作有DirectX 12图形API封装、简易应用框架、基础数学库、obj模型加载等；渲染相关算法实现了Tone Mapping、Shadow Mapping、单次大气散射、IBL、PBR、延迟渲染、Bloom、SSR等；另外有部分算法由朋友合作完成，比如TAA、皮肤渲染等。
+![Overview](./Tutorial09/Result/Final-Clean.png)
 
-![Overview](./Tutorial09/Result/Final.png)
+
+
+此项目是受[LearnOpenGL](https://learnopengl.com/)启发，开发的一个基于DirectX 12的、以学习为目的的渲染器。完成的基础工作有DirectX 12图形API封装、简易应用框架、基础数学库、obj模型加载等；渲染相关算法实现了Tone Mapping、Shadow Mapping、单次大气散射、IBL、PBR、延迟渲染、Bloom、SSR等；另外有部分算法由朋友合作完成，比如TAA、皮肤渲染等。
 
 
 
