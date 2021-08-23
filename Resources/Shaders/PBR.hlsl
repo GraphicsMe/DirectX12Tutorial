@@ -28,10 +28,6 @@ cbuffer PSContant : register(b0)
 	float4x4 InvViewProj;
 	float4	TemporalAAJitter;
 	
-	int		OpacityInAlbedoAlpha;
-	int		UseGeometryNormal;
-	float2	pad;
-
 	float3	Coeffs[16];
 };
 
@@ -243,14 +239,10 @@ void PS_PBR_Floor(PixelInput In, out PixelOutput Out)
 
 void PS_PBR(PixelInput In, out PixelOutput Out)
 {
-	float4 Albedo = BaseMap.Sample(LinearSampler, In.Tex);
 	float Opacity = OpacityMap.Sample(LinearSampler, In.Tex).r;
-	if (OpacityInAlbedoAlpha > 0)
-	{
-		Opacity = Albedo.a;
-	}
 	clip(Opacity < 0.1f ? -1 : 1);
 
+	float3 Albedo = BaseMap.Sample(LinearSampler, In.Tex).xyz;
 	float Metallic = MetallicMap.Sample(LinearSampler, In.Tex).x;
 	float Roughness = RoughnessMap.Sample(LinearSampler, In.Tex).x;
 	float AO = AOMap.Sample(LinearSampler, In.Tex).x;
@@ -260,16 +252,11 @@ void PS_PBR(PixelInput In, out PixelOutput Out)
 	float3 tNormal = NormalMap.Sample(LinearSampler, In.Tex).xyz;
 	tNormal = 2 * tNormal - 1.0; // [0,1] -> [-1, 1]
 	float3 N = mul(tNormal, TBN);
-	if (UseGeometryNormal)
-	{
-		N = In.N;
-	}
-	N = normalize(N);
 
 	Out.Target0 = float4(Emissive, 1.0);
 	Out.Target1 = float4(0.5*N+0.5, 1.0);
 	Out.Target2 = float4(Metallic, 0.5, Roughness, 1.0);
-	Out.Target3 = float4(Albedo.rgb, AO);
+	Out.Target3 = float4(Albedo, AO);
 	Out.Target4 = float4(Calculate3DVelocity(In.VelocityScreenPosition, In.VelocityPrevScreenPosition), 0);
 }
 

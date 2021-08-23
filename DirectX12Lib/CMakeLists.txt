@@ -146,7 +146,6 @@ set(SHADER_FILES
 	../Resources/shaders/PreIntegratedSkinShading.hlsl
 	../Resources/shaders/LTC_Floor.hlsl
 	../Resources/shaders/LTC_LightPolygon.hlsl
-	../Resources/shaders/SponzaPBR.hlsl
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

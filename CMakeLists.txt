@@ -79,11 +79,6 @@ add_executable(TutorialLTC TutorialLTC/TutorialLTC.cpp)
 target_link_libraries(TutorialLTC LINK_PUBLIC DirectX12Lib)
 set_target_properties(TutorialLTC PROPERTIES
 	PROJECT_LABEL "TutorialLTC - PolygonalLightShadingWithLinearlyTransformedCosines")
-	
-add_executable(TutorialAO TutorialAO/TutorialAO.cpp)
-target_link_libraries(TutorialAO LINK_PUBLIC DirectX12Lib)
-set_target_properties(TutorialAO PROPERTIES
-	PROJECT_LABEL "TutorialAO - Ambient Occlusion")
 
 set_target_properties(
 	Tutorial01
@@ -98,7 +93,6 @@ set_target_properties(
 	Tutorial10
 	TutorialSkin
 	TutorialLTC
-	TutorialAO
 	PROPERTIES
 		FOLDER Tutorials
 )
