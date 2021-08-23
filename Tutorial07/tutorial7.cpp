@@ -19,6 +19,7 @@
 #include "Light.h"
 #include "GameInput.h"
 #include "BufferManager.h"
+#include "ImguiManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -79,6 +80,27 @@ public:
 		if (GameInput::IsKeyDown('F'))
 			SetupCameraLight();
 	}
+
+	void OnGUI(FCommandContext& CommandContext)
+	{
+		ImguiManager::Get().NewFrame();
+
+		ImGui::Begin("Background Color", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::ColorEdit3("Color", &m_ClearColor.x);
+
+		ImGui::BeginGroup();
+		ImGui::Text("Shadow Mode");
+		ImGui::Indent(20);
+		ImGui::RadioButton("Raw", &m_ShadowMode, SM_Raw);
+		ImGui::RadioButton("PCF", &m_ShadowMode, SM_PCF);
+		ImGui::RadioButton("VSM", &m_ShadowMode, SM_VSM);
+
+		ImGui::EndGroup();
+
+		ImGui::End();
+
+		ImguiManager::Get().Render(CommandContext, RenderWindow::Get());
+	}
 	
 	void OnRender()
 	{
@@ -90,7 +112,10 @@ public:
 			ComputePass(CommandContext);
 		}
 		ColorPass(CommandContext);
+
+		OnGUI(CommandContext);
 		
+		CommandContext.TransitionResource(RenderWindow::Get().GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 		CommandContext.Finish(true);
 
 		RenderWindow::Get().Present();
@@ -184,7 +209,7 @@ private:
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		m_PipelineState.SetRenderTargetFormats(1, &RenderWindow::Get().GetColorFormat(), g_SceneDepthZ.GetFormat());
 		m_PipelineState.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_VertexShader.Get()));
-		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(GetPixelShaderByMode(m_ShadowMode)));
+		m_PipelineState.SetPixelShader(CD3DX12_SHADER_BYTECODE(GetPixelShaderByMode((EShadowMode)m_ShadowMode)));
 		m_PipelineState.Finalize();
 
 		m_ShadowPSO.SetRootSignature(m_RootSignature);
@@ -250,15 +275,18 @@ private:
 
 		m_VSConstant.ModelMatrix = m_Box->GetModelMatrix();
 		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
-		m_Box->Draw(CommandContext);
+		CommandContext.SetDynamicDescriptor(2, 0, m_Box->GetTextureView(0, 0));
+		m_Box->Draw(CommandContext, false);
 
 		m_VSConstant.ModelMatrix = m_Pillar->GetModelMatrix();
 		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
-		m_Pillar->Draw(CommandContext);
+		CommandContext.SetDynamicDescriptor(2, 0, m_Pillar->GetTextureView(0, 0));
+		m_Pillar->Draw(CommandContext, false);
 
 		m_VSConstant.ModelMatrix = m_Floor->GetModelMatrix();
 		CommandContext.SetDynamicConstantBufferView(0, sizeof(m_VSConstant), &m_VSConstant);
-		m_Floor->Draw(CommandContext);
+		CommandContext.SetDynamicDescriptor(2, 0, m_Floor->GetTextureView(0, 0));
+		m_Floor->Draw(CommandContext, false);
 	}
 	
 	void ComputePass(FCommandContext& GfxContext)
@@ -345,6 +373,7 @@ private:
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), g_SceneDepthZ.GetDSV());
 
 		// Record commands.
+		BackBuffer.SetClearColor(m_ClearColor);
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.ClearDepth(g_SceneDepthZ);
 
@@ -363,7 +392,6 @@ private:
 		RenderObjects(CommandContext, m_Camera.GetViewMatrix(), m_Camera.GetProjectionMatrix());
 
 		CommandContext.TransitionResource(m_BlurredVSMBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
 
 private:
@@ -411,7 +439,8 @@ private:
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;
 
-	EShadowMode m_ShadowMode = SM_VSM;
+	int m_ShadowMode = SM_VSM;
+	Vector3f m_ClearColor = Vector3f(0.5f, 0.58f, 0.8f);
 };
 
 int main()

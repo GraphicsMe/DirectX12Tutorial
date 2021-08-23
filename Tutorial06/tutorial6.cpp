@@ -183,6 +183,7 @@ private:
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV(), g_SceneDepthZ.GetDSV());
 
 		// Record commands.
+		BackBuffer.SetClearColor(m_ClearColor);
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.ClearDepth(g_SceneDepthZ);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -218,6 +219,7 @@ private:
 
 	FTexture m_Texture;
 
+	Vector3f m_ClearColor = Vector3f(0.5f, 0.58f, 0.8f);
 	float m_elapsedTime = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 

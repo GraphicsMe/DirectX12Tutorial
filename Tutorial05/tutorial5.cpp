@@ -186,6 +186,7 @@ private:
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		// Record commands.
+		BackBuffer.SetClearColor(m_ClearColor);
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		D3D12_VERTEX_BUFFER_VIEW VertexViews[] = { m_VertexPositionBuffer.VertexBufferView(), m_VertexColorBuffer.VertexBufferView(), m_VertexUVBuffer.VertexBufferView() };
@@ -218,6 +219,7 @@ private:
 
 	FTexture m_Texture;
 
+	Vector3f m_ClearColor = Vector3f(0.5f, 0.58f, 0.8f);
 	float m_elapsedTime = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };

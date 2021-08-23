@@ -1141,7 +1141,7 @@ int main()
 	ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 	GameDesc Desc;
 	//Desc.Width = Desc.Height = 1024;
-	Desc.Caption = L"IBL Maps Generator";
+	Desc.Caption = L"IBL + PBR";
 	Tutorial9 tutorial(Desc);
 	ApplicationWin32::Get().Run(&tutorial);
 	CoUninitialize();

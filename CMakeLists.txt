@@ -60,16 +60,16 @@ target_link_libraries(Tutorial08 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial08 PROPERTIES
 	PROJECT_LABEL "Tutorial08 - Atmospheric Scattering")
 
+add_executable(Tutorial09_1 Tutorial09/tutoria9_1.cpp)
+target_link_libraries(Tutorial09_1 LINK_PUBLIC DirectX12Lib)
+set_target_properties(Tutorial09_1 PROPERTIES
+	PROJECT_LABEL "Tutorial09(1) - IBL Maps Generator")
+
 add_executable(Tutorial09 Tutorial09/tutorial9.cpp)
 target_link_libraries(Tutorial09 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial09 PROPERTIES
-	PROJECT_LABEL "Tutorial09 - IBL Maps Generator")
-	
-add_executable(Tutorial10 Tutorial10/tutoria10.cpp)
-target_link_libraries(Tutorial10 LINK_PUBLIC DirectX12Lib)
-set_target_properties(Tutorial10 PROPERTIES
-	PROJECT_LABEL "Tutorial10 - IBL Precompute")
-	
+	PROJECT_LABEL "Tutorial09(2) - IBL + PBR")
+
 add_executable(TutorialSkin TutorialSkin/TutorialSkin.cpp)
 target_link_libraries(TutorialSkin LINK_PUBLIC DirectX12Lib)
 set_target_properties(TutorialSkin PROPERTIES
@@ -89,8 +89,8 @@ set_target_properties(
 	Tutorial06
 	Tutorial07
 	Tutorial08
+	Tutorial09_1
 	Tutorial09
-	Tutorial10
 	TutorialSkin
 	TutorialLTC
 	PROPERTIES

@@ -15,6 +15,7 @@
 #include "DirectXTex.h"
 #include "Texture.h"
 #include "SamplerManager.h"
+#include "ImguiManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -42,6 +43,17 @@ public:
 	void OnUpdate()
 	{
 
+	}
+
+	void OnGUI(FCommandContext& CommandContext)
+	{
+		ImguiManager::Get().NewFrame();
+
+		ImGui::Begin("Background Color", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::ColorEdit3("Color", &m_ClearColor.x);
+		ImGui::End();
+
+		ImguiManager::Get().Render(CommandContext, RenderWindow::Get());
 	}
 	
 	void OnRender()
@@ -164,12 +176,15 @@ private:
 		CommandContext.SetRenderTargets(1, &BackBuffer.GetRTV());
 
 		// Record commands.
+		BackBuffer.SetClearColor(m_ClearColor);
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		CommandContext.SetVertexBuffer(0, m_VertexBuffer.VertexBufferView());
 		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
 
 		CommandContext.DrawIndexed(m_IndexBuffer.GetElementCount());
+
+		OnGUI(CommandContext);
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}
@@ -193,6 +208,7 @@ private:
 
 	FTexture m_Texture;
 
+	Vector3f m_ClearColor = Vector3f(0.5f, 0.58f, 0.8f);
 	float m_elapsedTime = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 };

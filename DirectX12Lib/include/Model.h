@@ -23,6 +23,8 @@ public:
 
 	void GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout);
 
+	D3D12_CPU_DESCRIPTOR_HANDLE GetTextureView(uint32_t SubMeshIndex, uint32_t TexIndex);
+
 	void SetScale(float Scale);
 	void SetScale(float x, float y, float z);
 	void SetRotation(const FMatrix& Rotation);
