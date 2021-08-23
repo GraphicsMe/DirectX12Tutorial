@@ -17,7 +17,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/release)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(DirectX12Lib)
-add_subdirectory(Supplement)
+# add_subdirectory(Supplement)
 add_subdirectory(ThirdParty)
 
 add_executable(Tutorial01 Tutorial01/tutorial1.cpp)
