@@ -25,7 +25,7 @@ void FPipelineState::Initialize()
 	RasterizerShadow = RasterizerDefault;
 	RasterizerShadow.DepthBias = 10;
 	RasterizerShadow.DepthBiasClamp = 0.f;
-	RasterizerShadow.SlopeScaledDepthBias = 1.5f;
+	RasterizerShadow.SlopeScaledDepthBias = 2.f;
 
 	// blend state
 	D3D12_BLEND_DESC alphaBlend = {};

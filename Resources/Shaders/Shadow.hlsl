@@ -44,7 +44,7 @@ VertexOutput vs_main(VertexInput Input)
 	float4 WorldPos = mul(float4(Input.inPos, 1.0f), ModelMatrix);
 	Output.gl_Position = mul(WorldPos, ViewProjection);
 	Output.tex = Input.tex;
-	Output.normal = normalize(mul(float4(normalize(Input.normal), 1.0), ModelMatrix).xyz);
+	Output.normal = normalize(mul(Input.normal, (float3x3)ModelMatrix));
 	Output.ShadowCoord = mul(WorldPos, ShadowMatrix);
 	return Output;
 }
