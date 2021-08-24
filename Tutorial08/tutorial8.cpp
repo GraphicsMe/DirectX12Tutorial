@@ -17,6 +17,7 @@
 #include "Model.h"
 #include "ShadowBuffer.h"
 #include "Light.h"
+#include "ImguiManager.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -28,7 +29,6 @@ extern FCommandListManager g_CommandListManager;
 
 
 const int SHADOW_BUFFER_SIZE = 1024;
-const static bool USE_CS = true;
 
 
 class Tutorial8 : public FGame
@@ -57,17 +57,34 @@ public:
 		m_Constants.InvProjectionMatrix = m_Camera.GetProjectionMatrix().Inverse();
 		m_Constants.InvViewMatrix = m_Camera.GetViewMatrix().Inverse();
 	}
+
+	void OnGUI(FCommandContext& CommandContext)
+	{
+		ImguiManager::Get().NewFrame();
+
+		ImGui::Begin("config", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::BeginGroup();
+		ImGui::Checkbox("Use Compute Shader", &m_bUseComputeShader);
+		ImGui::EndGroup();
+
+		ImGui::End();
+
+		ImguiManager::Get().Render(CommandContext, RenderWindow::Get());
+	}
 	
 	void OnRender()
 	{
 		FCommandContext& CommandContext = FCommandContext::Begin(D3D12_COMMAND_LIST_TYPE_DIRECT, L"3D Queue");
 
-		if (USE_CS)
+		if (m_bUseComputeShader)
 			ScatteringPassCS(CommandContext);
 		else
 			ScatteringPassPS(CommandContext);
 		PostProcess(CommandContext);
 		
+		OnGUI(CommandContext);
+
+		CommandContext.TransitionResource(RenderWindow::Get().GetBackBuffer(), D3D12_RESOURCE_STATE_PRESENT);
 		CommandContext.Finish(true);
 
 		RenderWindow::Get().Present();
@@ -218,7 +235,7 @@ private:
 
 	void PostProcess(FCommandContext& GfxContext)
 	{
-		if (USE_CS)
+		if (m_bUseComputeShader)
 		{
 			g_CommandListManager.GetGraphicsQueue().StallForProducer(g_CommandListManager.GetComputeQueue());
 		}
@@ -243,8 +260,6 @@ private:
 
 		// no need to set vertex buffer and index buffer
 		GfxContext.Draw(3);
-		
-		GfxContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
 
 private:
@@ -275,6 +290,8 @@ private:
 	ComPtr<ID3DBlob> m_ScreenQuadVS;
 	ComPtr<ID3DBlob> m_PostPS;
 	ComPtr<ID3DBlob> m_ScatteringPS;
+
+	bool m_bUseComputeShader = true;
 
 	FCamera m_Camera;
 	FDirectionalLight m_DirectionLight;

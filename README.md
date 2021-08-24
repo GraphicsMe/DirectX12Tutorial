@@ -80,7 +80,7 @@ Table of contents
 
 ## Tutorial 08 - Atmospheric Scattering
 
-实现了单次大气散射，计划后续完成预计算的多重散射。
+实现了单次大气散射，计划后续完成预计算的多重散射。同时测试了Compute Shader异步调用、同步机制。
 
 ![Tutorial08](./Tutorial08/Result/Tutorial08.png)
 
