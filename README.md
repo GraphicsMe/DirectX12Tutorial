@@ -22,7 +22,7 @@ Table of contents
 * [Tutorial 08 - Atmospheric Scattering](#tutorial-08---atmospheric-scattering)
 * [Tutorial 09(1) - IBL Maps Generator](#tutorial-091---ibl-maps-generator)
 * [Tutorial 09(2) - IBL+PBR](#tutorial-092---iblpbr)
-
+* [Tutorial Skin - Skin Rendering](#tutorial-skin---skin-rendering)
 
 
 
@@ -106,4 +106,12 @@ Preintegrated BRDF
 最终包含IBL、PBR、TAA、Bloom、SSR等渲染效果。
 
 ![Tutorial09_02](./Tutorial09/Result/Final.png)
+
+
+
+## Tutorial Skin - Skin Rendering
+
+实现了SSSS以及基于预计算的皮肤渲染。
+
+![TutorialSkin](./TutorialSkin/Result/TutorialSkin.png)
 
