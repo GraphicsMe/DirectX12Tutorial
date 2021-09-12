@@ -544,16 +544,6 @@ private:
 		m_FloorPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorPS.Get()));
 		m_FloorPSO.Finalize();
 
-		m_FloorPSO.SetRootSignature(m_MeshSignature);
-		m_FloorPSO.SetRasterizerState(FPipelineState::RasterizerTwoSided);
-		m_FloorPSO.SetBlendState(FPipelineState::BlendTraditional);
-		m_FloorPSO.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
-		// no need to set input layout
-		m_FloorPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		m_FloorPSO.SetRenderTargetFormats(5, RTFormats, g_SceneDepthZ.GetFormat());
-		m_FloorPSO.SetVertexShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorVS.Get()));
-		m_FloorPSO.SetPixelShader(CD3DX12_SHADER_BYTECODE(m_PBRFloorPS.Get()));
-		m_FloorPSO.Finalize();
 
 		m_IBLSignature.Reset(3, 1);
 		m_IBLSignature[0].InitAsBufferCBV(0, D3D12_SHADER_VISIBILITY_VERTEX);
