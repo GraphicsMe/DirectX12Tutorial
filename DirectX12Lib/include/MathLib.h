@@ -8,6 +8,7 @@
 #include <limits>
 #include <cmath>
 #include <random>
+#include <chrono>
 
 const float MATH_PI = 3.141592654f;
 const float MATH_2PI = 2.f * MATH_PI;
@@ -403,7 +404,8 @@ inline CubeUV XYZ2CubeUV(const Vector3f& p)
 
 inline float NormalRandom(float mu = 0.f, float sigma = 1.f)
 {
-	static std::default_random_engine generator;
+	unsigned seed = (unsigned)std::chrono::steady_clock::now().time_since_epoch().count();
+	static std::default_random_engine generator(seed);
 	static std::normal_distribution<float> distribution(mu, sigma);
 	return distribution(generator);
 }

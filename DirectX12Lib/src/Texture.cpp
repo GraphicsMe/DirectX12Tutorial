@@ -152,7 +152,7 @@ void FTextureArray::LoadFromFile(const std::wstring& FileName, bool IsSRGB /*= t
 	FCommandContext::InitializeTexture(*this, (UINT)subresources.size(), &subresources[0]);
 
 	if (m_CpuDescriptorHandle.ptr == D3D12_CPU_VIRTUAL_ADDRESS_UNKNOWN)
-		m_CpuDescriptorHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, image.GetMetadata().arraySize);
+		m_CpuDescriptorHandle = D3D12RHI::Get().AllocateDescriptor(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, (UINT)image.GetMetadata().arraySize);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;

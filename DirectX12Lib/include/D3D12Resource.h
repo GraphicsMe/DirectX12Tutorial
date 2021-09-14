@@ -31,6 +31,7 @@ public:
 	{
 		m_Resource = nullptr;
 		m_GpuAddress = 0;
+		m_AllCurrentState.resize(0);
 	}
 
 	ID3D12Resource* GetResource() { return m_Resource.Get(); }

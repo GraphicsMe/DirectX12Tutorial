@@ -7,6 +7,9 @@
 #include "CommandContext.h"
 #include "Texture.h"
 
+#undef max
+#undef min
+
 using namespace DirectX;
 
 extern FCommandListManager g_CommandListManager;
@@ -281,9 +284,9 @@ void RandomSample(const DirectX::ScratchImage& InputImage, size_t Width, size_t 
 		ComputePitch(image.format, image.width, image.height, rowPitch, slicePitch);
 
 		float* dst = (float*)(image.pixels + rowPitch * rowIndex);
-		float R = dst[colIndex * 4 + 0];
-		float G = dst[colIndex * 4 + 1];
-		float B = dst[colIndex * 4 + 2];
+		float R = std::min(dst[colIndex * 4 + 0], 2048.f);
+		float G = std::min(dst[colIndex * 4 + 1], 2048.f);
+		float B = std::min(dst[colIndex * 4 + 2], 2048.f);
 
 		//printf("[%f,%f,%f]\n", R, G, B);
 		vex.color = { R,G,B };
@@ -346,6 +349,14 @@ std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 	DirectX::ScratchImage image;
 	FCommandQueue& Queue = g_CommandListManager.GetQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 	hr = DirectX::CaptureTexture(Queue.GetD3D12CommandQueue(), m_Resource.Get(), true/*isCubeMap*/, image, m_AllCurrentState[0], m_AllCurrentState[0]);
+	if (SUCCEEDED(hr))
+	{
+		hr = DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DDS_FLAGS_NONE, L"F:/code/DirectX12Tutorial/Resources/test.hdr");
+		if (FAILED(hr))
+		{
+			printf("Falied to save cubemap to dds file\n");
+		}
+	}
 #else
 	DirectX::ScratchImage image_posx;
 	DirectX::ScratchImage image_negx;
@@ -385,7 +396,8 @@ std::vector<Vector3f> FCubeBuffer::GenerateSHcoeffs(int Degree, int SampleNum)
 	hr = DirectX::_ConvertFromR16G16B16A16(temp.GetImages()[0], image.GetImages()[5]);
 #endif
 
-	if (SUCCEEDED(hr))
+	Assert(SUCCEEDED(hr));
+	//if (SUCCEEDED(hr))
 	{
 		std::vector<Vertex> Samples;
 		RandomSample(image, image.GetMetadata().width, image.GetMetadata().height, SampleNum, Samples);

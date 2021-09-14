@@ -63,6 +63,7 @@ set_target_properties(Tutorial08 PROPERTIES
 add_executable(Tutorial09_1 Tutorial09/tutoria9_1.cpp)
 target_link_libraries(Tutorial09_1 LINK_PUBLIC DirectX12Lib)
 set_target_properties(Tutorial09_1 PROPERTIES
+	CXX_STANDARD 17
 	PROJECT_LABEL "Tutorial09(1) - IBL Maps Generator")
 
 add_executable(Tutorial09 Tutorial09/tutorial9.cpp)

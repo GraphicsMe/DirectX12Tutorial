@@ -142,20 +142,20 @@ public:
 				ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &ScreenSpaceSubsurface::g_DebugFlag, 0, 2);
 				ImGui::SliderFloat("sss Width", &ScreenSpaceSubsurface::g_sssWidth, 1.f, 80.f);
 				ImGui::SliderFloat("sss Strength", &ScreenSpaceSubsurface::g_sssStr, 0.f, 3.f);
-				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001, 1);
-				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001, 1);
+				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001f, 1.f);
+				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001f, 1.f);
 			}
 			else if(m_ShowMode == SM_PreIntegratedSkin)
 			{
 				ImGui::SliderInt("DebugFlag,1:OnlyDiffuse,2:OnlySpecular", &m_DebugFlag, 0, 2);
-				ImGui::SliderFloat("CurveFactor", &m_CurveFactor, 0.001, 1);
+				ImGui::SliderFloat("CurveFactor", &m_CurveFactor, 0.001f, 1.f);
 				ImGui::Checkbox("UseBlurNoaml", &m_UseBlurNoaml);
 				if (m_UseBlurNoaml)
 				{
 					ImGui::SliderFloat3("TuneNormalBlur", &m_TuneNormalBlur.x, 0.f, 1.f);
 				}
-				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001, 1);
-				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001, 1);
+				ImGui::SliderFloat("SpecularSmooth", &m_SpecularSmooth, 0.001f, 1.f);
+				ImGui::SliderFloat("SpecularScale", &m_SpecularScale, 0.001f, 1.f);
 			}
 			
 			ImGui::SliderFloat("m_LightDir.x", &m_LightDir.x, -1, 1);
@@ -516,7 +516,7 @@ private:
 		SkinLightingPass_PSConstants.DebugFlag = m_DebugFlag;
 		SkinLightingPass_PSConstants.Smooth = m_SpecularSmooth;
 		SkinLightingPass_PSConstants.SpecularScale = m_SpecularScale;
-		SkinLightingPass_PSConstants.SubsurfaceColor = Vector3f(0.655000, 0.559480f, 0.382083f);
+		SkinLightingPass_PSConstants.SubsurfaceColor = Vector3f(0.655000f, 0.559480f, 0.382083f);
 
 		GfxContext.SetDynamicConstantBufferView(1, sizeof(SkinLightingPass_PSConstants), &SkinLightingPass_PSConstants);
 		GfxContext.SetDynamicDescriptor(2, 0, g_GBufferA.GetSRV());
@@ -603,7 +603,7 @@ private:
 		PSConstants.CurveFactor = m_CurveFactor;
 		PSConstants.LightDir = m_LightDir;
 		PSConstants.DebugFlag = m_DebugFlag;
-		PSConstants.SubsurfaceColor = Vector3f(0.655000, 0.559480f, 0.382083f);
+		PSConstants.SubsurfaceColor = Vector3f(0.655000f, 0.559480f, 0.382083f);
 		PSConstants.UseBlurNoaml = m_UseBlurNoaml;
 		PSConstants.TuneNormalBlur = m_TuneNormalBlur;
 		PSConstants.Smooth = m_SpecularSmooth;
@@ -669,10 +669,10 @@ private:
 	//
 	float						m_CurveFactor = 1.f;
 	bool						m_UseBlurNoaml = true;
-	Vector3f					m_TuneNormalBlur = Vector3f(0.9f, 0.8, 0.7);
+	Vector3f					m_TuneNormalBlur = Vector3f(0.9f, 0.8f, 0.7f);
 
-	float						m_SpecularSmooth = 0.65;
-	float						m_SpecularScale = 0.30;
+	float						m_SpecularSmooth = 0.65f;
+	float						m_SpecularScale = 0.30f;
 
 	// ShowMode
 	int							m_ShowMode = SM_ScreenSpaceSurfaceScater;
