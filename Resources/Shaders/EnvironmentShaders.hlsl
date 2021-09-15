@@ -81,7 +81,8 @@ TextureCube CubeEnvironment : register(t0);
 float4 PS_SkyCube(VertexOutput In) : SV_Target
 {
 	// Local Direction don't need to normalized
-	return CubeEnvironment.Sample(LinearSampler, In.LocalDirection);
+	float4 Sample = CubeEnvironment.Sample(LinearSampler, In.LocalDirection);
+	return float4(Sample.xyz * Exposure, 1.0);
 }
 
 

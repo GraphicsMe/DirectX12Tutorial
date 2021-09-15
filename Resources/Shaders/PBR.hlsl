@@ -188,7 +188,7 @@ float GetSpecularOcclusion(float NoV, float AO, float roughness)
 	return saturate(pow(NoV + AO, exp2(-16.0 * roughness - 1.0)) - 1.0 + AO);
 }
 
-float4 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO, float4 SSR)
+float3 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughness, float AO, float4 SSR)
 {
 	float3 R = reflect(-V, N); //incident ray, surface normal
 
@@ -218,7 +218,7 @@ float4 CalcIBL(float3 N, float3 V, float3 Albedo, float Metallic, float Roughnes
 
 	float SpecAO = GetSpecularOcclusion(NoV, AO, Roughness);
 	float3 Final = (Diffuse * AO + Specular * SpecAO) * (1-SSR.a) + SSR.rgb;
-	return float4(Final, 1.0);
+	return Final;
 }
 
 
@@ -288,6 +288,6 @@ float4 PS_IBL(float2 Tex : TEXCOORD, float4 ScreenPos : SV_Position) : SV_Target
 	WorldPos /= WorldPos.w;
 
 	float3 V = normalize(CameraPos - WorldPos.xyz);
-	float4 IBL = CalcIBL(N, V, AlbedoAo.xyz, Metallic, Roughness, AO, SSR);
-	return IBL;
+	float3 IBL = CalcIBL(N, V, AlbedoAo.xyz, Metallic, Roughness, AO, SSR);
+	return float4(IBL * Exposure, 1.0);
 }
