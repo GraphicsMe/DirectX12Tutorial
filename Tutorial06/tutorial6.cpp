@@ -18,6 +18,8 @@
 #include "MeshData.h"
 #include "ObjLoader.h"
 #include "BufferManager.h"
+#include "GLTFLoader.h"
+#include "Scene.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -38,8 +40,11 @@ public:
 	{
 		SetupRootSignature();
 
-		m_mesh_data = FObjLoader::LoadObj("../Resources/Models/primitive/cube.obj");
-
+		//m_mesh_data = FObjLoader::LoadObj("../Resources/Models/primitive/cube.obj");
+		//m_mesh_data = FGLTFLoader::LoadGLTF("../Resources/gltf2.0/Box/glTF/Box.gltf");
+		m_Scene = FGLTFLoader::LoadFromFile("../Resources/gltf2.0/DamagedHelmet/glTF/DamagedHelmet.gltf");
+		//m_mesh_data = FGLTFLoader::LoadGLTF("../Resources/gltf2.0/FlightHelmet/glTF/FlightHelmet.gltf");
+		
 		std::string basecolor_path = m_mesh_data->GetBaseColorPath(0);
 		m_Texture.LoadFromFile(ToWideString(basecolor_path));
 
@@ -74,13 +79,15 @@ public:
 		tStart = std::chrono::high_resolution_clock::now();
 
 		// Update Uniforms
-		m_elapsedTime += 0.001f * time;
+		//m_elapsedTime += 0.001f * time;
 		m_elapsedTime = fmodf(m_elapsedTime, 6.283185307179586f);
 		//m_elapsedTime = MATH_PI / 4.f;
 		m_uboVS.modelMatrix = FMatrix::RotateY(m_elapsedTime);
 
-		FCamera camera(Vector3f(0.f, 0.f, -5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
+		FCamera camera(Vector3f(0.f, 0.f, 5.f), Vector3f(0.f, 0.0f, 0.f), Vector3f(0.f, 1.f, 0.f));
 		m_uboVS.viewMatrix = camera.GetViewMatrix();
+		FQuaternion Quat = FQuaternion(0.7071068286895752f, 0.f, 0.f, 0.7071068286895752f);
+		m_uboVS.modelMatrix = Quat.ToMatrix();
 
 		const float FovVertical = MATH_PI / 4.f;
 		m_uboVS.projectionMatrix = FMatrix::MatrixPerspectiveFovLH(FovVertical, (float)GetDesc().Width / GetDesc().Height, 0.1f, 100.f);
@@ -224,6 +231,7 @@ private:
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 
 	MeshData* m_mesh_data;
+	Scene* m_Scene;
 };
 
 int main()

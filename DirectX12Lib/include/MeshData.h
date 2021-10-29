@@ -29,6 +29,7 @@ struct MaterialData
 {
 	std::string Name;
 	std::string BaseColorPath;
+	std::string MetallicRoughnessPath;
 	std::string NormalPath;
 	std::string MetallicPath;
 	std::string RoughnessPath;
@@ -38,6 +39,14 @@ struct MaterialData
 	Vector3f Albedo;
 	float Metallic = 0.f;
 	float Roughness = 0.f;
+};
+
+class MeshData;
+struct MeshDrawCommand
+{
+	MeshData* Mesh;
+	uint32_t StartIndex;
+	uint32_t IndexCount;
 };
 
 struct SubMeshData
@@ -89,6 +98,7 @@ public:
 	std::string GetNormalPath(uint32_t MtlIndex);
 	const MaterialData& GetMaterialData(size_t Index);
 
+	void CollectMeshBatch(std::vector<MeshDrawCommand>& MeshDrawCommands);
 
 	void ComputeBoundingBox();
 	void GetBoundingBox(Vector3f& BoundMin, Vector3f& BoundMax);

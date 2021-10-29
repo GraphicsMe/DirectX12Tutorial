@@ -246,6 +246,11 @@ const MaterialData& MeshData::GetMaterialData(size_t Index)
 	return m_materials[Index];
 }
 
+void MeshData::CollectMeshBatch(std::vector<MeshDrawCommand>& MeshDrawCommands)
+{
+
+}
+
 void MeshData::ComputeBoundingBox()
 {
 	m_BoundMin = Vector3f(std::numeric_limits<float>::max());

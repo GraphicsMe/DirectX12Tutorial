@@ -36,6 +36,12 @@ struct Vector2
 	Vector2(T c) : x(c), y(c) {}
 	Vector2(T x, T y) : x(x), y(y) {}
 
+	template<typename V>
+	static Vector2 MakeVector(const V* Values)
+	{
+		return Vector2((T)Values[0], (T)Values[1]);
+	}
+
 	Vector2 operator - (const Vector2& rhs) const
 	{
 		return Vector2(x - rhs.x, y - rhs.y);
@@ -81,6 +87,12 @@ struct Vector3
 	Vector3(T c) : x(c), y(c), z(c) {}
 	Vector3(T x, T y, T z) : x(x), y(y), z(z) {}
 	Vector3(const Vector4<T>& v) : x(v.x), y(v.y), z(v.z) {}
+
+	template<typename V>
+	static Vector3 MakeVector(const V* Values)
+	{
+		return Vector3((T)Values[0], (T)Values[1], (T)Values[2]);
+	}
 
 	T Dot(const Vector3& rhs) const
 	{
@@ -197,6 +209,13 @@ struct Vector4
 	Vector4(T c) : x(c), y(c), z(c), w(c) {}
 	Vector4(T x, T y, T z, T w) : x(x), y(y), z(z), w(w) {}
 	Vector4(const Vector3<T>& v, T s = 0) : x(v.x), y(v.y), z(v.z), w(s) {}
+
+	template<typename V>
+	static Vector4 MakeVector(const V* Values)
+	{
+		return Vector4((T)Values[0], (T)Values[1], (T)Values[2], (T)Values[3]);
+	}
+
 	T Dot(const Vector4& rhs) const
 	{
 		return x * rhs.x + y * rhs.y + z * rhs.z + w * rhs.w;
@@ -260,6 +279,9 @@ struct FMatrix
 	FMatrix operator * (float rhs) const;
 	FMatrix& operator *= (float rhs);
 
+	Vector4f& operator[](int r) { return row[r]; }
+	const Vector4f& operator[](int r) const { return row[r]; }
+
 	Vector3f TranslateVector(const Vector3f& vector) const;
 	Vector3f TransformPosition(const Vector3f& position) const;
 	FBoundingBox TransformBoundingBox(const FBoundingBox& BoundBox) const;
@@ -278,6 +300,87 @@ struct FMatrix
 	static FMatrix MatrixPerspectiveFovLH(float FovAngleY, float AspectHByW, float NearZ, float FarZ);
 	static FMatrix MatrixOrthoLH(float Width, float Height, float NearZ, float FarZ);
 };
+
+
+struct FQuaternion
+{
+	Vector4f q;
+
+	FQuaternion(const Vector4f& other) : q(other) {}
+	FQuaternion(float x, float y, float z, float w) : q(x, y, z, w) {}
+	FQuaternion() {}
+
+	template<typename T>
+	static FQuaternion MakeQuaternion(const T* Values)
+	{
+		return FQuaternion((float)Values[0], (float)Values[1], (float)Values[2], (float)Values[3]);
+	}
+
+	static FQuaternion RotationFromAxisAngle(const Vector3f& axis, float angle)
+	{
+		FQuaternion out{ 0, 0, 0, 1 };
+		float      norm = axis.Length();
+		if (norm != 0)
+		{
+			float sina2 = sin(0.5f * angle);
+			out.q[0] = sina2 * axis[0] / norm;
+			out.q[1] = sina2 * axis[1] / norm;
+			out.q[2] = sina2 * axis[2] / norm;
+			out.q[3] = cos(0.5f * angle);
+		}
+		return out;
+	}
+
+	void GetAxisAngle(Vector3f& outAxis, float& outAngle) const
+	{
+		float sina2 = sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2]);
+		outAngle = 2.0f * atan2(sina2, q[3]);
+		float r = (sina2 > 0) ? (1.0f / sina2) : 0;
+		outAxis[0] = r * q[0];
+		outAxis[1] = r * q[1];
+		outAxis[2] = r * q[2];
+	}
+
+	static FQuaternion Mul(const FQuaternion& q1, const FQuaternion& q2)
+	{
+		FQuaternion q1_q2;
+		q1_q2.q.x = +q1.q.x * q2.q.w + q1.q.y * q2.q.z - q1.q.z * q2.q.y + q1.q.w * q2.q.x;
+		q1_q2.q.y = -q1.q.x * q2.q.z + q1.q.y * q2.q.w + q1.q.z * q2.q.x + q1.q.w * q2.q.y;
+		q1_q2.q.z = +q1.q.x * q2.q.y - q1.q.y * q2.q.x + q1.q.z * q2.q.w + q1.q.w * q2.q.z;
+		q1_q2.q.w = -q1.q.x * q2.q.x - q1.q.y * q2.q.y - q1.q.z * q2.q.z + q1.q.w * q2.q.w;
+		return q1_q2;
+	}
+
+	FMatrix ToMatrix() const
+	{
+		FMatrix out;
+		float    yy2 = 2.0f * q[1] * q[1];
+		float    xy2 = 2.0f * q[0] * q[1];
+		float    xz2 = 2.0f * q[0] * q[2];
+		float    yz2 = 2.0f * q[1] * q[2];
+		float    zz2 = 2.0f * q[2] * q[2];
+		float    wz2 = 2.0f * q[3] * q[2];
+		float    wy2 = 2.0f * q[3] * q[1];
+		float    wx2 = 2.0f * q[3] * q[0];
+		float    xx2 = 2.0f * q[0] * q[0];
+		out[0][0] = -yy2 - zz2 + 1.0f;
+		out[0][1] = xy2 + wz2;
+		out[0][2] = xz2 - wy2;
+		out[0][3] = 0;
+		out[1][0] = xy2 - wz2;
+		out[1][1] = -xx2 - zz2 + 1.0f;
+		out[1][2] = yz2 + wx2;
+		out[1][3] = 0;
+		out[2][0] = xz2 + wy2;
+		out[2][1] = yz2 - wx2;
+		out[2][2] = -xx2 - yy2 + 1.0f;
+		out[2][3] = 0;
+		out[3][0] = out[3][1] = out[3][2] = 0;
+		out[3][3] = 1;
+		return out;
+	}
+};
+
 
 //inline Vector4f operator*(const FMatrix& mat, const Vector4f& vec);
 

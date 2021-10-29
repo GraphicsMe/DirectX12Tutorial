@@ -41,6 +41,8 @@
 	include/DepthOfField.h
 	include/ScreenSpaceSubsurface.h
 	include/UserMarkers.h
+	include/GLTFLoader.h
+	include/Scene.h
 )
 
 set(SOURCES
@@ -83,6 +85,8 @@ set(SOURCES
 	src/DepthOfField.cpp
 	src/ScreenSpaceSubsurface.cpp
 	src/UserMarkers.cpp
+	src/GLTFLoader.cpp
+	src/Scene.cpp
 )
 
 set( IMGUI_HEADERS
