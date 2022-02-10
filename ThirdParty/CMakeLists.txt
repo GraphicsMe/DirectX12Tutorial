@@ -1,4 +1,6 @@
-﻿add_subdirectory(DirectXTex)
+﻿set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+add_subdirectory(DirectXTex)
 add_subdirectory(AGS)
 
 SET(TINYGLTF_BUILD_LOADER_EXAMPLE OFF)
