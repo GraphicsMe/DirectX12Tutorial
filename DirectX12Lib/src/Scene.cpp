@@ -1,5 +1,6 @@
 #include "Scene.h"
 #include "MathLib.h"
+#include "CommandContext.h"
 
 SceneNode::SceneNode()
 	: Parent(nullptr)
@@ -42,9 +43,27 @@ bool SceneNode::IsMeshNode() const
 	return false;
 }
 
-void SceneNode::CollectMeshBatch(std::vector<MeshDrawCommand>& MeshDrawCommands)
+MeshData* SceneNode::GetFirstMeshData()
 {
+	for (size_t i = 0; i < Children.size(); ++i)
+	{
+		MeshData* Mesh = Children[i]->GetFirstMeshData();
+		if (Mesh)
+		{
+			return Mesh;
+		}
+	}
+	return nullptr;
+}
 
+void SceneNode::PostLoad()
+{
+	UpdateTransform();
+}
+
+void SceneNode::CollectMeshList(std::vector<MeshNode*>& MeshList)
+{
+	
 }
 
 MeshNode::MeshNode(MeshData* MData)
@@ -59,12 +78,22 @@ bool MeshNode::IsMeshNode() const
 	return true;
 }
 
-void MeshNode::CollectMeshBatch(std::vector<MeshDrawCommand>& MeshDrawCommands)
+void MeshNode::PostLoad()
 {
-	Mesh->CollectMeshBatch(MeshDrawCommands);
+	SceneNode::PostLoad();
+
+	if (Mesh)
+	{
+		Mesh->PostLoad();
+	}
+}
+
+void MeshNode::CollectMeshList(std::vector<MeshNode*>& MeshList)
+{
+	MeshList.push_back(this);
 	for (size_t i = 0; i < Children.size(); ++i)
 	{
-		Children[i]->CollectMeshBatch(MeshDrawCommands);
+		Children[i]->CollectMeshList(MeshList);
 	}
 }
 
@@ -82,13 +111,26 @@ void Scene::PostLoad()
 {
 	for (size_t i = 0; i < Nodes.size(); ++i)
 	{
-		Nodes[i]->UpdateTransform();
+		Nodes[i]->PostLoad();
 	}
 
-	MeshDrawCommands.clear();
+	MeshList.clear();
 	for (size_t i = 0; i < Nodes.size(); ++i)
 	{
-		Nodes[i]->CollectMeshBatch(MeshDrawCommands);
+		Nodes[i]->CollectMeshList(MeshList);
 	}
 }
 
+MeshData* Scene::GetFirstMesh()
+{
+	for (size_t i = 0; i < Nodes.size(); ++i)
+	{
+		MeshData* Mesh = Nodes[i]->GetFirstMeshData();
+		if (Mesh)
+		{
+			return Mesh;
+		}
+	}
+
+	return nullptr;
+}

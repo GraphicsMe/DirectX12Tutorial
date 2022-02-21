@@ -1,6 +1,9 @@
 ﻿#pragma once
 
+#include "Common.h"
 #include "MathLib.h"
+#include "GpuBuffer.h"
+#include "Texture.h"
 #include <vector>
 #include <string>
 
@@ -66,8 +69,12 @@ class FObjLoader;
 class MeshData
 {
 public:
+	const static int TEX_PER_MATERIAL = 7;
+
 	MeshData(const std::string& filepath);
 	~MeshData();
+
+	void PostLoad();
 
 	bool HasVertexElement(VertexElementType type) const;
 
@@ -98,12 +105,22 @@ public:
 	std::string GetNormalPath(uint32_t MtlIndex);
 	const MaterialData& GetMaterialData(size_t Index);
 
+	FGpuBuffer* GetVertexBuffer(VertexElementType EleIndex) { return &m_VertexBuffer[static_cast<uint32_t>(EleIndex)]; }
+	FGpuBuffer* GetIndexBuffer() { return &m_IndexBuffer; }
+	FTexture* GetTexture(uint32_t MtlIndex, int TexIndex);
+	FTexture* GetTextureByMeshIndex(uint32_t SubMeshIndex, int TexIndex);
+
+
 	void CollectMeshBatch(std::vector<MeshDrawCommand>& MeshDrawCommands);
 
 	void ComputeBoundingBox();
 	void GetBoundingBox(Vector3f& BoundMin, Vector3f& BoundMax);
+	void GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout);
 
 	friend FObjLoader;
+
+private:
+	void InitRenderingResource();
 
 public:
 	std::string m_filepath;
@@ -114,10 +131,18 @@ public:
 	std::vector<Vector4f> m_tangents;
 	std::vector<uint32_t> m_indices;
 
+	std::vector<uint8_t*> m_buffers;
+
 	std::vector<MaterialData> m_materials;
 	std::vector<SubMeshData> m_submeshes;
 
 	Vector3f m_BoundMin, m_BoundMax;
+
+private:
+	FGpuBuffer m_VertexBuffer[VET_Max];
+	FGpuBuffer m_IndexBuffer;
+
+	std::vector<FTexture> m_Textures;
 };
 
 

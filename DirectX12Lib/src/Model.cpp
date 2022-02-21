@@ -3,7 +3,6 @@
 #include "MeshData.h"
 #include "CommandContext.h"
 
-const int TEX_PER_MATERIAL = 7;
 
 FModel::FModel()
 	: m_Scale(1.f)
@@ -46,13 +45,13 @@ void FModel::Draw(FCommandContext& CommandContext, bool UseDefualtMaterial)
 		size_t MtlIndex = m_MeshData->GetSubMaterialIndex(i);
 		if (MtlIndex < m_MeshData->GetMaterialCount())
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE Handles[TEX_PER_MATERIAL];
-			for (int j = 0; j < TEX_PER_MATERIAL ; ++j)
+			D3D12_CPU_DESCRIPTOR_HANDLE Handles[MeshData::TEX_PER_MATERIAL];
+			for (int j = 0; j < MeshData::TEX_PER_MATERIAL ; ++j)
 			{
-				Handles[j] = m_Textures[TEX_PER_MATERIAL * MtlIndex + j].GetSRV();
+				Handles[j] = m_Textures[MeshData::TEX_PER_MATERIAL * MtlIndex + j].GetSRV();
 			}
 			if(UseDefualtMaterial)
-				CommandContext.SetDynamicDescriptors(2, 0, TEX_PER_MATERIAL, Handles);
+				CommandContext.SetDynamicDescriptors(2, 0, MeshData::TEX_PER_MATERIAL, Handles);
 		}
 		CommandContext.DrawIndexed((UINT)m_MeshData->GetSubIndexCount(i), (UINT)m_MeshData->GetSubIndexStart(i));
 	}
@@ -65,9 +64,9 @@ D3D12_CPU_DESCRIPTOR_HANDLE FModel::GetTextureView(uint32_t SubMeshIndex, uint32
 	if (SubMeshIndex < m_MeshData->GetMeshCount())
 	{
 		size_t MtlIndex = m_MeshData->GetSubMaterialIndex(SubMeshIndex);
-		if (MtlIndex < m_MeshData->GetMaterialCount() && TexIndex < TEX_PER_MATERIAL)
+		if (MtlIndex < m_MeshData->GetMaterialCount() && TexIndex < MeshData::TEX_PER_MATERIAL)
 		{
-			Result = m_Textures[TEX_PER_MATERIAL * MtlIndex + TexIndex].GetSRV();
+			Result = m_Textures[MeshData::TEX_PER_MATERIAL * MtlIndex + TexIndex].GetSRV();
 		}
 	}
 	return Result;
@@ -75,27 +74,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE FModel::GetTextureView(uint32_t SubMeshIndex, uint32
 
 void FModel::GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout)
 {
-	UINT slot = 0;
-	if (m_MeshData->HasVertexElement(VET_Position))
-	{
-		MeshLayout.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-	}
-	if (m_MeshData->HasVertexElement(VET_Color))
-	{
-		MeshLayout.push_back({ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-	}
-	if (m_MeshData->HasVertexElement(VET_Texcoord))
-	{
-		MeshLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-	}
-	if (m_MeshData->HasVertexElement(VET_Normal))
-	{
-		MeshLayout.push_back({ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-	}
-	if (m_MeshData->HasVertexElement(VET_Tangent))
-	{
-		MeshLayout.push_back({ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-	}
+	m_MeshData->GetMeshLayout(MeshLayout);
 }
 
 void FModel::SetScale(float Scale)
@@ -165,17 +144,17 @@ void FModel::InitializeResource()
 	m_IndexBuffer.Create(L"MeshIndexBuffer", m_MeshData->GetIndexCount(), m_MeshData->GetIndexElementSize(), m_MeshData->GetIndexData());
 
 	uint32_t MaterialCount = (uint32_t)m_MeshData->GetMaterialCount();
-	m_Textures.resize(MaterialCount * TEX_PER_MATERIAL);
+	m_Textures.resize(MaterialCount * MeshData::TEX_PER_MATERIAL);
 	for (uint32_t i = 0; i < MaterialCount; ++i)
 	{
 		MaterialData MtlData = m_MeshData->GetMaterialData(i);
 		//basecolor, opacity, emissive, metallic, roughness, ao, normal
-		m_Textures[TEX_PER_MATERIAL * i + 0].LoadFromFile(ToWideString(m_MeshData->GetBaseColorPath(i)), true);
-		m_Textures[TEX_PER_MATERIAL * i + 1].LoadFromFile(ToWideString(m_MeshData->GetOpacityPath(i)), false);
-		m_Textures[TEX_PER_MATERIAL * i + 2].LoadFromFile(ToWideString(m_MeshData->GetEmissivePath(i)), true);
-		m_Textures[TEX_PER_MATERIAL * i + 3].LoadFromFile(ToWideString(m_MeshData->GetMetallicPath(i)), false);
-		m_Textures[TEX_PER_MATERIAL * i + 4].LoadFromFile(ToWideString(m_MeshData->GetRoughnessPath(i)), false);
-		m_Textures[TEX_PER_MATERIAL * i + 5].LoadFromFile(ToWideString(m_MeshData->GetAOPath(i)), false);
-		m_Textures[TEX_PER_MATERIAL * i + 6].LoadFromFile(ToWideString(m_MeshData->GetNormalPath(i)), false);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 0].LoadFromFile(ToWideString(m_MeshData->GetBaseColorPath(i)), true);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 1].LoadFromFile(ToWideString(m_MeshData->GetOpacityPath(i)), false);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 2].LoadFromFile(ToWideString(m_MeshData->GetEmissivePath(i)), true);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 3].LoadFromFile(ToWideString(m_MeshData->GetMetallicPath(i)), false);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 4].LoadFromFile(ToWideString(m_MeshData->GetRoughnessPath(i)), false);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 5].LoadFromFile(ToWideString(m_MeshData->GetAOPath(i)), false);
+		m_Textures[MeshData::TEX_PER_MATERIAL * i + 6].LoadFromFile(ToWideString(m_MeshData->GetNormalPath(i)), false);
 	}
 }

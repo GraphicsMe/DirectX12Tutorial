@@ -3,6 +3,7 @@
 
 #include <limits>
 
+
 MeshData::MeshData(const std::string& filepath)
 	: m_filepath(filepath)
 {
@@ -11,6 +12,11 @@ MeshData::MeshData(const std::string& filepath)
 
 MeshData::~MeshData()
 {
+}
+
+void MeshData::PostLoad()
+{
+	InitRenderingResource();
 }
 
 bool MeshData::HasVertexElement(VertexElementType type) const
@@ -246,6 +252,24 @@ const MaterialData& MeshData::GetMaterialData(size_t Index)
 	return m_materials[Index];
 }
 
+FTexture* MeshData::GetTexture(uint32_t MtlIndex, int TexIndex)
+{
+	uint32_t Index = TEX_PER_MATERIAL* MtlIndex + TexIndex;
+	if (Index < m_Textures.size())
+		return &m_Textures[Index];
+	else
+		return nullptr;
+}
+
+FTexture* MeshData::GetTextureByMeshIndex(uint32_t SubMeshIndex, int TexIndex)
+{
+	size_t MtlIndex = this->GetSubMaterialIndex(SubMeshIndex);
+	if (MtlIndex < m_materials.size())
+		return GetTexture(MtlIndex, TexIndex);
+	else
+		return nullptr;
+}
+
 void MeshData::CollectMeshBatch(std::vector<MeshDrawCommand>& MeshDrawCommands)
 {
 
@@ -266,6 +290,60 @@ void MeshData::GetBoundingBox(Vector3f& BoundMin, Vector3f& BoundMax)
 {
 	BoundMin = m_BoundMin;
 	BoundMax = m_BoundMax;
+}
+
+void MeshData::GetMeshLayout(std::vector<D3D12_INPUT_ELEMENT_DESC>& MeshLayout)
+{
+	UINT slot = 0;
+	if (this->HasVertexElement(VET_Position))
+	{
+		MeshLayout.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
+	}
+	if (this->HasVertexElement(VET_Color))
+	{
+		MeshLayout.push_back({ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
+	}
+	if (this->HasVertexElement(VET_Texcoord))
+	{
+		MeshLayout.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
+	}
+	if (this->HasVertexElement(VET_Normal))
+	{
+		MeshLayout.push_back({ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
+	}
+	if (this->HasVertexElement(VET_Tangent))
+	{
+		MeshLayout.push_back({ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
+	}
+}
+
+void MeshData::InitRenderingResource()
+{
+	for (int i = 0; i < VET_Max; ++i)
+	{
+		VertexElementType elmType = VertexElementType(i);
+		if (this->HasVertexElement(elmType))
+		{
+			m_VertexBuffer[i].Create(L"VertexStream", this->GetVertexCount(), this->GetVertexStride(elmType), this->GetVertexData(elmType));
+		}
+	}
+
+	m_IndexBuffer.Create(L"MeshIndexBuffer", this->GetIndexCount(), this->GetIndexElementSize(), this->GetIndexData());
+
+	uint32_t MaterialCount = (uint32_t)this->GetMaterialCount();
+	m_Textures.resize(MaterialCount * TEX_PER_MATERIAL);
+	for (uint32_t i = 0; i < MaterialCount; ++i)
+	{
+		MaterialData MtlData = this->GetMaterialData(i);
+		//basecolor, opacity, emissive, metallic, roughness, ao, normal
+		m_Textures[TEX_PER_MATERIAL * i + 0].LoadFromFile(ToWideString(this->GetBaseColorPath(i)), true);
+		m_Textures[TEX_PER_MATERIAL * i + 1].LoadFromFile(ToWideString(this->GetOpacityPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 2].LoadFromFile(ToWideString(this->GetEmissivePath(i)), true);
+		m_Textures[TEX_PER_MATERIAL * i + 3].LoadFromFile(ToWideString(this->GetMetallicPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 4].LoadFromFile(ToWideString(this->GetRoughnessPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 5].LoadFromFile(ToWideString(this->GetAOPath(i)), false);
+		m_Textures[TEX_PER_MATERIAL * i + 6].LoadFromFile(ToWideString(this->GetNormalPath(i)), false);
+	}
 }
 
 MeshPlane::MeshPlane()

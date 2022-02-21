@@ -20,6 +20,7 @@
 #include "BufferManager.h"
 #include "GLTFLoader.h"
 #include "Scene.h"
+#include "Renderer.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -32,7 +33,7 @@ using namespace BufferManager;
 class Tutorial6 : public FGame
 {
 public:
-	Tutorial6(const GameDesc& Desc) : FGame(Desc), m_mesh_data(nullptr)
+	Tutorial6(const GameDesc& Desc) : FGame(Desc), m_Scene(nullptr)
 	{
 	}
 
@@ -40,13 +41,7 @@ public:
 	{
 		SetupRootSignature();
 
-		//m_mesh_data = FObjLoader::LoadObj("../Resources/Models/primitive/cube.obj");
-		//m_mesh_data = FGLTFLoader::LoadGLTF("../Resources/gltf2.0/Box/glTF/Box.gltf");
 		m_Scene = FGLTFLoader::LoadFromFile("../Resources/gltf2.0/DamagedHelmet/glTF/DamagedHelmet.gltf");
-		//m_mesh_data = FGLTFLoader::LoadGLTF("../Resources/gltf2.0/FlightHelmet/glTF/FlightHelmet.gltf");
-		
-		std::string basecolor_path = m_mesh_data->GetBaseColorPath(0);
-		m_Texture.LoadFromFile(ToWideString(basecolor_path));
 
 		SetupMesh();
 		SetupShaders();
@@ -55,10 +50,10 @@ public:
 
 	void OnShutdown()
 	{
-		if (m_mesh_data)
+		if (m_Scene)
 		{
-			delete m_mesh_data;
-			m_mesh_data = nullptr;
+			delete m_Scene;
+			m_Scene = nullptr;
 		}
 	}
 
@@ -114,20 +109,7 @@ private:
 
 	void SetupMesh()
 	{
-		for (int i = 0; i < VET_Max; ++i)
-		{
-			VertexElementType elmType = VertexElementType(i);
-			if (m_mesh_data->HasVertexElement(elmType))
-			{
-				m_VertexBuffer[i].Create(
-					L"VertexStream", 
-					m_mesh_data->GetVertexCount(), 
-					m_mesh_data->GetVertexStride(elmType),
-					m_mesh_data->GetVertexData(elmType));
-			}
-		}
-
-		m_IndexBuffer.Create(L"MeshIndexBuffer", m_mesh_data->GetIndexCount(), m_mesh_data->GetIndexElementSize(), m_mesh_data->GetIndexData());
+		
 	}
 
 	void SetupShaders()
@@ -139,29 +121,13 @@ private:
 
 	void SetupPipelineState()
 	{
-		UINT slot = 0;
-		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
-		if (m_mesh_data->HasVertexElement(VET_Position))
-		{
-			inputElements.push_back({ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-		}
-		if (m_mesh_data->HasVertexElement(VET_Color))
-		{
-			inputElements.push_back({ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-		}
-		if (m_mesh_data->HasVertexElement(VET_Texcoord))
-		{
-			inputElements.push_back({ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-		}
-		if (m_mesh_data->HasVertexElement(VET_Normal))
-		{
-			inputElements.push_back({ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot++, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 });
-		}
-
 		m_PipelineState.SetRootSignature(m_RootSignature);
 		m_PipelineState.SetRasterizerState(FPipelineState::RasterizerDefault);
 		m_PipelineState.SetBlendState(FPipelineState::BlendTraditional);
 		m_PipelineState.SetDepthStencilState(FPipelineState::DepthStateReadWrite);
+
+		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
+		m_Scene->GetFirstMesh()->GetMeshLayout(inputElements);
 		Assert(inputElements.size() > 0);
 		m_PipelineState.SetInputLayout((UINT)inputElements.size(), &inputElements[0]);
 		m_PipelineState.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
@@ -180,8 +146,6 @@ private:
 
 		CommandContext.SetConstantArray(0, sizeof(m_uboVS) / 4, &m_uboVS);
 
-		CommandContext.SetDynamicDescriptor(1, 0, m_Texture.GetSRV());
-		
 		RenderWindow& renderWindow = RenderWindow::Get();
 		FColorBuffer& BackBuffer = renderWindow.GetBackBuffer();
 		// Indicate that the back buffer will be used as a render target.
@@ -194,15 +158,13 @@ private:
 		CommandContext.ClearColor(BackBuffer);
 		CommandContext.ClearDepth(g_SceneDepthZ);
 		CommandContext.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		for (int i = 0, slot = 0; i < VET_Max; ++i)
+
+		FTexture* Texture = m_Scene->GetFirstMesh()->GetTexture(0, 0);
+		if (Texture)
 		{
-			if (m_mesh_data->HasVertexElement(VertexElementType(i)))
-			{
-				CommandContext.SetVertexBuffer(slot++, m_VertexBuffer[i].VertexBufferView());
-			}
+			CommandContext.SetDynamicDescriptor(1, 0, Texture->GetSRV());
 		}
-		CommandContext.SetIndexBuffer(m_IndexBuffer.IndexBufferView());
-		CommandContext.DrawIndexed(m_IndexBuffer.GetElementCount());
+		m_Renderer->Draw(m_Scene, CommandContext, false);
 
 		CommandContext.TransitionResource(BackBuffer, D3D12_RESOURCE_STATE_PRESENT, true);
 	}
@@ -221,17 +183,13 @@ private:
 	ComPtr<ID3DBlob> m_vertexShader;
 	ComPtr<ID3DBlob> m_pixelShader;
 
-	FGpuBuffer m_VertexBuffer[VET_Max];
-	FGpuBuffer m_IndexBuffer;
-
-	FTexture m_Texture;
-
 	Vector3f m_ClearColor = Vector3f(0.5f, 0.58f, 0.8f);
 	float m_elapsedTime = 0;
 	std::chrono::high_resolution_clock::time_point tStart, tEnd;
 
 	MeshData* m_mesh_data;
 	Scene* m_Scene;
+	Renderer* m_Renderer;
 };
 
 int main()

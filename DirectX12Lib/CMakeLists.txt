@@ -43,6 +43,7 @@
 	include/UserMarkers.h
 	include/GLTFLoader.h
 	include/Scene.h
+	include/Renderer.h
 )
 
 set(SOURCES
@@ -87,6 +88,7 @@ set(SOURCES
 	src/UserMarkers.cpp
 	src/GLTFLoader.cpp
 	src/Scene.cpp
+	src/Renderer.cpp
 )
 
 set( IMGUI_HEADERS
